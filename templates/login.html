@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="login-wrap">
+  <form class="login-card" method="POST">
+    <div class="brand"><span class="dot"></span>Kho Xe Đạp</div>
+    <p class="login-sub">Đăng nhập quản lý</p>
+    <label>Tài khoản</label>
+    <input type="text" name="username" required autofocus>
+    <label>Mật khẩu</label>
+    <input type="password" name="password" required>
+    <button type="submit">Đăng nhập</button>
+    <a class="back-link" href="{{ url_for('catalog') }}">← Quay lại trang xem hàng</a>
+  </form>
+</div>
+{% endblock %}

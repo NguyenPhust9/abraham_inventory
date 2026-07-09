@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+  .card {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(20, 20, 20, 0.08);
+  }
+
+  .product-modal {
+    width: min(860px, calc(100% - 28px));
+    border: 0;
+    border-radius: 22px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .product-modal::backdrop {
+    background: rgba(20, 20, 20, 0.48);
+    backdrop-filter: blur(2px);
+  }
+
+  .modal-box {
+    background: #fffefa;
+    border: 1px solid #ddd6c7;
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(20, 20, 20, 0.28);
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid #e6dfd0;
+    background: #f8f5ed;
+  }
+
+  .modal-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 900;
+    color: #13201a;
+  }
+
+  .modal-sub {
+    margin-top: 6px;
+    color: #6f6a5f;
+    font-size: 14px;
+  }
+
+  .modal-close {
+    width: 42px;
+    height: 42px;
+    border: 1px solid #ddd6c7;
+    border-radius: 999px;
+    background: #fffefa;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    color: #1f2a24;
+  }
+
+  .modal-body {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .modal-image-wrap {
+    border: 1px solid #ddd6c7;
+    border-radius: 18px;
+    background: #f8f5ed;
+    overflow: hidden;
+    min-height: 230px;
+    display: grid;
+    place-items: center;
+  }
+
+  .modal-image {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .modal-no-image {
+    color: #9a9386;
+    font-weight: 800;
+  }
+
+  .modal-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .modal-stat {
+    border: 1px solid #e6dfd0;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .modal-stat-label {
+    font-size: 12px;
+    color: #777064;
+    margin-bottom: 4px;
+  }
+
+  .modal-stat-value {
+    font-size: 17px;
+    font-weight: 900;
+    color: #13201a;
+  }
+
+  .variant-title {
+    font-size: 15px;
+    font-weight: 900;
+    margin: 0 0 10px;
+  }
+
+  .variant-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .variant-row {
+    display: grid;
+    grid-template-columns: 30px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #eee7d8;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .variant-color {
+    font-weight: 850;
+    color: #111c17;
+  }
+
+  .variant-code {
+    color: #7c7568;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  .copy-btn,
+  .copy-all-btn {
+    border: 1px solid #ddd6c7;
+    background: #f8f5ed;
+    color: #1f2a24;
+    border-radius: 999px;
+    min-height: 34px;
+    padding: 0 12px;
+    cursor: pointer;
+    font-weight: 850;
+    font-size: 13px;
+  }
+
+  .copy-all-btn {
+    background: #1f2a24;
+    color: #fff;
+    border-color: #1f2a24;
+    margin-top: 14px;
+  }
+
+  .modal-stock {
+    white-space: nowrap;
+  }
+
+  .modal-note {
+    margin-top: 12px;
+    color: #7c7568;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 760px) {
+    .modal-body {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .variant-row {
+      grid-template-columns: 30px 1fr auto;
+    }
+
+    .copy-btn {
+      grid-column: 2 / -1;
+      width: 100%;
+    }
+  }
+</style>
+
+<header>
+  <div class="brandrow">
+    <div class="brand"><span class="dot"></span>Kho Xe Đạp</div>
+    <a class="stamp-link" href="{{ url_for('admin_login') }}">Quản lý</a>
+  </div>
+
+  <div class="controls">
+    <div class="searchwrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/>
+        <path d="M21 21l-4.3-4.3"/>
+      </svg>
+      <input id="search" type="text" placeholder="Tìm theo tên xe, mã hàng, màu…" autocomplete="off">
+    </div>
+
+    <div class="pills" id="catpills"></div>
+  </div>
+</header>
+
+<main>
+  <div class="summary">
+    <span id="summaryText"></span>
+    <span id="summaryStock"></span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="empty" id="emptyState" style="display:none;">
+    Không tìm thấy sản phẩm phù hợp.
+  </div>
+</main>
+
+<dialog id="productModal" class="product-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title" id="modalTitle">Chi tiết sản phẩm</h2>
+        <div class="modal-sub" id="modalSub"></div>
+      </div>
+
+      <button type="button" class="modal-close" id="modalClose">×</button>
+    </div>
+
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</dialog>
+
+<footer>Giá "Liên hệ" nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.</footer>
+
+<script src="{{ url_for('static', filename='catalog.js') }}?v=3"></script>
+
+{% endblock %}
