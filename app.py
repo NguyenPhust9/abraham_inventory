@@ -27,10 +27,20 @@ app.config["SECRET_KEY"] = SECRET_KEY
 
 # ---------- Database ----------
 Base = declarative_base()
-engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False}
-)
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
+else:
+    engine = create_engine(
+        f"sqlite:///{DB_PATH}",
+        connect_args={"check_same_thread": False}
+    )
 SessionLocal = sessionmaker(bind=engine)
 
 
@@ -99,10 +109,11 @@ def ensure_columns():
         conn.commit()
 
 
-try:
-    ensure_columns()
-except Exception:
-    pass
+if engine.dialect.name == "sqlite":
+    try:
+        ensure_columns()
+    except Exception:
+        pass
 
 
 # ---------- Auth ----------
