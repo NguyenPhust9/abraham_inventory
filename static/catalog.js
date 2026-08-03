@@ -50,6 +50,13 @@ const els = {
   modalClose: document.getElementById('modalClose'),
 };
 
+// Dong bo trang thai loc voi checkbox tren giao dien ngay tu dau,
+// tranh viec checkbox hien tick san (checked trong HTML) nhung
+// bien onlyInStock van la false cho den khi nguoi dung bam doi.
+if (els.onlyStock) {
+  onlyInStock = els.onlyStock.checked;
+}
+
 function normalizeModelName(modelName) {
   if (!modelName) return '';
 
