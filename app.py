@@ -549,7 +549,9 @@ def admin_import():
 
     has_name = "Tên hàng hóa" in df.columns
     has_category = "Loại hàng hóa" in df.columns
-    has_unit = "Đơn vị tính" in df.columns or "Đơn vị tính chính" in df.columns
+    unit_col = "Đơn vị tính" if "Đơn vị tính" in df.columns else (
+        "Đơn vị tính chính" if "Đơn vị tính chính" in df.columns else None
+    )
     has_stock = "Số lượng tồn" in df.columns
     has_reserved = "SL đã đặt chưa giao" in df.columns
     has_price = "Đơn giá bán" in df.columns
@@ -559,47 +561,62 @@ def admin_import():
     db = SessionLocal()
     added, updated, skipped = 0, 0, 0
 
+    BATCH_SIZE = 1000
+
     try:
-        for _, row in df.iterrows():
+        # Lay toan bo (id, code) hien co 1 lan duy nhat, khong load ca
+        # object de tiet kiem bo nho va thoi gian query.
+        existing_by_code = {
+            code: pid for pid, code in db.query(Product.id, Product.code).all()
+        }
+
+        to_insert = []
+        to_update = []
+
+        for row in df.itertuples(index=False):
+            row = dict(zip(df.columns, row))
+
             code = str(row["Mã hàng hóa"]).strip()
 
             if not code or code == "0":
                 continue
 
-            p = db.query(Product).filter_by(code=code).first()
+            existing_id = existing_by_code.get(code)
 
-            if p:
+            if existing_id:
                 # San pham da co: chi cap nhat cot nao co trong file,
                 # cot khong co trong file thi giu nguyen du lieu cu.
+                data = {"id": existing_id}
+
                 if has_name:
                     name = str(row["Tên hàng hóa"]).strip()
                     if name and name != "0":
                         model, color = split_model_color(name)
-                        p.model = model
-                        p.color = color
+                        data["model"] = model
+                        data["color"] = color
 
                 if has_category:
                     category = str(row.get("Loại hàng hóa", "")).strip()
                     if category and category != "0":
-                        p.category = category
+                        data["category"] = category
 
-                if has_unit:
-                    unit_col = "Đơn vị tính" if "Đơn vị tính" in df.columns else "Đơn vị tính chính"
+                if unit_col:
                     unit = str(row.get(unit_col, "")).strip()
                     if unit and unit != "0":
-                        p.unit = unit
+                        data["unit"] = unit
 
                 if has_stock:
-                    p.stock = safe_int(row.get("Số lượng tồn", 0))
+                    data["stock"] = safe_int(row.get("Số lượng tồn", 0))
 
                 if has_reserved:
-                    p.reserved = safe_int(row.get("SL đã đặt chưa giao", 0))
+                    data["reserved"] = safe_int(row.get("SL đã đặt chưa giao", 0))
 
                 if has_price:
                     price_value = safe_float(row.get("Đơn giá bán"))
                     if price_value is not None:
-                        p.price = price_value
+                        data["price"] = price_value
 
+                to_update.append(data)
                 updated += 1
 
             else:
@@ -616,29 +633,46 @@ def admin_import():
 
                 model, color = split_model_color(name)
 
-                db.add(Product(
-                    code=code,
-                    model=model,
-                    color=color,
-                    category=str(row.get("Loại hàng hóa", "")).strip() if has_category else "",
-                    unit=(
-                        str(row.get(
-                            "Đơn vị tính" if "Đơn vị tính" in df.columns else "Đơn vị tính chính",
-                            "Chiếc",
-                        )).strip() or "Chiếc"
-                    ) if has_unit else "Chiếc",
-                    stock=safe_int(row.get("Số lượng tồn", 0)) if has_stock else 0,
-                    reserved=safe_int(row.get("SL đã đặt chưa giao", 0)) if has_reserved else 0,
-                    price=safe_float(row.get("Đơn giá bán")) if has_price else None,
-                ))
+                to_insert.append({
+                    "code": code,
+                    "model": model,
+                    "color": color,
+                    "category": str(row.get("Loại hàng hóa", "")).strip() if has_category else "",
+                    "unit": (str(row.get(unit_col, "Chiếc")).strip() or "Chiếc") if unit_col else "Chiếc",
+                    "stock": safe_int(row.get("Số lượng tồn", 0)) if has_stock else 0,
+                    "reserved": safe_int(row.get("SL đã đặt chưa giao", 0)) if has_reserved else 0,
+                    "price": safe_float(row.get("Đơn giá bán")) if has_price else None,
+                })
                 added += 1
 
-        db.commit()
+            # Flush theo batch de tranh giu transaction qua lon trong bo nho.
+            if len(to_insert) >= BATCH_SIZE:
+                db.bulk_insert_mappings(Product, to_insert)
+                db.commit()
+                to_insert.clear()
+
+            if len(to_update) >= BATCH_SIZE:
+                db.bulk_update_mappings(Product, to_update)
+                db.commit()
+                to_update.clear()
+
+        # Flush phan con lai.
+        if to_insert:
+            db.bulk_insert_mappings(Product, to_insert)
+            db.commit()
+
+        if to_update:
+            db.bulk_update_mappings(Product, to_update)
+            db.commit()
 
         message = f"Nhập xong: thêm mới {added}, cập nhật {updated}."
         if skipped:
             message += f" Bỏ qua {skipped} dòng thiếu tên hàng."
         flash(message)
+
+    except Exception as e:
+        db.rollback()
+        flash(f"Lỗi khi nhập dữ liệu: {e}")
 
     finally:
         db.close()
