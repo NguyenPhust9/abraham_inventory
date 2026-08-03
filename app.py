@@ -1,5 +1,7 @@
 import os
 import re
+import cloudinary  # type: ignore
+import cloudinary.uploader  # type: ignore
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash  # type: ignore
@@ -20,7 +22,16 @@ DB_PATH = os.path.join(BASE_DIR, "shop.db")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "bike123")
 SECRET_KEY = os.environ.get("SECRET_KEY", "doi-chuoi-bi-mat-nay-truoc-khi-deploy")
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
 
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET,
+    secure=True,
+)
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
 
@@ -200,18 +211,18 @@ def save_product_image(file, product_id):
     if not file or not file.filename:
         return ""
 
-    filename = secure_filename(file.filename)
-    _, ext = os.path.splitext(filename)
-
-    if not ext:
-        ext = ".jpg"
-
-    save_name = f"product_{product_id}{ext.lower()}"
-    path = os.path.join(IMAGE_UPLOAD_DIR, save_name)
-    file.save(path)
-
-    return save_name
-
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            folder="abraham_inventory/products",
+            public_id=f"product_{product_id}",
+            overwrite=True,
+            resource_type="image",
+        )
+        return result.get("secure_url", "")
+    except Exception as e:
+        print(f"Loi upload Cloudinary: {e}")
+        return ""
 
 def seed_if_empty():
     db = SessionLocal()
@@ -269,13 +280,7 @@ def api_products():
             d["original_model"] = p.model
             d["model"] = normalize_model_name(p.model)
 
-            if p.image_filename:
-                d["image_url"] = url_for(
-                    "static",
-                    filename=f"uploads/{p.image_filename}"
-                )
-            else:
-                d["image_url"] = None
+            d["image_url"] = p.image_filename if p.image_filename else None
 
             out.append(d)
 
@@ -470,7 +475,34 @@ def admin_edit_product(product_id):
 
     return redirect(url_for("admin_dashboard"))
 
+@app.route("/admin/products/<int:product_id>/delete-image", methods=["POST"])
+@login_required
+def admin_delete_product_image(product_id):
+    db = SessionLocal()
+    try:
+        p = db.query(Product).get(product_id)
 
+        if not p:
+            flash("Không tìm thấy sản phẩm.")
+            return redirect(url_for("admin_dashboard"))
+
+        if p.image_filename:
+            try:
+                public_id = f"abraham_inventory/products/product_{p.id}"
+                cloudinary.uploader.destroy(public_id, resource_type="image")
+            except Exception as e:
+                print(f"Loi xoa anh Cloudinary: {e}")
+
+            p.image_filename = ""
+            db.commit()
+            flash("Đã xóa ảnh sản phẩm.")
+        else:
+            flash("Sản phẩm này chưa có ảnh.")
+
+    finally:
+        db.close()
+
+    return redirect(url_for("admin_dashboard"))
 @app.route("/admin/products/<int:product_id>/delete", methods=["POST"])
 @login_required
 def admin_delete_product(product_id):
@@ -507,21 +539,21 @@ def admin_import():
         flash(f"Không đọc được file: {e}")
         return redirect(url_for("admin_dashboard"))
 
-    required_cols = {
-        "Mã hàng hóa",
-        "Tên hàng hóa",
-        "Loại hàng hóa",
-        "Số lượng tồn"
-    }
-
-    if not required_cols.issubset(set(df.columns)):
-        flash("File thiếu cột bắt buộc: Mã hàng hóa, Tên hàng hóa, Loại hàng hóa, Số lượng tồn.")
+  if "Mã hàng hóa" not in df.columns:
+        flash("File thiếu cột bắt buộc: Mã hàng hóa.")
         return redirect(url_for("admin_dashboard"))
+
+    has_name = "Tên hàng hóa" in df.columns
+    has_category = "Loại hàng hóa" in df.columns
+    has_unit = "Đơn vị tính" in df.columns or "Đơn vị tính chính" in df.columns
+    has_stock = "Số lượng tồn" in df.columns
+    has_reserved = "SL đã đặt chưa giao" in df.columns
+    has_price = "Đơn giá bán" in df.columns
 
     df = df.fillna(0)
 
     db = SessionLocal()
-    added, updated = 0, 0
+    added, updated, skipped = 0, 0, 0
 
     try:
         for _, row in df.iterrows():
@@ -530,39 +562,79 @@ def admin_import():
             if not code or code == "0":
                 continue
 
-            name = str(row["Tên hàng hóa"]).strip()
-            model, color = split_model_color(name)
-
-            reserved = safe_int(row.get("SL đã đặt chưa giao", 0))
-            stock = safe_int(row.get("Số lượng tồn", 0))
-            category = str(row.get("Loại hàng hóa", "")).strip()
-            unit = str(row.get("Đơn vị tính", "Chiếc")).strip() or "Chiếc"
-
             p = db.query(Product).filter_by(code=code).first()
 
             if p:
-                p.model = model
-                p.color = color
-                p.category = category
-                p.unit = unit
-                p.stock = stock
-                p.reserved = reserved
+                # San pham da co: chi cap nhat cot nao co trong file,
+                # cot khong co trong file thi giu nguyen du lieu cu.
+                if has_name:
+                    name = str(row["Tên hàng hóa"]).strip()
+                    if name and name != "0":
+                        model, color = split_model_color(name)
+                        p.model = model
+                        p.color = color
+
+                if has_category:
+                    category = str(row.get("Loại hàng hóa", "")).strip()
+                    if category and category != "0":
+                        p.category = category
+
+                if has_unit:
+                    unit_col = "Đơn vị tính" if "Đơn vị tính" in df.columns else "Đơn vị tính chính"
+                    unit = str(row.get(unit_col, "")).strip()
+                    if unit and unit != "0":
+                        p.unit = unit
+
+                if has_stock:
+                    p.stock = safe_int(row.get("Số lượng tồn", 0))
+
+                if has_reserved:
+                    p.reserved = safe_int(row.get("SL đã đặt chưa giao", 0))
+
+                if has_price:
+                    price_value = safe_float(row.get("Đơn giá bán"))
+                    if price_value is not None:
+                        p.price = price_value
+
                 updated += 1
+
             else:
+                # San pham chua co: bat buoc phai co ten de tao moi.
+                if not has_name:
+                    skipped += 1
+                    continue
+
+                name = str(row["Tên hàng hóa"]).strip()
+
+                if not name or name == "0":
+                    skipped += 1
+                    continue
+
+                model, color = split_model_color(name)
+
                 db.add(Product(
                     code=code,
                     model=model,
                     color=color,
-                    category=category,
-                    unit=unit,
-                    stock=stock,
-                    reserved=reserved,
-                    price=None,
+                    category=str(row.get("Loại hàng hóa", "")).strip() if has_category else "",
+                    unit=(
+                        str(row.get(
+                            "Đơn vị tính" if "Đơn vị tính" in df.columns else "Đơn vị tính chính",
+                            "Chiếc",
+                        )).strip() or "Chiếc"
+                    ) if has_unit else "Chiếc",
+                    stock=safe_int(row.get("Số lượng tồn", 0)) if has_stock else 0,
+                    reserved=safe_int(row.get("SL đã đặt chưa giao", 0)) if has_reserved else 0,
+                    price=safe_float(row.get("Đơn giá bán")) if has_price else None,
                 ))
                 added += 1
 
         db.commit()
-        flash(f"Nhập xong: thêm mới {added}, cập nhật {updated}.")
+
+        message = f"Nhập xong: thêm mới {added}, cập nhật {updated}."
+        if skipped:
+            message += f" Bỏ qua {skipped} dòng thiếu tên hàng."
+        flash(message)
 
     finally:
         db.close()
