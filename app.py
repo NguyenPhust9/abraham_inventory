@@ -224,6 +224,7 @@ def save_product_image(file, product_id):
         print(f"Loi upload Cloudinary: {e}")
         return ""
 
+
 def seed_if_empty():
     db = SessionLocal()
     try:
@@ -475,6 +476,7 @@ def admin_edit_product(product_id):
 
     return redirect(url_for("admin_dashboard"))
 
+
 @app.route("/admin/products/<int:product_id>/delete-image", methods=["POST"])
 @login_required
 def admin_delete_product_image(product_id):
@@ -503,6 +505,8 @@ def admin_delete_product_image(product_id):
         db.close()
 
     return redirect(url_for("admin_dashboard"))
+
+
 @app.route("/admin/products/<int:product_id>/delete", methods=["POST"])
 @login_required
 def admin_delete_product(product_id):
@@ -539,7 +543,7 @@ def admin_import():
         flash(f"Không đọc được file: {e}")
         return redirect(url_for("admin_dashboard"))
 
-  if "Mã hàng hóa" not in df.columns:
+    if "Mã hàng hóa" not in df.columns:
         flash("File thiếu cột bắt buộc: Mã hàng hóa.")
         return redirect(url_for("admin_dashboard"))
 
