@@ -31,6 +31,8 @@ const COLOR_MAP = [
 
 let PRODUCTS = [];
 let activeCat = 'Tất cả';
+let onlyInStock = false;
+let sortPriceOrder = '';
 
 const els = {
   search: document.getElementById('search'),
@@ -39,6 +41,8 @@ const els = {
   empty: document.getElementById('emptyState'),
   summaryText: document.getElementById('summaryText'),
   summaryStock: document.getElementById('summaryStock'),
+  onlyStock: document.getElementById('onlyStock'),
+  sortPrice: document.getElementById('sortPrice'),
   modal: document.getElementById('productModal'),
   modalTitle: document.getElementById('modalTitle'),
   modalSub: document.getElementById('modalSub'),
@@ -430,13 +434,28 @@ function render() {
   const filtered = PRODUCTS.filter(p => {
     const matchesCat = activeCat === 'Tất cả' || p.category === activeCat;
     const matchesQ = matchesSearch(p, q);
+    const matchesStock = !onlyInStock || Number(p.available || 0) > 0;
 
-    return matchesCat && matchesQ;
+    return matchesCat && matchesQ && matchesStock;
   });
 
-  const groups = groupByModel(filtered).sort((a, b) => {
-    return a.model.localeCompare(b.model, 'vi');
-  });
+  const groups = groupByModel(filtered);
+
+  if (sortPriceOrder === 'asc' || sortPriceOrder === 'desc') {
+    groups.sort((a, b) => {
+      const priceA = getGroupPrice(a.variants);
+      const priceB = getGroupPrice(b.variants);
+
+      // Sản phẩm chưa có giá ("Liên hệ") luôn xếp cuối, bất kể chiều sắp xếp
+      if (priceA === null && priceB === null) return 0;
+      if (priceA === null) return 1;
+      if (priceB === null) return -1;
+
+      return sortPriceOrder === 'asc' ? priceA - priceB : priceB - priceA;
+    });
+  } else {
+    groups.sort((a, b) => a.model.localeCompare(b.model, 'vi'));
+  }
 
   els.grid.innerHTML = '';
   els.empty.style.display = groups.length ? 'none' : 'block';
@@ -546,6 +565,20 @@ async function load() {
 
 if (els.search) {
   els.search.addEventListener('input', render);
+}
+
+if (els.onlyStock) {
+  els.onlyStock.addEventListener('change', () => {
+    onlyInStock = els.onlyStock.checked;
+    render();
+  });
+}
+
+if (els.sortPrice) {
+  els.sortPrice.addEventListener('change', () => {
+    sortPriceOrder = els.sortPrice.value;
+    render();
+  });
 }
 
 if (els.modalClose) {

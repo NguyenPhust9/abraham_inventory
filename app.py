@@ -680,6 +680,76 @@ def admin_import():
     return redirect(url_for("admin_dashboard"))
 
 
+@app.route("/admin/import-price", methods=["POST"])
+@login_required
+def admin_import_price():
+    """
+    Nhap gia rieng, sieu nhanh.
+
+    Chi cap nhat cot 'Đơn giá bán' theo 'Mã hàng hóa', khong dung ORM
+    (khong bulk_update_mappings) ma dung SQL thuan + executemany trong
+    1 transaction duy nhat. Voi vai nghin dong, cach nay chi mat
+    duoi 1 giay thay vi vai chuc giay nhu import day du.
+    """
+    file = request.files.get("file")
+
+    if not file or file.filename == "":
+        flash("Chưa chọn file để nhập giá.")
+        return redirect(url_for("admin_dashboard"))
+
+    try:
+        if file.filename.lower().endswith(".csv"):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file)
+    except Exception as e:
+        flash(f"Không đọc được file: {e}")
+        return redirect(url_for("admin_dashboard"))
+
+    if "Mã hàng hóa" not in df.columns or "Đơn giá bán" not in df.columns:
+        flash("File thiếu cột bắt buộc: Mã hàng hóa hoặc Đơn giá bán.")
+        return redirect(url_for("admin_dashboard"))
+
+    df = df[["Mã hàng hóa", "Đơn giá bán"]]
+
+    payload = []
+    skipped = 0
+
+    for row in df.itertuples(index=False):
+        code = str(row[0]).strip()
+        price = safe_float(row[1])
+
+        if not code or code == "0" or price is None:
+            skipped += 1
+            continue
+
+        payload.append({"code": code, "price": price})
+
+    if not payload:
+        flash("Không có dòng nào hợp lệ để cập nhật giá.")
+        return redirect(url_for("admin_dashboard"))
+
+    try:
+        # 1 transaction, executemany qua driver DB-API - nhanh hon rat
+        # nhieu so voi tao/sua object ORM tung dong.
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("UPDATE products SET price = :price WHERE code = :code"),
+                payload,
+            )
+            matched = result.rowcount if result.rowcount is not None else len(payload)
+
+        message = f"Đã cập nhật giá cho {matched} mã hàng."
+        if skipped:
+            message += f" Bỏ qua {skipped} dòng thiếu mã hoặc giá."
+        flash(message)
+
+    except Exception as e:
+        flash(f"Lỗi khi cập nhật giá: {e}")
+
+    return redirect(url_for("admin_dashboard"))
+
+
 if __name__ == "__main__":
     seed_if_empty()
     app.run(host="0.0.0.0", port=5000, debug=True)

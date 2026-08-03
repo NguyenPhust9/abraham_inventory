@@ -1,0 +1,216 @@
+HTTP lay token: 200
+
+LOI: Khong tim thay access token.
+HTTP lay token: 200
+LAY TOKEN THANH CONG
+HTTP lay danh sach kho: 200
+
+DA CHON KHO:
+HCM 3 - Kho HCM - Xe Đạp & Phụ Kiện
+Trang 1: HTTP 200
+Trang 2: HTTP 200
+Trang 3: HTTP 200
+Trang 4: HTTP 200
+Trang 5: HTTP 200
+Trang 6: HTTP 200
+Trang 7: HTTP 200
+Trang 8: HTTP 200
+Trang 9: HTTP 200
+Trang 10: HTTP 200
+Trang 11: HTTP 200
+Trang 12: HTTP 200
+Trang 13: HTTP 200
+Trang 14: HTTP 200
+Trang 15: HTTP 200
+Trang 16: HTTP 200
+Trang 17: HTTP 200
+Trang 18: HTTP 200
+Trang 19: HTTP 200
+Trang 20: HTTP 200
+Trang 21: HTTP 200
+Trang 22: HTTP 200
+Trang 23: HTTP 200
+Trang 24: HTTP 200
+Trang 25: HTTP 200
+Trang 26: HTTP 200
+Trang 27: HTTP 200
+Trang 28: HTTP 200
+Trang 29: HTTP 200
+Trang 30: HTTP 200
+Trang 31: HTTP 200
+Trang 32: HTTP 200
+Trang 33: HTTP 200
+Trang 34: HTTP 200
+
+Tong so dong ton kho AMIS: 1674
+Tong so ma hang AMIS: 1674
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3302, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 179, in _do_get
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\create.py", line 643, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 621, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: could not translate host name "jbak0hay123@aws-0-ap-southeast-2.pooler.supabase.com" to address: Non-recoverable failure in name resolution
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\sync_amis_to_supabase.py", line 574, in <module>
+    main()
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\sync_amis_to_supabase.py", line 570, in main
+    update_supabase(inventory_map)
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\sync_amis_to_supabase.py", line 455, in update_supabase
+    with engine.begin() as connection:
+         ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3242, in begin
+    with self.connect() as conn:
+         ^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3278, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 148, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2442, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3302, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 179, in _do_get
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\create.py", line 643, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 621, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Inventory_bike\abraham_inventory\venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not translate host name "jbak0hay123@aws-0-ap-southeast-2.pooler.supabase.com" to address: Non-recoverable failure in name resolution
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+HTTP lay token: 200
+LAY TOKEN THANH CONG
+HTTP lay danh sach kho: 200
+
+DA CHON KHO:
+HCM 3 - Kho HCM - Xe Đạp & Phụ Kiện
+Trang 1: HTTP 200
+Trang 2: HTTP 200
+Trang 3: HTTP 200
+Trang 4: HTTP 200
+Trang 5: HTTP 200
+Trang 6: HTTP 200
+Trang 7: HTTP 200
+Trang 8: HTTP 200
+Trang 9: HTTP 200
+Trang 10: HTTP 200
+Trang 11: HTTP 200
+Trang 12: HTTP 200
+Trang 13: HTTP 200
+Trang 14: HTTP 200
+Trang 15: HTTP 200
+Trang 16: HTTP 200
+Trang 17: HTTP 200
+Trang 18: HTTP 200
+Trang 19: HTTP 200
+Trang 20: HTTP 200
+Trang 21: HTTP 200
+Trang 22: HTTP 200
+Trang 23: HTTP 200
+Trang 24: HTTP 200
+Trang 25: HTTP 200
+Trang 26: HTTP 200
+Trang 27: HTTP 200
+Trang 28: HTTP 200
+Trang 29: HTTP 200
+Trang 30: HTTP 200
+Trang 31: HTTP 200
+Trang 32: HTTP 200
+Trang 33: HTTP 200
+Trang 34: HTTP 200
+
+Tong so dong ton kho AMIS: 1674
+Tong so ma hang AMIS: 1674
+
+========================================
+DONG BO SUPABASE THANH CONG
+Da cap nhat: 0
+Khong thay doi: 387
+Khong tim thay tren AMIS: 0
+========================================

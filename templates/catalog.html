@@ -201,10 +201,102 @@
       grid-template-columns: 30px 1fr auto;
     }
 
-    .copy-btn {
+   .copy-btn {
       grid-column: 2 / -1;
       width: 100%;
     }
+  }
+
+  .pills-wrap{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center;
+    gap:6px;
+    width:100%;
+  }
+
+  .pills{
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    overflow-x:auto;
+    scroll-behavior:smooth;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+    flex:1 1 auto;
+    min-width:0;
+  }
+
+  .pills::-webkit-scrollbar{
+    display:none;
+  }
+
+  .pills-arrow{
+    flex:0 0 auto !important;
+    width:34px !important;
+    height:34px !important;
+    max-width:34px;
+    border-radius:999px;
+    border:1px solid #ddd6c7;
+    background:#fffefa;
+    color:#1f2a24;
+    cursor:pointer;
+    font-size:18px;
+    line-height:1;
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    padding:0 !important;
+    margin:0 !important;
+  }
+
+  .pills-arrow:hover{
+    background:#f8f5ed;
+  }
+
+  .pills-arrow:disabled{
+    opacity:.35;
+    cursor:default;
+  }
+
+  .extra-filters{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+
+  .check-inline{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:13.5px;
+    color:#1f2a24;
+    cursor:pointer;
+    user-select:none;
+  }
+
+  .check-inline input{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+    accent-color:#1f2a24;
+  }
+
+  .sort-select{
+    padding:8px 14px;
+    border-radius:999px;
+    border:1px solid #ddd6c7;
+    background:#fffefa;
+    font-size:13px;
+    color:#1f2a24;
+    cursor:pointer;
+    font-family:inherit;
+  }
+
+  .sort-select:focus{
+    outline:none;
+    border-color:#1f2a24;
   }
 </style>
 
@@ -223,7 +315,24 @@
       <input id="search" type="text" placeholder="Tìm theo tên xe, mã hàng, màu…" autocomplete="off">
     </div>
 
-    <div class="pills" id="catpills"></div>
+    <div class="pills-wrap">
+      <button type="button" class="pills-arrow" id="pillsLeft" aria-label="Cuộn trái">‹</button>
+      <div class="pills" id="catpills"></div>
+      <button type="button" class="pills-arrow" id="pillsRight" aria-label="Cuộn phải">›</button>
+    </div>
+
+    <div class="extra-filters">
+      <label class="check-inline">
+        <input type="checkbox" id="onlyStock">
+        Chỉ hiện còn hàng
+      </label>
+
+      <select class="sort-select" id="sortPrice">
+        <option value="">Sắp xếp: Mặc định</option>
+        <option value="asc">Giá: Thấp → Cao</option>
+        <option value="desc">Giá: Cao → Thấp</option>
+      </select>
+    </div>
   </div>
 </header>
 
@@ -257,6 +366,39 @@
 
 <footer>Giá "Liên hệ" nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.</footer>
 
-<script src="{{ url_for('static', filename='catalog.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=4"></script>
+<script>
+  (function () {
+    const pills = document.getElementById("catpills");
+    const btnLeft = document.getElementById("pillsLeft");
+    const btnRight = document.getElementById("pillsRight");
 
+    if (!pills || !btnLeft || !btnRight) return;
+
+    const scrollAmount = 220;
+
+    btnLeft.addEventListener("click", function () {
+      pills.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+    });
+
+    btnRight.addEventListener("click", function () {
+      pills.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    });
+
+    function updateArrows() {
+      const maxScroll = pills.scrollWidth - pills.clientWidth;
+      btnLeft.disabled = pills.scrollLeft <= 2;
+      btnRight.disabled = pills.scrollLeft >= maxScroll - 2;
+    }
+
+    pills.addEventListener("scroll", updateArrows);
+    window.addEventListener("resize", updateArrows);
+
+    // Chờ catalog.js render xong danh sách pills rồi mới cập nhật trạng thái mũi tên
+    const observer = new MutationObserver(updateArrows);
+    observer.observe(pills, { childList: true });
+
+    updateArrows();
+  })();
+</script>
 {% endblock %}

@@ -2,1050 +2,472 @@
 {% block content %}
 
 <style>
-  :root {
-    --bg: #f5f7fb;
-    --card: #ffffff;
-    --text: #172033;
-    --muted: #6b7280;
-    --border: #e5e7eb;
-
-    --blue: #2563eb;
-    --blue-soft: #eff6ff;
-    --green: #16a34a;
-    --green-soft: #ecfdf3;
-    --red: #dc2626;
-    --red-soft: #fef2f2;
-    --orange: #f97316;
-    --orange-soft: #fff7ed;
-
-    --shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-    --radius: 18px;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  .admin-page {
-    min-height: 100vh;
-    padding: 20px;
-    background: var(--bg);
-    color: var(--text);
-  }
-
-  .admin-container {
-    max-width: 1320px;
-    margin: 0 auto;
-  }
-
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    flex-wrap: wrap;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 16px 18px;
-    box-shadow: var(--shadow);
-    margin-bottom: 16px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 24px;
-    font-weight: 900;
-  }
-
-  .brand-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-    display: grid;
-    place-items: center;
-    background: var(--blue-soft);
-    color: var(--blue);
-    font-size: 22px;
-  }
-
-  .admin-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: #f1f5f9;
-    color: #334155;
-    font-size: 12px;
-    font-weight: 800;
-  }
-
-  .top-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .link-btn {
-    min-height: 40px;
-    padding: 0 14px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    background: #fff;
-    color: var(--text);
-    border: 1px solid var(--border);
-    font-weight: 800;
-  }
-
-  .link-btn:hover {
-    border-color: var(--blue);
-    color: var(--blue);
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .stat-card {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 16px;
-    box-shadow: var(--shadow);
-    border-left: 5px solid var(--blue);
-  }
-
-  .stat-card.green {
-    border-left-color: var(--green);
-  }
-
-  .stat-card.orange {
-    border-left-color: var(--orange);
-  }
-
-  .stat-label {
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-
-  .stat-value {
-    font-size: 28px;
-    font-weight: 900;
-  }
-
-  .form-grid-wrap {
-    display: grid;
-    grid-template-columns: 0.8fr 1.2fr;
-    gap: 14px;
-    margin-bottom: 16px;
-  }
-
-  .panel {
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-    box-shadow: var(--shadow);
-  }
-
-  .panel h2 {
-    margin: 0;
-    font-size: 19px;
-  }
-
-  .hint {
-    margin: 6px 0 0;
-    color: var(--muted);
-    line-height: 1.5;
-    font-size: 14px;
-  }
-
-  input,
-  button {
-    font: inherit;
-  }
-
-  input[type="text"],
-  input[type="number"],
-  input:not([type]) {
-    width: 100%;
-    min-height: 42px;
-    padding: 9px 11px;
-    border-radius: 11px;
-    border: 1px solid var(--border);
-    outline: none;
-    background: #fff;
-  }
-
-  input:focus {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  }
-
-  input[type="file"] {
-    width: 100%;
-    min-height: 42px;
-    padding: 8px;
-    border-radius: 11px;
-    border: 1px dashed #cbd5e1;
-    background: #f8fafc;
-  }
-
-  button {
-    border: 0;
-    cursor: pointer;
-    border-radius: 11px;
-    min-height: 42px;
-    padding: 0 14px;
-    font-weight: 850;
-  }
-
-  .primary-btn {
-    background: var(--blue);
-    color: #fff;
-  }
-
-  .add-btn {
-    background: var(--green);
-    color: #fff;
-  }
-
-  .save-btn {
-    background: var(--green);
-    color: #fff;
-  }
-
-  .del-btn {
-    background: var(--red-soft);
-    color: var(--red);
-    border: 1px solid rgba(220, 38, 38, 0.18);
-  }
-
-  .cancel-btn {
-    background: #f1f5f9;
-    color: #334155;
-    border: 1px solid var(--border);
-  }
-
-  .inline-form {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-    margin-top: 14px;
-  }
-
-  .grid-form {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-    margin-top: 14px;
-  }
-
-  .grid-form .wide {
-    grid-column: span 2;
-  }
-
-  .list-panel {
-    padding: 0;
-    overflow: hidden;
-  }
-
-  .list-head {
-    padding: 16px 18px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .list-title h2 {
-    margin: 0;
-    font-size: 20px;
-  }
-
-  .search-box {
-    width: min(380px, 100%);
-  }
-
-  .table-wrap {
-    width: 100%;
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    min-width: 1120px;
-    border-collapse: separate;
-    border-spacing: 0;
-    background: #fff;
-  }
-
-  th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding: 12px 10px;
-    text-align: left;
-    font-size: 12px;
-    color: #475569;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  td {
-    padding: 11px 10px;
-    border-bottom: 1px solid #edf2f7;
-    vertical-align: middle;
-    background: #fff;
-  }
-
-  tbody tr:hover td {
-    background: #f8fafc;
-  }
-
-  .code-line {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .code-badge {
-    display: inline-flex;
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: var(--blue-soft);
-    color: var(--blue);
-    font-weight: 850;
-    white-space: nowrap;
-  }
-
-  .edit-btn {
-    background: var(--blue);
-    color: #fff;
-    min-height: 34px;
-    padding: 0 12px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 850;
-  }
-
-  .thumb-cell {
-    min-width: 130px;
-  }
-
-  .thumb-box {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-  }
-
-  .thumb {
-    width: 58px;
-    height: 58px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: #f1f5f9;
-    flex: 0 0 auto;
-  }
-
-  .placeholder {
-    display: inline-block;
-    position: relative;
-    background: #f1f5f9;
-  }
-
-  .placeholder::after {
-    content: "Ảnh";
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    color: #94a3b8;
-    font-size: 12px;
-    font-weight: 800;
-  }
-
-  .color-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: #f8fafc;
-    color: #334155;
-    border: 1px solid var(--border);
-    font-weight: 800;
-    white-space: nowrap;
-  }
-
-  .muted-text {
-    color: #94a3b8;
-    font-weight: 750;
-  }
-
-  .available-pill {
-    display: inline-flex;
-    min-width: 50px;
-    justify-content: center;
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: var(--green-soft);
-    color: var(--green);
-    font-weight: 900;
-  }
-
-  .num {
-    text-align: right;
-  }
-
-  .price-text {
-    font-weight: 900;
-    color: #0f172a;
-    white-space: nowrap;
-  }
-
-  .delete-cell form {
-    margin: 0;
-  }
-
-  .delete-cell button {
-    min-height: 36px;
-    font-size: 13px;
-  }
-
-  .empty-state {
-    padding: 30px;
-    text-align: center;
-    color: var(--muted);
-  }
-
-  .pagination-bar {
-    display: flex;
-    justify-content: center;
-    padding: 18px 12px;
-    gap: 8px;
-    flex-wrap: wrap;
-    background: #f8fafc;
-    border-top: 1px solid var(--border);
-  }
-
-  .pagination {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .page-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    padding: 10px 12px;
-    border-radius: 999px;
-    border: 1px solid transparent;
-    font-size: 13px;
-    font-weight: 800;
-    text-decoration: none;
-    color: #475569;
-    background: #fff;
-  }
-
-  .page-link:hover:not(.current):not(.disabled) {
-    border-color: rgba(37, 99, 235, 0.18);
-    color: var(--blue);
-  }
-
-  .page-link.current {
-    background: var(--blue);
-    color: #fff;
-    border-color: var(--blue);
-  }
-
-  .page-link.disabled {
-    opacity: 0.5;
-    cursor: default;
-    pointer-events: none;
-    background: #f8fafc;
-  }
-
-  .edit-dialog {
-    width: min(760px, calc(100% - 24px));
-    border: 0;
-    border-radius: 22px;
-    padding: 0;
-    box-shadow: 0 30px 90px rgba(15, 23, 42, 0.32);
-    overflow: hidden;
-  }
-
-  .edit-dialog::backdrop {
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(2px);
-  }
-
-  .modal-card {
-    background: #fff;
-    padding: 18px;
-  }
-
-  .modal-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 14px;
-    margin-bottom: 16px;
-  }
-
-  .modal-head h3 {
-    margin: 0;
-    font-size: 21px;
-  }
-
-  .close-btn {
-    background: #f1f5f9;
-    color: #334155;
-    border: 1px solid var(--border);
-    min-width: 42px;
-    padding: 0 12px;
-    font-size: 18px;
-  }
-
-  .modal-product-preview {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    background: #f8fafc;
-    margin-bottom: 14px;
-  }
-
-  .modal-product-preview .thumb {
-    width: 68px;
-    height: 68px;
-  }
-
-  .preview-name {
-    font-weight: 900;
-    font-size: 16px;
-  }
-
-  .preview-code {
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 750;
-    margin-top: 3px;
-  }
-
-  .edit-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .field label {
-    display: block;
-    font-size: 13px;
-    font-weight: 850;
-    color: #475569;
-    margin-bottom: 6px;
-  }
-
-  .field.full {
-    grid-column: 1 / -1;
-  }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-  }
-
-  @media (max-width: 980px) {
-    .form-grid-wrap {
-      grid-template-columns: 1fr;
+  .admin-page{ --stat-blue:#3d6b8c; --stat-blue-soft:#e7eff3; }
+
+  .admin-page{ padding:0; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .top-actions{ display:flex; gap:10px; }
+  .link-btn{
+    min-height:36px; padding:0 14px; border-radius:999px; display:inline-flex; align-items:center;
+    justify-content:center; text-decoration:none; background:var(--card); color:var(--ink);
+    border:1px solid var(--line); font-family:'IBM Plex Mono', monospace; font-size:12.5px; font-weight:600;
+  }
+  .link-btn:hover{ border-color:var(--ink-soft); }
+
+  .stats-grid{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+  .stat-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px 16px; border-left:4px solid var(--accent);
+  }
+  .stat-card.blue{ border-left-color:var(--stat-blue); }
+  .stat-card.green{ border-left-color:var(--good); }
+  .stat-label{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); margin-bottom:4px;
+  }
+  .stat-value{ font-family:'Space Grotesk', sans-serif; font-size:26px; font-weight:700; }
+
+  .form-grid-wrap{ display:grid; grid-template-columns:0.85fr 1.15fr; gap:14px; margin-bottom:16px; }
+
+  .inline-form{ display:grid; grid-template-columns:1fr auto; gap:10px; margin-top:12px; }
+  .grid-form{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; margin-top:12px; }
+  .grid-form .wide{ grid-column:span 2; }
+  .add-btn{ background:var(--good); }
+  .add-btn:hover{ background:#245038; }
+
+  .import-divider{
+    border:none; border-top:1px dashed var(--line); margin:14px 0;
+  }
+  .price-import-form{ display:grid; grid-template-columns:1fr auto; gap:10px; margin-top:10px; }
+  .price-btn{ background:var(--stat-blue); }
+  .price-btn:hover{ background:#2e5570; }
+
+  .list-panel{ padding:0; overflow:hidden; }
+  .list-head{
+    padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center;
+    justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .list-title h2{ margin:0; }
+  .search-box{ width:min(320px, 100%); }
+  .search-box input{
+    width:100%; padding:9px 12px; border-radius:999px; border:1px solid var(--line);
+    font-family:'Inter'; font-size:13.5px; outline:none;
+  }
+  .search-box input:focus{ border-color:var(--accent); }
+
+  table{ min-width:980px; }
+  th{ position:sticky; top:0; background:var(--card); z-index:1; }
+  th.num, td.num{ text-align:right; }
+  .code-line{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .code-badge{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600;
+    background:rgba(232,96,28,0.1); color:var(--accent); padding:4px 9px; border-radius:999px; white-space:nowrap;
+  }
+  .edit-btn{ background:var(--stat-blue); padding:6px 11px; font-size:12px; border-radius:999px; }
+  .edit-btn:hover{ background:#2e5570; }
+
+  .model-cell strong{ font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:14px; }
+  .color-pill{
+    font-family:'IBM Plex Mono', monospace; font-size:11.5px; font-weight:500;
+    background:var(--card); border:1px solid var(--chip-border); color:var(--ink-soft);
+    padding:4px 9px; border-radius:999px; white-space:nowrap;
+  }
+  .muted-text{ color:var(--ink-soft); font-size:12.5px; }
+  .price-text{ font-family:'IBM Plex Mono', monospace; font-weight:600; color:var(--ink); white-space:nowrap; }
+
+  .del-btn{ min-height:32px; font-size:12px; padding:0 12px; }
+.delete-cell{ display:flex; align-items:center; gap:8px; }
+.delete-cell form{ margin:0; display:inline; }
+  .empty-state{ padding:40px 20px; text-align:center; color:var(--ink-soft); font-family:'IBM Plex Mono', monospace; font-size:13px; }
+
+  .pagination-bar{
+    display:flex; justify-content:center; padding:14px 12px; gap:8px; flex-wrap:wrap;
+    border-top:1px solid var(--line); background:rgba(23,32,28,0.015);
+  }
+  .pagination{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
+  .page-link{
+    display:inline-flex; align-items:center; justify-content:center; min-width:36px; height:36px;
+    padding:0 10px; border-radius:999px; font-family:'IBM Plex Mono', monospace; font-size:12.5px;
+    font-weight:600; text-decoration:none; color:var(--ink-soft); background:var(--card); border:1px solid var(--line);
+  }
+  .page-link:hover:not(.current):not(.disabled){ border-color:var(--ink-soft); }
+  .page-link.current{ background:var(--ink); color:#f2f1ea; border-color:var(--ink); }
+  .page-link.disabled{ opacity:.45; pointer-events:none; }
+
+  /* ---- Modal (Sửa sản phẩm) ---- */
+  .edit-dialog{
+    width:min(720px, calc(100% - 24px)); border:0; border-radius:16px; padding:0;
+    box-shadow:0 30px 90px rgba(23,32,28,0.32); overflow:hidden;
+  }
+  .edit-dialog::backdrop{ background:rgba(23,32,28,0.45); backdrop-filter:blur(2px); }
+  .modal-card{ background:var(--card); padding:18px; }
+  .modal-head{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+    border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:14px;
+  }
+  .modal-head h3{ margin:0; font-family:'Space Grotesk'; font-size:18px; }
+  .close-btn{
+    background:transparent; color:var(--ink-soft); border:1px solid var(--line);
+    min-width:34px; height:34px; padding:0; font-size:17px; border-radius:999px;
+  }
+  .close-btn:hover{ border-color:var(--ink-soft); background:transparent; }
+
+  /* Khối quản lý ảnh trong modal */
+  .image-manager{
+    display:flex; align-items:center; gap:14px; padding:12px; border:1px solid var(--line);
+    border-radius:12px; background:rgba(23,32,28,0.02); margin-bottom:14px; flex-wrap:wrap;
+  }
+  .image-manager .thumb{ width:76px; height:76px; border-radius:10px; }
+  .image-manager .thumb.placeholder{ width:76px; height:76px; }
+  .image-manager-info{ flex:1; min-width:180px; }
+  .preview-name{ font-family:'Space Grotesk'; font-weight:600; font-size:15px; }
+  .preview-code{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
+  .del-img-btn{
+    background:var(--out-bg); color:var(--out); border:1px solid rgba(172,58,46,0.25);
+    padding:6px 12px; font-size:12px; border-radius:999px;
+  }
+  .del-img-btn:hover{ background:#efd2ce; }
+
+  .edit-form-grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  .field label{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); margin-bottom:5px;
+  }
+  .field.full{ grid-column:1 / -1; }
+  .modal-actions{
+    display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:12px;
+    border-top:1px solid var(--line);
+  }
+  .cancel-btn{ background:var(--card); color:var(--ink); border:1px solid var(--line); }
+  .cancel-btn:hover{ background:rgba(23,32,28,0.04); }
+
+  @media (max-width: 980px){
+    .form-grid-wrap{ grid-template-columns:1fr; }
+    .grid-form{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  }
+
+  @media (max-width: 720px){
+    .top-actions{ width:100%; }
+    .link-btn{ flex:1; }
+    .stats-grid, .grid-form{ grid-template-columns:1fr; }
+    .grid-form .wide{ grid-column:auto; }
+    .list-head{ flex-direction:column; align-items:stretch; }
+    .search-box{ width:100%; }
+    .table-wrap{ overflow:visible; }
+    table, thead, tbody, tr, td{ display:block; width:100%; min-width:0; }
+    thead{ display:none; }
+    tbody{ display:grid; gap:12px; padding:12px; background:rgba(23,32,28,0.02); }
+    tr{ background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    td{ display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center; padding:10px 12px; }
+    td::before{
+      content:attr(data-label); font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft);
     }
-
-    .grid-form {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 720px) {
-    .admin-page {
-      padding: 12px;
-    }
-
-    .brand {
-      font-size: 21px;
-    }
-
-    .top-actions {
-      width: 100%;
-    }
-
-    .link-btn {
-      flex: 1;
-    }
-
-    .stats-grid,
-    .inline-form,
-    .grid-form {
-      grid-template-columns: 1fr;
-    }
-
-    .grid-form .wide {
-      grid-column: auto;
-    }
-
-    .list-head {
-      display: grid;
-      grid-template-columns: 1fr;
-    }
-
-    .search-box {
-      width: 100%;
-    }
-
-    .table-wrap {
-      overflow: visible;
-    }
-
-    table,
-    thead,
-    tbody,
-    tr,
-    td {
-      display: block;
-      width: 100%;
-      min-width: 0;
-    }
-
-    thead {
-      display: none;
-    }
-
-    tbody {
-      display: grid;
-      gap: 12px;
-      padding: 12px;
-      background: #f8fafc;
-    }
-
-    tr {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-    }
-
-    td {
-      display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 8px;
-      align-items: center;
-      padding: 11px 12px;
-      border-bottom: 1px solid #edf2f7;
-    }
-
-    td::before {
-      content: attr(data-label);
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 800;
-    }
-
-    td:last-child {
-      border-bottom: 0;
-    }
-
-    .code-line {
-      justify-content: flex-start;
-    }
-
-    .num {
-      text-align: left;
-    }
-
-    .edit-form-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .field.full {
-      grid-column: auto;
-    }
-
-    .modal-actions {
-      display: grid;
-      grid-template-columns: 1fr;
-    }
-
-    .modal-actions button {
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 420px) {
-    td {
-      grid-template-columns: 1fr;
-    }
-
-    td::before {
-      margin-bottom: 2px;
-    }
-
-    .modal-product-preview {
-      align-items: flex-start;
-    }
+    .num{ text-align:left; }
+    .edit-form-grid{ grid-template-columns:1fr; }
+    .field.full{ grid-column:auto; }
+    .modal-actions{ display:grid; grid-template-columns:1fr; }
+    .price-import-form{ grid-template-columns:1fr; }
   }
 </style>
 
 <div class="admin-page">
-  <div class="admin-container">
 
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-icon">🚲</span>
-        Kho Xe Đạp
-        <span class="admin-tag">ADMIN</span>
-      </div>
+  <header class="topbar" style="margin-bottom:16px;">
+    <div class="brand">
+      <span class="dot"></span>
+      Kho Xe Đạp
+      <span class="admin-tag">ADMIN</span>
+    </div>
 
-      <div class="top-actions">
-        <a class="link-btn" href="{{ url_for('catalog') }}" target="_blank">Xem trang khách</a>
-        <a class="link-btn" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
-      </div>
-    </header>
+    <div class="top-actions">
+      <a class="link-btn" href="{{ url_for('catalog') }}" target="_blank">Xem trang khách</a>
+      <a class="link-btn" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
+    </div>
+  </header>
 
-    <section class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Tổng sản phẩm</div>
-        <div class="stat-value">{{ total_products }}</div>
-      </div>
+  <section class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-label">TỔNG SẢN PHẨM</div>
+      <div class="stat-value">{{ total_products }}</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">TỔNG TỒN KHO</div>
+      <div class="stat-value">{{ total_stock }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">CÓ THỂ BÁN</div>
+      <div class="stat-value">{{ total_available }}</div>
+    </div>
+  </section>
 
-      <div class="stat-card green">
-        <div class="stat-label">Tổng tồn kho</div>
-        <div class="stat-value">{{ total_stock }}</div>
-      </div>
+  <div class="form-grid-wrap">
 
-      <div class="stat-card orange">
-        <div class="stat-label">Có thể bán</div>
-        <div class="stat-value">{{ total_available }}</div>
-      </div>
+    <section class="panel">
+      <h2>Nhập dữ liệu hàng loạt</h2>
+      <p class="hint">Hỗ trợ Excel/CSV. Trùng mã hàng sẽ cập nhật, mã mới sẽ được thêm.</p>
+
+      <form method="POST" action="{{ url_for('admin_import') }}" enctype="multipart/form-data" class="inline-form">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+        <button type="submit">Nhập file</button>
+      </form>
+
+      <hr class="import-divider">
+
+      <h2 style="font-size:15px;">Cập nhật giá nhanh</h2>
+      <p class="hint">Chỉ cập nhật cột giá theo mã hàng, không đổi tên/tồn kho. Nhanh hơn nhiều với file lớn.</p>
+
+      <form method="POST" action="{{ url_for('admin_import_price') }}" enctype="multipart/form-data" class="price-import-form">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+        <button type="submit" class="price-btn">Cập nhật giá</button>
+      </form>
     </section>
 
-    <main>
-      <div class="form-grid-wrap">
+    <section class="panel">
+      <h2>Thêm sản phẩm mới</h2>
+      <p class="hint">Mỗi màu nên là một mã sản phẩm riêng để quản lý tồn kho chính xác.</p>
 
-        <section class="panel">
-          <h2>Nhập dữ liệu hàng loạt</h2>
-          <p class="hint">Hỗ trợ Excel/CSV. Trùng mã hàng sẽ cập nhật, mã mới sẽ được thêm.</p>
+      <form method="POST" action="{{ url_for('admin_add_product') }}" class="grid-form" enctype="multipart/form-data">
+        <input name="code" placeholder="Mã hàng hóa" required>
+        <input name="model" placeholder="Tên mẫu xe" required>
+        <input name="color" placeholder="Màu sản phẩm">
+        <input name="category" placeholder="Loại xe" list="cat-list">
 
-          <form method="POST" action="{{ url_for('admin_import') }}" enctype="multipart/form-data" class="inline-form">
-            <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
-            <button type="submit" class="primary-btn">Nhập file</button>
-          </form>
-        </section>
+        <input type="file" name="image" accept="image/*" class="wide">
 
-        <section class="panel">
-          <h2>Thêm sản phẩm mới</h2>
-          <p class="hint">Mỗi màu nên là một mã sản phẩm riêng để quản lý tồn kho chính xác.</p>
+        <datalist id="cat-list">
+          {% for c in categories %}
+            <option value="{{ c }}">
+          {% endfor %}
+        </datalist>
 
-          <form method="POST" action="{{ url_for('admin_add_product') }}" class="grid-form" enctype="multipart/form-data">
-            <input name="code" placeholder="Mã hàng hóa" required>
-            <input name="model" placeholder="Tên mẫu xe" required>
-            <input name="color" placeholder="Màu sản phẩm">
-            <input name="category" placeholder="Loại xe" list="cat-list">
+        <input name="stock" type="number" inputmode="numeric" placeholder="Tồn kho" value="0">
+        <input name="reserved" type="number" inputmode="numeric" placeholder="Đã đặt" value="0">
+        <input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá bán">
+        <button type="submit" class="add-btn">Thêm sản phẩm</button>
+      </form>
+    </section>
 
-            <input type="file" name="image" accept="image/*" class="wide">
+  </div>
 
-            <datalist id="cat-list">
-              {% for c in categories %}
-                <option value="{{ c }}">
-              {% endfor %}
-            </datalist>
-
-            <input name="stock" type="number" inputmode="numeric" placeholder="Tồn kho" value="0">
-            <input name="reserved" type="number" inputmode="numeric" placeholder="Đã đặt" value="0">
-            <input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá bán">
-            <button type="submit" class="add-btn">Thêm sản phẩm</button>
-          </form>
-        </section>
-
+  <section class="panel list-panel">
+    <div class="list-head">
+      <div class="list-title">
+        <h2>Danh sách sản phẩm</h2>
+        <p class="hint">Bấm Sửa để chỉnh thông tin và ảnh của từng mã hàng.</p>
       </div>
 
-      <section class="panel list-panel">
-        <div class="list-head">
-          <div class="list-title">
-            <h2>Danh sách sản phẩm</h2>
-            <p class="hint">Bấm nút Sửa trên từng sản phẩm để chỉnh mã, màu, ảnh, tồn kho và giá bán.</p>
-          </div>
+      <div class="search-box">
+        <input id="productSearch" type="text" placeholder="Tìm mã, mẫu xe, màu, loại...">
+      </div>
+    </div>
 
-          <div class="search-box">
-            <input id="productSearch" type="text" placeholder="Tìm mã, mẫu xe, màu, loại...">
-          </div>
-        </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mã hàng</th>
+            <th>Ảnh</th>
+            <th>Mẫu xe</th>
+            <th>Màu</th>
+            <th>Loại</th>
+            <th class="num">Tồn</th>
+            <th class="num">Đã đặt</th>
+            <th class="num">Có thể bán</th>
+            <th class="num">Giá</th>
+<th>Thao tác</th>          </tr>
+        </thead>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Mã hàng</th>
-                <th>Ảnh</th>
-                <th>Mẫu xe</th>
-                <th>Màu</th>
-                <th>Loại</th>
-                <th>Tồn</th>
-                <th>Đã đặt</th>
-                <th>Có thể bán</th>
-                <th>Giá</th>
-                <th>Xóa</th>
-              </tr>
-            </thead>
+        <tbody id="productTableBody">
+          {% for p in products %}
+          {% set img_url = p.image_filename if p.image_filename and p.image_filename.startswith('http')
+             else (url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else None) %}
 
-            <tbody id="productTableBody">
-              {% for p in products %}
-              <tr
-                class="product-row"
-                data-search="{{ p.code }} {{ p.model }} {{ p.color }} {{ p.category }}"
-              >
-                <td data-label="Mã hàng">
-                  <div class="code-line">
-                    <span class="code-badge">{{ p.code }}</span>
-                    <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')">
-                      Sửa
-                    </button>
+          <tr class="product-row" data-search="{{ p.code }} {{ p.model }} {{ p.color }} {{ p.category }}">
+
+            <td data-label="Mã hàng">
+              <div class="code-line">
+                <span class="code-badge">{{ p.code }}</span>
+              </div>
+
+              <dialog class="edit-dialog" id="editModal-{{ p.id }}">
+                <div class="modal-card">
+                  <div class="modal-head">
+                    <div>
+                      <h3>Sửa sản phẩm</h3>
+                      <p class="hint">Chỉnh thông tin riêng cho mã hàng này.</p>
+                    </div>
+                    <button type="button" class="close-btn" onclick="closeEditModal('{{ p.id }}')">×</button>
                   </div>
 
-                  <dialog class="edit-dialog" id="editModal-{{ p.id }}">
-                    <div class="modal-card">
-                      <div class="modal-head">
-                        <div>
-                          <h3>Sửa sản phẩm</h3>
-                          <p class="hint">Chỉnh thông tin riêng cho mã hàng này.</p>
-                        </div>
-
-                        <button type="button" class="close-btn" onclick="closeEditModal('{{ p.id }}')">
-                          ×
-                        </button>
-                      </div>
-
-                      <div class="modal-product-preview">
-                        {% if p.image_filename %}
-                          <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.model }}" class="thumb">
-                        {% else %}
-                          <span class="thumb placeholder"></span>
-                        {% endif %}
-
-                        <div>
-                          <div class="preview-name">{{ p.model }}</div>
-                          <div class="preview-code">Mã hàng: {{ p.code }}</div>
-                          <div class="preview-code">
-                            Màu:
-                            {% if p.color %}
-                              {{ p.color }}
-                            {% else %}
-                              Chưa có màu
-                            {% endif %}
-                          </div>
-                        </div>
-                      </div>
-
-                      <form
-                        method="POST"
-                        action="{{ url_for('admin_edit_product', product_id=p.id) }}"
-                        enctype="multipart/form-data"
-                      >
-                        <div class="edit-form-grid">
-
-                          <div class="field">
-                            <label>Mã hàng hóa</label>
-                            <input name="code" value="{{ p.code }}" required>
-                          </div>
-
-                          <div class="field">
-                            <label>Tên mẫu xe</label>
-                            <input name="model" value="{{ p.model }}" required>
-                          </div>
-
-                          <div class="field">
-                            <label>Màu sản phẩm</label>
-                            <input name="color" value="{{ p.color }}" placeholder="Ví dụ: Đỏ, Đen, Xanh dương">
-                          </div>
-
-                          <div class="field">
-                            <label>Loại xe</label>
-                            <input name="category" value="{{ p.category }}" list="cat-list">
-                          </div>
-
-                          <div class="field">
-                            <label>Tồn kho</label>
-                            <input name="stock" type="number" inputmode="numeric" value="{{ p.stock }}">
-                          </div>
-
-                          <div class="field">
-                            <label>Đã đặt</label>
-                            <input name="reserved" type="number" inputmode="numeric" value="{{ p.reserved }}">
-                          </div>
-
-                          <div class="field">
-                            <label>Giá bán</label>
-                            <input
-                              name="price"
-                              type="number"
-                              inputmode="numeric"
-                              step="1000"
-                              value="{{ p.price or '' }}"
-                              placeholder="Liên hệ"
-                            >
-                          </div>
-
-                          <div class="field">
-                            <label>Đổi ảnh sản phẩm</label>
-                            <input type="file" name="image" accept="image/*">
-                          </div>
-
-                        </div>
-
-                        <div class="modal-actions">
-                          <button type="button" class="cancel-btn" onclick="closeEditModal('{{ p.id }}')">
-                            Hủy
-                          </button>
-
-                          <button type="submit" class="save-btn">
-                            Lưu thay đổi
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  </dialog>
-                </td>
-
-                <td class="thumb-cell" data-label="Ảnh">
-                  <div class="thumb-box">
-                    {% if p.image_filename %}
-                      <img src="{{ url_for('static', filename='uploads/' + p.image_filename) }}" alt="{{ p.model }}" class="thumb">
+                  <div class="image-manager">
+                    {% if img_url %}
+                      <img src="{{ img_url }}" alt="{{ p.model }}" class="thumb">
                     {% else %}
                       <span class="thumb placeholder"></span>
                     {% endif %}
+
+                    <div class="image-manager-info">
+                      <div class="preview-name">{{ p.model }}</div>
+                      <div class="preview-code">Mã hàng: {{ p.code }}</div>
+                    </div>
+
+                    {% if img_url %}
+                    <form method="POST" action="{{ url_for('admin_delete_product_image', product_id=p.id) }}"
+                          onsubmit="return confirm('Xóa ảnh sản phẩm này? Ảnh sẽ bị xóa khỏi Cloudinary.');">
+                      <button type="submit" class="del-img-btn">Xóa ảnh</button>
+                    </form>
+                    {% endif %}
                   </div>
-                </td>
 
-                <td data-label="Mẫu xe">
-                  <strong>{{ p.model }}</strong>
-                </td>
+                  <form method="POST" action="{{ url_for('admin_edit_product', product_id=p.id) }}" enctype="multipart/form-data">
+                    <div class="edit-form-grid">
 
-                <td data-label="Màu">
-                  {% if p.color %}
-                    <span class="color-pill">{{ p.color }}</span>
-                  {% else %}
-                    <span class="muted-text">Chưa có màu</span>
-                  {% endif %}
-                </td>
+                      <div class="field">
+                        <label>Mã hàng hóa</label>
+                        <input name="code" value="{{ p.code }}" required>
+                      </div>
 
-                <td data-label="Loại">
-                  {% if p.category %}
-                    {{ p.category }}
-                  {% else %}
-                    <span class="muted-text">Chưa phân loại</span>
-                  {% endif %}
-                </td>
+                      <div class="field">
+                        <label>Tên mẫu xe</label>
+                        <input name="model" value="{{ p.model }}" required>
+                      </div>
 
-                <td data-label="Tồn" class="num">
-                  {{ p.stock }}
-                </td>
+                      <div class="field">
+                        <label>Màu sản phẩm</label>
+                        <input name="color" value="{{ p.color }}" placeholder="Ví dụ: Đỏ, Đen, Xanh dương">
+                      </div>
 
-                <td data-label="Đã đặt" class="num">
-                  {{ p.reserved }}
-                </td>
+                      <div class="field">
+                        <label>Loại xe</label>
+                        <input name="category" value="{{ p.category }}" list="cat-list">
+                      </div>
 
-                <td data-label="Có thể bán">
-                  <span class="available-pill">{{ p.available }}</span>
-                </td>
+                      <div class="field">
+                        <label>Tồn kho</label>
+                        <input name="stock" type="number" inputmode="numeric" value="{{ p.stock }}">
+                      </div>
 
-                <td data-label="Giá" class="num">
-                  {% if p.price %}
-                    <span class="price-text">{{ "{:,.0f}".format(p.price|float).replace(",", ".") }}đ</span>
-                  {% else %}
-                    <span class="muted-text">Liên hệ</span>
-                  {% endif %}
-                </td>
+                      <div class="field">
+                        <label>Đã đặt</label>
+                        <input name="reserved" type="number" inputmode="numeric" value="{{ p.reserved }}">
+                      </div>
 
-                <td data-label="Xóa" class="delete-cell">
-                  <form
-                    method="POST"
-                    action="{{ url_for('admin_delete_product', product_id=p.id) }}"
-                    onsubmit="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?');"
-                  >
-                    <button type="submit" class="del-btn">Xóa</button>
+                      <div class="field">
+                        <label>Giá bán</label>
+                        <input name="price" type="number" inputmode="numeric" step="1000" value="{{ p.price or '' }}" placeholder="Liên hệ">
+                      </div>
+
+                      <div class="field full">
+                        <label>{{ "Thay ảnh mới" if img_url else "Thêm ảnh sản phẩm" }}</label>
+                        <input type="file" name="image" accept="image/*">
+                      </div>
+
+                    </div>
+
+                    <div class="modal-actions">
+                      <button type="button" class="cancel-btn" onclick="closeEditModal('{{ p.id }}')">Hủy</button>
+                      <button type="submit" class="save-btn">Lưu thay đổi</button>
+                    </div>
                   </form>
-                </td>
-              </tr>
+                </div>
+              </dialog>
+            </td>
 
+            <td class="thumb-cell" data-label="Ảnh">
+              {% if img_url %}
+                <img src="{{ img_url }}" alt="{{ p.model }}" class="thumb">
               {% else %}
-              <tr>
-                <td colspan="10">
-                  <div class="empty-state">
-                    Chưa có sản phẩm nào. Hãy thêm sản phẩm mới hoặc nhập file Excel/CSV.
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="pagination-bar">
-          {% if total_pages > 1 %}
-          <nav class="pagination">
-            {% if page > 1 %}
-              <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1) }}">« Trước</a>
-            {% else %}
-              <span class="page-link disabled">« Trước</span>
-            {% endif %}
-
-            {% for num in range(1, total_pages + 1) %}
-              {% if num == page %}
-                <span class="page-link current">{{ num }}</span>
-              {% else %}
-                <a class="page-link" href="{{ url_for('admin_dashboard', page=num) }}">{{ num }}</a>
+                <span class="thumb placeholder"></span>
               {% endif %}
-            {% endfor %}
+            </td>
 
-            {% if page < total_pages %}
-              <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1) }}">Tiếp »</a>
-            {% else %}
-              <span class="page-link disabled">Tiếp »</span>
-            {% endif %}
-          </nav>
+            <td data-label="Mẫu xe" class="model-cell"><strong>{{ p.model }}</strong></td>
+
+            <td data-label="Màu">
+              {% if p.color %}
+                <span class="color-pill">{{ p.color }}</span>
+              {% else %}
+                <span class="muted-text">Chưa có màu</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Loại">
+              {% if p.category %}
+                {{ p.category }}
+              {% else %}
+                <span class="muted-text">Chưa phân loại</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Tồn" class="num">{{ p.stock }}</td>
+            <td data-label="Đã đặt" class="num">{{ p.reserved }}</td>
+
+            <td data-label="Có thể bán" class="num">
+              {% if p.available == 0 %}
+                <span class="stockbadge out">{{ p.available }}</span>
+              {% elif p.available <= 5 %}
+                <span class="stockbadge low">{{ p.available }}</span>
+              {% else %}
+                <span class="stockbadge good">{{ p.available }}</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Giá" class="num">
+              {% if p.price %}
+                <span class="price-text">{{ "{:,.0f}".format(p.price|float).replace(",", ".") }}đ</span>
+              {% else %}
+                <span class="muted-text">Liên hệ</span>
+              {% endif %}
+            </td>
+
+           <td data-label="Thao tác" class="delete-cell">
+  <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')">Sửa</button>
+  <form method="POST" action="{{ url_for('admin_delete_product', product_id=p.id) }}"
+        onsubmit="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?');" style="display:inline;">
+    <button type="submit" class="del-btn">Xóa</button>
+  </form>
+</td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="10">
+              <div class="empty-state">Chưa có sản phẩm nào. Hãy thêm sản phẩm mới hoặc nhập file Excel/CSV.</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-bar">
+      {% if total_pages > 1 %}
+      <nav class="pagination">
+        {% if page > 1 %}
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1) }}">‹</a>
+        {% else %}
+          <span class="page-link disabled">‹</span>
+        {% endif %}
+
+        {% for num in range(1, total_pages + 1) %}
+          {% if num == page %}
+            <span class="page-link current">{{ num }}</span>
+          {% else %}
+            <a class="page-link" href="{{ url_for('admin_dashboard', page=num) }}">{{ num }}</a>
           {% endif %}
-        </div>
-      </section>
-    </main>
+        {% endfor %}
 
-  </div>
+        {% if page < total_pages %}
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1) }}">›</a>
+        {% else %}
+          <span class="page-link disabled">›</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -1055,7 +477,6 @@
   if (productSearch) {
     productSearch.addEventListener("input", function () {
       const keyword = this.value.toLowerCase().trim();
-
       productRows.forEach(function (row) {
         const text = (row.dataset.search || row.innerText).toLowerCase();
         row.style.display = text.includes(keyword) ? "" : "none";
@@ -1065,24 +486,17 @@
 
   function openEditModal(productId) {
     const modal = document.getElementById("editModal-" + productId);
-
-    if (modal) {
-      modal.showModal();
-    }
+    if (modal) modal.showModal();
   }
 
   function closeEditModal(productId) {
     const modal = document.getElementById("editModal-" + productId);
-
-    if (modal) {
-      modal.close();
-    }
+    if (modal) modal.close();
   }
 
   document.querySelectorAll(".edit-dialog").forEach(function (dialog) {
     dialog.addEventListener("click", function (event) {
       const modalCard = dialog.querySelector(".modal-card");
-
       if (modalCard && !modalCard.contains(event.target)) {
         dialog.close();
       }

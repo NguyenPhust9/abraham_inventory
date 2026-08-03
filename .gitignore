@@ -12,3 +12,4 @@ static/uploads/*
 Thumbs.db
 
 .vercel
+.env*
