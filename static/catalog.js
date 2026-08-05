@@ -242,26 +242,13 @@ function matchesSearch(product, keyword) {
 }
 
 function buildShareText(group) {
-  const totalAvailable = group.variants.reduce((sum, v) => {
-    return sum + Number(v.available || 0);
-  }, 0);
+  const inStockVariants = sortVariants(group.variants).filter(v => Number(v.available || 0) > 0);
 
-  const lines = [
-    `${group.model}${group.category ? ' - ' + group.category : ''}`,
-    `Tổng còn: ${totalAvailable} chiếc`,
-    ''
-  ];
-
-  sortVariants(group.variants).forEach(v => {
-    const colorName = v.color || 'Chưa có màu';
-    lines.push(`- ${colorName}: còn ${v.available} | Mã: ${v.code}`);
-  });
+  const colorNames = inStockVariants.map(v => v.color || 'Chưa có màu').join(', ');
 
   const price = fmtPrice(getGroupPrice(group.variants));
-  lines.push('');
-  lines.push(`Giá bán: ${price}`);
 
-  return lines.join('\n');
+  return `${group.model}${group.category ? ' - ' + group.category : ''}, còn màu: ${colorNames}. Giá bán: ${price}`;
 }
 
 async function copyText(text) {
@@ -319,6 +306,75 @@ async function copyText(text) {
 
   // Cách 3: Nếu điện thoại vẫn chặn, hiện nội dung để bấm giữ copy tay
   window.prompt('Điện thoại không cho copy tự động. Bạn bấm giữ để copy nội dung này:', content);
+}
+
+async function copyProductImage(group) {
+  const imgVariant = getGroupImage(sortVariants(group.variants));
+  const imageUrl = imgVariant && imgVariant.image_url;
+
+  if (!imageUrl) {
+    alert('Sản phẩm này chưa có ảnh để copy.');
+    return;
+  }
+
+  if (!navigator.clipboard || !window.ClipboardItem) {
+    alert('Trình duyệt này không hỗ trợ copy ảnh. Bạn có thể bấm giữ vào ảnh để lưu/gửi thủ công.');
+    return;
+  }
+
+  try {
+    const response = await fetch(imageUrl, { mode: 'cors' });
+    const blob = await response.blob();
+    const pngBlob = await toPngBlob(blob);
+
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'image/png': pngBlob
+      })
+    ]);
+
+    alert('Đã copy ảnh. Dán (Ctrl+V) vào Zalo/Facebook để gửi khách.');
+  } catch (error) {
+    console.warn('Không copy được ảnh:', error);
+    alert('Không copy được ảnh (có thể do lỗi tải ảnh). Bạn có thể bấm giữ vào ảnh để lưu/gửi thủ công.');
+  }
+}
+
+async function copyProductText(group) {
+  await copyText(buildShareText(group));
+}
+
+function toPngBlob(blob) {
+  if (blob.type === 'image/png') {
+    return Promise.resolve(blob);
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      canvas.toBlob(pngBlob => {
+        URL.revokeObjectURL(url);
+        if (pngBlob) resolve(pngBlob);
+        else reject(new Error('Không convert được ảnh sang PNG'));
+      }, 'image/png');
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Không tải được ảnh'));
+    };
+
+    img.src = url;
+  });
 }
 
 function openProductModal(group) {
@@ -407,12 +463,18 @@ function openProductModal(group) {
         ${variantRows}
       </div>
 
-      <button type="button" class="copy-all-btn" id="copyProductSummary">
-        Copy danh sách gửi khách
-      </button>
+      <div class="copy-pair-row">
+        <button type="button" class="copy-all-btn" id="copyProductImageBtn">
+          Copy ảnh
+        </button>
+
+        <button type="button" class="copy-all-btn" id="copyProductTextBtn">
+          Copy danh sách
+        </button>
+      </div>
 
       <div class="modal-note">
-        Gợi ý: dùng nút copy để gửi nhanh mã hàng hoặc danh sách màu còn hàng cho khách qua Zalo/Facebook.
+        Gợi ý: bấm "Copy ảnh" dán vào Zalo/Facebook trước, sau đó bấm "Copy danh sách" dán tin nhắn tiếp theo để gửi khách đầy đủ.
       </div>
     </div>
   `;
@@ -424,11 +486,19 @@ function openProductModal(group) {
     });
   });
 
-  const copyAllBtn = document.getElementById('copyProductSummary');
-  if (copyAllBtn) {
-    copyAllBtn.addEventListener('click', event => {
+  const copyImageBtn = document.getElementById('copyProductImageBtn');
+  if (copyImageBtn) {
+    copyImageBtn.addEventListener('click', event => {
       event.stopPropagation();
-      copyText(buildShareText(group));
+      copyProductImage(group);
+    });
+  }
+
+  const copyTextBtn = document.getElementById('copyProductTextBtn');
+  if (copyTextBtn) {
+    copyTextBtn.addEventListener('click', event => {
+      event.stopPropagation();
+      copyProductText(group);
     });
   }
 

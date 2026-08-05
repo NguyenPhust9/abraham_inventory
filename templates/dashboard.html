@@ -256,10 +256,12 @@
         <h2>Danh sách sản phẩm</h2>
         <p class="hint">Bấm Sửa để chỉnh thông tin và ảnh của từng mã hàng.</p>
       </div>
-
-      <div class="search-box">
-        <input id="productSearch" type="text" placeholder="Tìm mã, mẫu xe, màu, loại...">
-      </div>
+        <div class="search-box">
+          <form method="GET" action="{{ url_for('admin_dashboard') }}" id="searchForm">
+            <input id="productSearch" name="q" type="text"
+                  placeholder="Tìm mã, mẫu xe, màu, loại..." value="{{ q or '' }}">
+          </form>
+        </div>
     </div>
 
     <div class="table-wrap">
@@ -283,8 +285,7 @@
           {% set img_url = p.image_filename if p.image_filename and p.image_filename.startswith('http')
              else (url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else None) %}
 
-          <tr class="product-row" data-search="{{ p.code }} {{ p.model }} {{ p.color }} {{ p.category }}">
-
+          <tr>
             <td data-label="Mã hàng">
               <div class="code-line">
                 <span class="code-badge">{{ p.code }}</span>
@@ -442,10 +443,8 @@
     </div>
 
     <div class="pagination-bar">
-      {% if total_pages > 1 %}
-      <nav class="pagination">
-        {% if page > 1 %}
-          <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1) }}">‹</a>
+          {% if page > 1 %}
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1, q=q) }}">‹</a>
         {% else %}
           <span class="page-link disabled">‹</span>
         {% endif %}
@@ -454,17 +453,15 @@
           {% if num == page %}
             <span class="page-link current">{{ num }}</span>
           {% else %}
-            <a class="page-link" href="{{ url_for('admin_dashboard', page=num) }}">{{ num }}</a>
+            <a class="page-link" href="{{ url_for('admin_dashboard', page=num, q=q) }}">{{ num }}</a>
           {% endif %}
         {% endfor %}
 
         {% if page < total_pages %}
-          <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1) }}">›</a>
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1, q=q) }}">›</a>
         {% else %}
           <span class="page-link disabled">›</span>
         {% endif %}
-      </nav>
-      {% endif %}
     </div>
   </section>
 
@@ -472,15 +469,15 @@
 
 <script>
   const productSearch = document.getElementById("productSearch");
-  const productRows = document.querySelectorAll(".product-row");
+  const searchForm = document.getElementById("searchForm");
 
-  if (productSearch) {
+  if (productSearch && searchForm) {
+    let debounceTimer;
     productSearch.addEventListener("input", function () {
-      const keyword = this.value.toLowerCase().trim();
-      productRows.forEach(function (row) {
-        const text = (row.dataset.search || row.innerText).toLowerCase();
-        row.style.display = text.includes(keyword) ? "" : "none";
-      });
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        searchForm.submit();
+      }, 500);
     });
   }
 

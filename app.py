@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
+import math
 
 
 # ---------- Config ----------
@@ -53,7 +54,7 @@ else:
         connect_args={"check_same_thread": False}
     )
 SessionLocal = sessionmaker(bind=engine)
-
+print(f"[APP DEBUG] Đang dùng DB: {engine.url}")
 
 class Product(Base):
     __tablename__ = "products"
@@ -198,11 +199,15 @@ def safe_int(value, default=0):
         return default
 
 
+
 def safe_float(value):
     try:
         if value is None or value == "":
             return None
-        return float(value)
+        result = float(value)
+        if math.isnan(result) or math.isinf(result):
+            return None
+        return result
     except Exception:
         return None
 
@@ -319,6 +324,7 @@ def admin_logout():
 @login_required
 def admin_dashboard():
     page = request.args.get("page", "1")
+    q = request.args.get("q", "").strip()
 
     try:
         page = max(1, int(page))
@@ -329,10 +335,21 @@ def admin_dashboard():
 
     db = SessionLocal()
     try:
-        total_products = db.query(Product).count()
+        base_query = db.query(Product)
+
+        if q:
+            like = f"%{q}%"
+            base_query = base_query.filter(
+                (Product.code.ilike(like)) |
+                (Product.model.ilike(like)) |
+                (Product.color.ilike(like)) |
+                (Product.category.ilike(like))
+            )
+
+        total_products = base_query.count()
 
         products = (
-            db.query(Product)
+            base_query
             .order_by(Product.model, Product.color, Product.code)
             .offset((page - 1) * per_page)
             .limit(per_page)
@@ -361,6 +378,7 @@ def admin_dashboard():
             total_stock=total_stock,
             total_available=total_available,
             per_page=per_page,
+            q=q,
         )
 
     finally:
@@ -686,10 +704,9 @@ def admin_import_price():
     """
     Nhap gia rieng, sieu nhanh.
 
-    Chi cap nhat cot 'Đơn giá bán' theo 'Mã hàng hóa', khong dung ORM
-    (khong bulk_update_mappings) ma dung SQL thuan + executemany trong
-    1 transaction duy nhat. Voi vai nghin dong, cach nay chi mat
-    duoi 1 giay thay vi vai chuc giay nhu import day du.
+    Chi cap nhat cot 'Đơn giá bán' theo 'Mã hàng hóa', dung SQL thuan
+    gop nhieu dong thanh 1 cau UPDATE duy nhat (theo tung chunk) thay
+    vi executemany tung dong rieng le, tranh bi timeout khi file lon.
     """
     file = request.files.get("file")
 
@@ -712,7 +729,7 @@ def admin_import_price():
 
     df = df[["Mã hàng hóa", "Đơn giá bán"]]
 
-    payload = []
+    rows = []
     skipped = 0
 
     for row in df.itertuples(index=False):
@@ -723,21 +740,39 @@ def admin_import_price():
             skipped += 1
             continue
 
-        payload.append({"code": code, "price": price})
+        rows.append((code, price))
 
-    if not payload:
+    if not rows:
         flash("Không có dòng nào hợp lệ để cập nhật giá.")
         return redirect(url_for("admin_dashboard"))
 
     try:
-        # 1 transaction, executemany qua driver DB-API - nhanh hon rat
-        # nhieu so voi tao/sua object ORM tung dong.
+        # Gop nhieu dong thanh 1 cau UPDATE duy nhat cho moi chunk,
+        # thay vi executemany tung dong -> giam so round-trip toi DB.
+        CHUNK = 2000
+        matched = 0
+
         with engine.begin() as conn:
-            result = conn.execute(
-                text("UPDATE products SET price = :price WHERE code = :code"),
-                payload,
-            )
-            matched = result.rowcount if result.rowcount is not None else len(payload)
+            for i in range(0, len(rows), CHUNK):
+                chunk = rows[i:i + CHUNK]
+
+                values_sql = ", ".join(
+                    f"(:code{j}, :price{j})" for j in range(len(chunk))
+                )
+                params = {}
+                for j, (code, price) in enumerate(chunk):
+                    params[f"code{j}"] = code
+                    params[f"price{j}"] = price
+
+                sql = text(f"""
+                    UPDATE products AS p
+                    SET price = c.price
+                    FROM (VALUES {values_sql}) AS c(code, price)
+                    WHERE p.code = c.code
+                """)
+
+                result = conn.execute(sql, params)
+                matched += result.rowcount or 0
 
         message = f"Đã cập nhật giá cho {matched} mã hàng."
         if skipped:
