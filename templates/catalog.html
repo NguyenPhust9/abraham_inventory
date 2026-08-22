@@ -3,12 +3,21 @@
 {% block title %}Kho Xe Đạp | Abraham Bike{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='catalog_29.css') }}?v=2">
+<link
+  rel="stylesheet"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=3"
+>
 {% endblock %}
 
+
 {% block content %}
+
+<!-- =========================================================
+     TICKER QUỐC KHÁNH 2/9
+========================================================= -->
 <div class="national-ticker">
   <div class="national-ticker-track">
+
     <span>
       ★ CHÀO MỪNG QUỐC KHÁNH 2/9
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
@@ -20,6 +29,7 @@
       &nbsp;&nbsp;&nbsp; ★
     </span>
 
+    <!-- Lặp lại để chạy vô hạn -->
     <span aria-hidden="true">
       ★ CHÀO MỪNG QUỐC KHÁNH 2/9
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
@@ -30,198 +40,409 @@
       TRA CỨU TỒN KHO NHANH CHÓNG – CHÍNH XÁC – TIỆN LỢI
       &nbsp;&nbsp;&nbsp; ★
     </span>
+
   </div>
 </div>
+
+
 <div class="catalog-page">
 
   <!-- =========================================================
-       HERO QUỐC KHÁNH 2/9
-       ========================================================= -->
-  <section class="catalog-hero">
-    <div class="hero-pattern" aria-hidden="true"></div>
-    <div class="hero-ribbon hero-ribbon-one" aria-hidden="true"></div>
-    <div class="hero-ribbon hero-ribbon-two" aria-hidden="true"></div>
+       HERO IMAGE 2/9
+  ========================================================= -->
+  <section class="catalog-hero-image">
 
-    <div class="hero-shell">
-      <div class="hero-nav">
-        <a class="hero-brand" href="{{ url_for('catalog') }}" aria-label="Abraham Bike - Kho xe đạp">
-          <span class="hero-brand-mark" aria-hidden="true">★</span>
-          <span class="hero-brand-copy">
-            <strong>ABRAHAM BIKE</strong>
-            <small>KHO XE ĐẠP</small>
-          </span>
-        </a>
+    <img
+      src="{{ url_for('static', filename='uploads/hero-2-9.png') }}"
+      alt="Abraham Bike - Chào mừng Quốc khánh 2/9"
+      class="hero-banner-img"
+    >
 
-        <a class="hero-manage-link" href="{{ url_for('admin_login') }}">
-          <span>Quản lý kho</span>
-          <span aria-hidden="true">↗</span>
-        </a>
-      </div>
+    <a
+      class="hero-manage-overlay"
+      href="{{ url_for('admin_login') }}"
+    >
+      Quản lý kho ↗
+    </a>
 
-      <div class="hero-grid">
-        <div class="hero-copy">
-          <div class="hero-eyebrow">
-            <span class="eyebrow-star" aria-hidden="true">★</span>
-            CHÀO MỪNG QUỐC KHÁNH VIỆT NAM
-          </div>
-
-          <div class="hero-date" aria-label="Ngày 2 tháng 9">
-            <span>02</span><em>/</em><span>09</span>
-          </div>
-
-          <h1 class="hero-title">TỰ HÀO VIỆT NAM</h1>
-          <p class="hero-description">
-            Tra cứu tồn kho Abraham Bike nhanh chóng, rõ ràng và sẵn sàng phục vụ đại lý trong mùa Đại lễ 2/9.
-          </p>
-
-          <div class="hero-meta">
-            <span>VIỆT NAM</span>
-            <i></i>
-            <span>ĐỘC LẬP</span>
-            <i></i>
-            <span>TỰ DO</span>
-            <i></i>
-            <span>HẠNH PHÚC</span>
-          </div>
-        </div>
-
-        <!-- Decorative visual: CSS only, không phụ thuộc ảnh ngoài -->
-        <div class="hero-art" aria-hidden="true">
-          <div class="hero-orbit orbit-1"></div>
-          <div class="hero-orbit orbit-2"></div>
-          <div class="hero-orbit orbit-3"></div>
-          <div class="hero-star">★</div>
-          <div class="hero-art-date">2·9</div>
-          <div class="hero-art-caption">QUỐC KHÁNH<br>VIỆT NAM</div>
-          <div class="hero-sun"></div>
-        </div>
-      </div>
-    </div>
   </section>
 
+
   <!-- =========================================================
-       SEARCH + FILTERS
-       Giữ nguyên toàn bộ ID để catalog.js tiếp tục hoạt động
-       ========================================================= -->
+       SEARCH + FILTER
+       QUAN TRỌNG:
+       Các ID dưới đây phải giữ nguyên để catalog.js hoạt động
+  ========================================================= -->
   <section class="catalog-controls-shell">
+
     <div class="catalog-controls">
+
+      <!-- Heading -->
       <div class="control-heading">
+
         <div>
-          <span class="control-kicker">TRA CỨU SẢN PHẨM</span>
-          <h2>Tìm xe đang có sẵn trong kho</h2>
+          <span class="control-kicker">
+            TRA CỨU SẢN PHẨM
+          </span>
+
+          <h2>
+            Tìm xe đang có sẵn trong kho
+          </h2>
         </div>
-        <span class="control-badge">Cập nhật theo tồn kho thực tế</span>
+
+        <span class="control-badge">
+          Cập nhật theo tồn kho thực tế
+        </span>
+
       </div>
 
+
+      <!-- Search -->
       <div class="searchwrap catalog-search">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
           <circle cx="11" cy="11" r="7"/>
           <path d="M21 21l-4.3-4.3"/>
         </svg>
-        <input id="search" type="text" placeholder="Tìm theo tên xe, mã hàng, màu…" autocomplete="off">
+
+        <input
+          id="search"
+          type="text"
+          placeholder="Tìm theo tên xe, mã hàng, màu…"
+          autocomplete="off"
+        >
+
       </div>
 
+
+      <!-- Category Pills -->
       <div class="pills-wrap">
-        <button type="button" class="pills-arrow" id="pillsLeft" aria-label="Cuộn trái">‹</button>
-        <div class="pills" id="catpills"></div>
-        <button type="button" class="pills-arrow" id="pillsRight" aria-label="Cuộn phải">›</button>
+
+        <button
+          type="button"
+          class="pills-arrow"
+          id="pillsLeft"
+          aria-label="Cuộn trái"
+        >
+          ‹
+        </button>
+
+        <div
+          class="pills"
+          id="catpills"
+        ></div>
+
+        <button
+          type="button"
+          class="pills-arrow"
+          id="pillsRight"
+          aria-label="Cuộn phải"
+        >
+          ›
+        </button>
+
       </div>
 
+
+      <!-- Extra Filters -->
       <div class="extra-filters">
+
+        <!-- Chỉ hiện sản phẩm còn hàng -->
         <label class="check-inline">
-          <input type="checkbox" id="onlyStock" checked>
-          <span>Chỉ hiện còn hàng</span>
+
+          <input
+            type="checkbox"
+            id="onlyStock"
+            checked
+          >
+
+          <span>
+            Chỉ hiện còn hàng
+          </span>
+
         </label>
 
-        <label class="sort-wrap" for="sortPrice">
-          <span>Sắp xếp</span>
-          <select class="sort-select" id="sortPrice">
-            <option value="">Mặc định</option>
-            <option value="asc">Giá: Thấp → Cao</option>
-            <option value="desc">Giá: Cao → Thấp</option>
+
+        <!-- Sắp xếp giá -->
+        <label
+          class="sort-wrap"
+          for="sortPrice"
+        >
+
+          <span>
+            Sắp xếp
+          </span>
+
+          <select
+            class="sort-select"
+            id="sortPrice"
+          >
+
+            <option value="">
+              Mặc định
+            </option>
+
+            <option value="asc">
+              Giá: Thấp → Cao
+            </option>
+
+            <option value="desc">
+              Giá: Cao → Thấp
+            </option>
+
           </select>
+
         </label>
+
       </div>
+
     </div>
+
   </section>
+
 
   <!-- =========================================================
        PRODUCT GRID
-       ========================================================= -->
+  ========================================================= -->
   <main class="catalog-main">
+
+    <!-- Summary -->
     <div class="summary catalog-summary">
+
       <span id="summaryText"></span>
-      <span class="summary-divider" aria-hidden="true"></span>
+
+      <span
+        class="summary-divider"
+        aria-hidden="true"
+      ></span>
+
       <span id="summaryStock"></span>
+
     </div>
 
-    <div class="grid" id="grid"></div>
 
-    <div class="empty" id="emptyState" style="display:none;">
-      <div class="empty-star" aria-hidden="true">★</div>
-      <strong>Không tìm thấy sản phẩm phù hợp</strong>
-      <span>Thử đổi từ khóa hoặc bộ lọc để xem thêm sản phẩm.</span>
+    <!-- catalog.js render card sản phẩm vào đây -->
+    <div
+      class="grid"
+      id="grid"
+    ></div>
+
+
+    <!-- Empty State -->
+    <div
+      class="empty"
+      id="emptyState"
+      style="display:none;"
+    >
+
+      <div
+        class="empty-star"
+        aria-hidden="true"
+      >
+        ★
+      </div>
+
+      <strong>
+        Không tìm thấy sản phẩm phù hợp
+      </strong>
+
+      <span>
+        Thử đổi từ khóa hoặc bộ lọc để xem thêm sản phẩm.
+      </span>
+
     </div>
+
   </main>
+
 
   <!-- =========================================================
        PRODUCT MODAL
-       ========================================================= -->
-  <dialog id="productModal" class="product-modal">
+  ========================================================= -->
+  <dialog
+    id="productModal"
+    class="product-modal"
+  >
+
     <div class="modal-box">
+
+      <!-- Modal Header -->
       <div class="modal-head">
+
         <div>
-          <span class="modal-kicker">ABRAHAM BIKE</span>
-          <h2 class="modal-title" id="modalTitle">Chi tiết sản phẩm</h2>
-          <div class="modal-sub" id="modalSub"></div>
+
+          <span class="modal-kicker">
+            ABRAHAM BIKE
+          </span>
+
+          <h2
+            class="modal-title"
+            id="modalTitle"
+          >
+            Chi tiết sản phẩm
+          </h2>
+
+          <div
+            class="modal-sub"
+            id="modalSub"
+          ></div>
+
         </div>
 
-        <button type="button" class="modal-close" id="modalClose" aria-label="Đóng">×</button>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="modalClose"
+          aria-label="Đóng"
+        >
+          ×
+        </button>
+
       </div>
 
-      <div class="modal-body" id="modalBody"></div>
+
+      <!-- catalog.js render nội dung modal -->
+      <div
+        class="modal-body"
+        id="modalBody"
+      ></div>
+
     </div>
+
   </dialog>
 
+
+  <!-- =========================================================
+       FOOTER
+  ========================================================= -->
   <footer class="catalog-footer">
-    <span class="footer-star" aria-hidden="true">★</span>
-    <span>Giá “Liên hệ” nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.</span>
+
+    <span
+      class="footer-star"
+      aria-hidden="true"
+    >
+      ★
+    </span>
+
+    <span>
+      Giá “Liên hệ” nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.
+    </span>
+
   </footer>
+
 </div>
 
-<script src="{{ url_for('static', filename='catalog.js') }}?v=4"></script>
-<script>
-  (function () {
-    const pills = document.getElementById("catpills");
-    const btnLeft = document.getElementById("pillsLeft");
-    const btnRight = document.getElementById("pillsRight");
 
-    if (!pills || !btnLeft || !btnRight) return;
-
-    const scrollAmount = 220;
-
-    btnLeft.addEventListener("click", function () {
-      pills.scrollBy({ left: -scrollAmount, behavior: "smooth" });
-    });
-
-    btnRight.addEventListener("click", function () {
-      pills.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    });
-
-    function updateArrows() {
-      const maxScroll = pills.scrollWidth - pills.clientWidth;
-      btnLeft.disabled = pills.scrollLeft <= 2;
-      btnRight.disabled = pills.scrollLeft >= maxScroll - 2;
-    }
-
-    pills.addEventListener("scroll", updateArrows);
-    window.addEventListener("resize", updateArrows);
-
-    // Chờ catalog.js render xong danh sách pills rồi mới cập nhật trạng thái mũi tên
-    const observer = new MutationObserver(updateArrows);
-    observer.observe(pills, { childList: true });
-
-    updateArrows();
-  })();
+<!-- =========================================================
+     CATALOG JS
+========================================================= -->
+<script
+  src="{{ url_for('static', filename='catalog.js') }}?v=4">
 </script>
+
+
+<!-- =========================================================
+     CATEGORY PILL SCROLL
+========================================================= -->
+<script>
+
+(function () {
+
+  const pills = document.getElementById("catpills");
+  const btnLeft = document.getElementById("pillsLeft");
+  const btnRight = document.getElementById("pillsRight");
+
+  if (!pills || !btnLeft || !btnRight) {
+    return;
+  }
+
+
+  const scrollAmount = 220;
+
+
+  /* -------------------------------
+     Scroll Left
+  -------------------------------- */
+  btnLeft.addEventListener("click", function () {
+
+    pills.scrollBy({
+      left: -scrollAmount,
+      behavior: "smooth"
+    });
+
+  });
+
+
+  /* -------------------------------
+     Scroll Right
+  -------------------------------- */
+  btnRight.addEventListener("click", function () {
+
+    pills.scrollBy({
+      left: scrollAmount,
+      behavior: "smooth"
+    });
+
+  });
+
+
+  /* -------------------------------
+     Update Arrow State
+  -------------------------------- */
+  function updateArrows() {
+
+    const maxScroll =
+      pills.scrollWidth - pills.clientWidth;
+
+    btnLeft.disabled =
+      pills.scrollLeft <= 2;
+
+    btnRight.disabled =
+      pills.scrollLeft >= maxScroll - 2;
+
+  }
+
+
+  pills.addEventListener(
+    "scroll",
+    updateArrows
+  );
+
+
+  window.addEventListener(
+    "resize",
+    updateArrows
+  );
+
+
+  /* --------------------------------
+     catalog.js render category pill
+     sau đó cập nhật lại nút arrow
+  -------------------------------- */
+  const observer =
+    new MutationObserver(updateArrows);
+
+
+  observer.observe(
+    pills,
+    {
+      childList: true
+    }
+  );
+
+
+  updateArrows();
+
+})();
+
+</script>
+
 {% endblock %}
