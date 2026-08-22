@@ -1,371 +1,168 @@
 {% extends "base.html" %}
+
+{% block title %}Kho Xe Đạp | Abraham Bike{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='catalog_29.css') }}?v=1">
+{% endblock %}
+
 {% block content %}
+<div class="catalog-page">
 
-<style>
-  .card {
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
+  <!-- =========================================================
+       HERO QUỐC KHÁNH 2/9
+       ========================================================= -->
+  <section class="catalog-hero">
+    <div class="hero-pattern" aria-hidden="true"></div>
+    <div class="hero-ribbon hero-ribbon-one" aria-hidden="true"></div>
+    <div class="hero-ribbon hero-ribbon-two" aria-hidden="true"></div>
 
-  .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 34px rgba(20, 20, 20, 0.08);
-  }
+    <div class="hero-shell">
+      <div class="hero-nav">
+        <a class="hero-brand" href="{{ url_for('catalog') }}" aria-label="Abraham Bike - Kho xe đạp">
+          <span class="hero-brand-mark" aria-hidden="true">★</span>
+          <span class="hero-brand-copy">
+            <strong>ABRAHAM BIKE</strong>
+            <small>KHO XE ĐẠP</small>
+          </span>
+        </a>
 
-  .product-modal {
-    width: min(860px, calc(100% - 28px));
-    border: 0;
-    border-radius: 22px;
-    padding: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .product-modal::backdrop {
-    background: rgba(20, 20, 20, 0.48);
-    backdrop-filter: blur(2px);
-  }
-
-  .modal-box {
-    background: #fffefa;
-    border: 1px solid #ddd6c7;
-    border-radius: 22px;
-    overflow: hidden;
-    box-shadow: 0 30px 90px rgba(20, 20, 20, 0.28);
-  }
-
-  .modal-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 18px 20px;
-    border-bottom: 1px solid #e6dfd0;
-    background: #f8f5ed;
-  }
-
-  .modal-title {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 900;
-    color: #13201a;
-  }
-
-  .modal-sub {
-    margin-top: 6px;
-    color: #6f6a5f;
-    font-size: 14px;
-  }
-
-  .modal-close {
-    width: 42px;
-    height: 42px;
-    border: 1px solid #ddd6c7;
-    border-radius: 999px;
-    background: #fffefa;
-    cursor: pointer;
-    font-size: 24px;
-    line-height: 1;
-    color: #1f2a24;
-  }
-
-  .modal-body {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 18px;
-    padding: 20px;
-  }
-
-  .modal-image-wrap {
-    border: 1px solid #ddd6c7;
-    border-radius: 18px;
-    background: #f8f5ed;
-    overflow: hidden;
-    min-height: 230px;
-    display: grid;
-    place-items: center;
-  }
-
-.modal-image {
-  width: 100%;
-  height: auto;
-  max-height: 420px;
-  object-fit: contain;
-  display: block;
-}
-
-  .modal-no-image {
-    color: #9a9386;
-    font-weight: 800;
-  }
-
-  .modal-info-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .modal-stat {
-    border: 1px solid #e6dfd0;
-    border-radius: 14px;
-    padding: 12px;
-    background: #fff;
-  }
-
-  .modal-stat-label {
-    font-size: 12px;
-    color: #777064;
-    margin-bottom: 4px;
-  }
-
-  .modal-stat-value {
-    font-size: 17px;
-    font-weight: 900;
-    color: #13201a;
-  }
-
-  .variant-title {
-    font-size: 15px;
-    font-weight: 900;
-    margin: 0 0 10px;
-  }
-
-  .variant-list {
-    display: grid;
-    gap: 8px;
-  }
-
-  .variant-row {
-    display: grid;
-    grid-template-columns: 30px 1fr auto auto;
-    align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border: 1px solid #eee7d8;
-    border-radius: 14px;
-    background: #fff;
-  }
-
-  .variant-color {
-    font-weight: 850;
-    color: #111c17;
-  }
-
-  .variant-code {
-    color: #7c7568;
-    font-size: 13px;
-    margin-top: 2px;
-  }
-
-  .copy-btn,
-  .copy-all-btn {
-    border: 1px solid #ddd6c7;
-    background: #f8f5ed;
-    color: #1f2a24;
-    border-radius: 999px;
-    min-height: 34px;
-    padding: 0 12px;
-    cursor: pointer;
-    font-weight: 850;
-    font-size: 13px;
-  }
-
-  .copy-all-btn {
-    background: #1f2a24;
-    color: #fff;
-    border-color: #1f2a24;
-    margin-top: 14px;
-  }
-
-  .modal-stock {
-    white-space: nowrap;
-  }
-
-  .modal-note {
-    margin-top: 12px;
-    color: #7c7568;
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  @media (max-width: 760px) {
-    .modal-body {
-      grid-template-columns: 1fr;
-    }
-
-    .modal-info-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .variant-row {
-      grid-template-columns: 30px 1fr auto;
-    }
-
-   .copy-btn {
-      grid-column: 2 / -1;
-      width: 100%;
-    }
-  }
-
-  .pills-wrap{
-    display:flex !important;
-    flex-direction:row !important;
-    align-items:center;
-    gap:6px;
-    width:100%;
-  }
-
-  .pills{
-    display:flex !important;
-    flex-wrap:nowrap !important;
-    overflow-x:auto;
-    scroll-behavior:smooth;
-    scrollbar-width:none;
-    -ms-overflow-style:none;
-    flex:1 1 auto;
-    min-width:0;
-  }
-
-  .pills::-webkit-scrollbar{
-    display:none;
-  }
-
-  .pills-arrow{
-    flex:0 0 auto !important;
-    width:34px !important;
-    height:34px !important;
-    max-width:34px;
-    border-radius:999px;
-    border:1px solid #ddd6c7;
-    background:#fffefa;
-    color:#1f2a24;
-    cursor:pointer;
-    font-size:18px;
-    line-height:1;
-    display:inline-flex !important;
-    align-items:center;
-    justify-content:center;
-    padding:0 !important;
-    margin:0 !important;
-  }
-
-  .pills-arrow:hover{
-    background:#f8f5ed;
-  }
-
-  .pills-arrow:disabled{
-    opacity:.35;
-    cursor:default;
-  }
-
-  .extra-filters{
-    display:flex;
-    align-items:center;
-    gap:16px;
-    flex-wrap:wrap;
-    margin-top:10px;
-  }
-
-  .check-inline{
-    display:flex;
-    align-items:center;
-    gap:7px;
-    font-size:13.5px;
-    color:#1f2a24;
-    cursor:pointer;
-    user-select:none;
-  }
-
-  .check-inline input{
-    width:16px;
-    height:16px;
-    cursor:pointer;
-    accent-color:#1f2a24;
-  }
-
-  .sort-select{
-    padding:8px 14px;
-    border-radius:999px;
-    border:1px solid #ddd6c7;
-    background:#fffefa;
-    font-size:13px;
-    color:#1f2a24;
-    cursor:pointer;
-    font-family:inherit;
-  }
-
-  .sort-select:focus{
-    outline:none;
-    border-color:#1f2a24;
-  }
-</style>
-
-<header>
-  <div class="brandrow">
-    <div class="brand"><span class="dot"></span>Kho Xe Đạp</div>
-    <a class="stamp-link" href="{{ url_for('admin_login') }}">Quản lý</a>
-  </div>
-
-  <div class="controls">
-    <div class="searchwrap">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"/>
-        <path d="M21 21l-4.3-4.3"/>
-      </svg>
-      <input id="search" type="text" placeholder="Tìm theo tên xe, mã hàng, màu…" autocomplete="off">
-    </div>
-
-    <div class="pills-wrap">
-      <button type="button" class="pills-arrow" id="pillsLeft" aria-label="Cuộn trái">‹</button>
-      <div class="pills" id="catpills"></div>
-      <button type="button" class="pills-arrow" id="pillsRight" aria-label="Cuộn phải">›</button>
-    </div>
-
-    <div class="extra-filters">
-      <label class="check-inline">
-        <input type="checkbox" id="onlyStock" checked>
-        Chỉ hiện còn hàng
-      </label>
-
-      <select class="sort-select" id="sortPrice">
-        <option value="">Sắp xếp: Mặc định</option>
-        <option value="asc">Giá: Thấp → Cao</option>
-        <option value="desc">Giá: Cao → Thấp</option>
-      </select>
-    </div>
-  </div>
-</header>
-
-<main>
-  <div class="summary">
-    <span id="summaryText"></span>
-    <span id="summaryStock"></span>
-  </div>
-
-  <div class="grid" id="grid"></div>
-
-  <div class="empty" id="emptyState" style="display:none;">
-    Không tìm thấy sản phẩm phù hợp.
-  </div>
-</main>
-
-<dialog id="productModal" class="product-modal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <div>
-        <h2 class="modal-title" id="modalTitle">Chi tiết sản phẩm</h2>
-        <div class="modal-sub" id="modalSub"></div>
+        <a class="hero-manage-link" href="{{ url_for('admin_login') }}">
+          <span>Quản lý kho</span>
+          <span aria-hidden="true">↗</span>
+        </a>
       </div>
 
-      <button type="button" class="modal-close" id="modalClose">×</button>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="hero-eyebrow">
+            <span class="eyebrow-star" aria-hidden="true">★</span>
+            CHÀO MỪNG QUỐC KHÁNH VIỆT NAM
+          </div>
+
+          <div class="hero-date" aria-label="Ngày 2 tháng 9">
+            <span>02</span><em>/</em><span>09</span>
+          </div>
+
+          <h1 class="hero-title">TỰ HÀO VIỆT NAM</h1>
+          <p class="hero-description">
+            Tra cứu tồn kho Abraham Bike nhanh chóng, rõ ràng và sẵn sàng phục vụ đại lý trong mùa Đại lễ 2/9.
+          </p>
+
+          <div class="hero-meta">
+            <span>VIỆT NAM</span>
+            <i></i>
+            <span>ĐỘC LẬP</span>
+            <i></i>
+            <span>TỰ DO</span>
+            <i></i>
+            <span>HẠNH PHÚC</span>
+          </div>
+        </div>
+
+        <!-- Decorative visual: CSS only, không phụ thuộc ảnh ngoài -->
+        <div class="hero-art" aria-hidden="true">
+          <div class="hero-orbit orbit-1"></div>
+          <div class="hero-orbit orbit-2"></div>
+          <div class="hero-orbit orbit-3"></div>
+          <div class="hero-star">★</div>
+          <div class="hero-art-date">2·9</div>
+          <div class="hero-art-caption">QUỐC KHÁNH<br>VIỆT NAM</div>
+          <div class="hero-sun"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SEARCH + FILTERS
+       Giữ nguyên toàn bộ ID để catalog.js tiếp tục hoạt động
+       ========================================================= -->
+  <section class="catalog-controls-shell">
+    <div class="catalog-controls">
+      <div class="control-heading">
+        <div>
+          <span class="control-kicker">TRA CỨU SẢN PHẨM</span>
+          <h2>Tìm xe đang có sẵn trong kho</h2>
+        </div>
+        <span class="control-badge">Cập nhật theo tồn kho thực tế</span>
+      </div>
+
+      <div class="searchwrap catalog-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input id="search" type="text" placeholder="Tìm theo tên xe, mã hàng, màu…" autocomplete="off">
+      </div>
+
+      <div class="pills-wrap">
+        <button type="button" class="pills-arrow" id="pillsLeft" aria-label="Cuộn trái">‹</button>
+        <div class="pills" id="catpills"></div>
+        <button type="button" class="pills-arrow" id="pillsRight" aria-label="Cuộn phải">›</button>
+      </div>
+
+      <div class="extra-filters">
+        <label class="check-inline">
+          <input type="checkbox" id="onlyStock" checked>
+          <span>Chỉ hiện còn hàng</span>
+        </label>
+
+        <label class="sort-wrap" for="sortPrice">
+          <span>Sắp xếp</span>
+          <select class="sort-select" id="sortPrice">
+            <option value="">Mặc định</option>
+            <option value="asc">Giá: Thấp → Cao</option>
+            <option value="desc">Giá: Cao → Thấp</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       PRODUCT GRID
+       ========================================================= -->
+  <main class="catalog-main">
+    <div class="summary catalog-summary">
+      <span id="summaryText"></span>
+      <span class="summary-divider" aria-hidden="true"></span>
+      <span id="summaryStock"></span>
     </div>
 
-    <div class="modal-body" id="modalBody"></div>
-  </div>
-</dialog>
+    <div class="grid" id="grid"></div>
 
-<footer>Giá "Liên hệ" nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.</footer>
+    <div class="empty" id="emptyState" style="display:none;">
+      <div class="empty-star" aria-hidden="true">★</div>
+      <strong>Không tìm thấy sản phẩm phù hợp</strong>
+      <span>Thử đổi từ khóa hoặc bộ lọc để xem thêm sản phẩm.</span>
+    </div>
+  </main>
+
+  <!-- =========================================================
+       PRODUCT MODAL
+       ========================================================= -->
+  <dialog id="productModal" class="product-modal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">ABRAHAM BIKE</span>
+          <h2 class="modal-title" id="modalTitle">Chi tiết sản phẩm</h2>
+          <div class="modal-sub" id="modalSub"></div>
+        </div>
+
+        <button type="button" class="modal-close" id="modalClose" aria-label="Đóng">×</button>
+      </div>
+
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </dialog>
+
+  <footer class="catalog-footer">
+    <span class="footer-star" aria-hidden="true">★</span>
+    <span>Giá “Liên hệ” nghĩa là cửa hàng chưa cập nhật giá cho mẫu này.</span>
+  </footer>
+</div>
 
 <script src="{{ url_for('static', filename='catalog.js') }}?v=4"></script>
 <script>
