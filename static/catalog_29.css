@@ -984,3 +984,239 @@
   .catalog-controls{ padding:14px; }
   .catalog-page .pills-arrow{ width:32px !important; height:32px !important; max-width:32px; }
 }
+/* =========================================================
+   NATIONAL DAY RUNNING TICKER
+========================================================= */
+
+.national-ticker {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      90deg,
+      #66060c 0%,
+      #980812 25%,
+      #c51420 55%,
+      #980812 80%,
+      #66060c 100%
+    );
+
+  border-top: 1px solid rgba(255, 218, 112, 0.35);
+  border-bottom: 1px solid rgba(255, 218, 112, 0.35);
+
+  color: #ffe08a;
+
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+
+  z-index: 30;
+
+  box-shadow:
+    0 4px 18px rgba(63, 0, 6, 0.16);
+}
+
+.national-ticker::before,
+.national-ticker::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 70px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.national-ticker::before {
+  left: 0;
+  background:
+    linear-gradient(
+      90deg,
+      #66060c 0%,
+      rgba(102, 6, 12, 0) 100%
+    );
+}
+
+.national-ticker::after {
+  right: 0;
+  background:
+    linear-gradient(
+      270deg,
+      #66060c 0%,
+      rgba(102, 6, 12, 0) 100%
+    );
+}
+
+.national-ticker-track {
+  display: flex;
+  width: max-content;
+
+  animation:
+    nationalTicker 28s linear infinite;
+
+  will-change: transform;
+}
+
+.national-ticker-track span {
+  flex-shrink: 0;
+
+  padding-right: 70px;
+
+  font-family: "IBM Plex Mono", monospace;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  letter-spacing: 0.13em;
+
+  white-space: nowrap;
+
+  text-transform: uppercase;
+
+  text-shadow:
+    0 1px 8px rgba(255, 202, 75, 0.15);
+}
+
+@keyframes nationalTicker {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Dừng chữ khi rê chuột vào */
+.national-ticker:hover .national-ticker-track {
+  animation-play-state: paused;
+}
+
+@media (max-width: 768px) {
+  .national-ticker {
+    height: 34px;
+  }
+
+  .national-ticker-track span {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding-right: 50px;
+  }
+}
+/* =========================================================
+   TICKER QUỐC KHÁNH 2/9
+========================================================= */
+
+.national-ticker {
+  position: relative;
+  z-index: 100;
+
+  width: 100%;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      90deg,
+      #65070c 0%,
+      #8d0912 25%,
+      #c91522 55%,
+      #9e0b16 78%,
+      #65070c 100%
+    );
+
+  border-top: 1px solid rgba(255, 215, 104, 0.35);
+  border-bottom: 1px solid rgba(255, 215, 104, 0.35);
+
+  color: #ffe08a;
+
+  box-shadow:
+    0 5px 20px rgba(73, 2, 9, 0.18);
+}
+
+
+/* Dải chữ chạy */
+.national-ticker-track {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+
+  align-items: center;
+
+  width: max-content;
+
+  white-space: nowrap;
+
+  animation: nationalTickerMove 34s linear infinite;
+
+  will-change: transform;
+}
+
+
+/* Mỗi bản text */
+.national-ticker-track span {
+  display: block;
+  flex: 0 0 auto;
+
+  white-space: nowrap;
+
+  padding-right: 80px;
+
+  color: #ffe08a;
+
+  font-family: "IBM Plex Mono", monospace;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  letter-spacing: 0.1em;
+
+  line-height: 38px;
+
+  text-transform: uppercase;
+}
+
+
+/* Chạy từ phải sang trái */
+@keyframes nationalTickerMove {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+
+/* Hover thì dừng */
+.national-ticker:hover .national-ticker-track {
+  animation-play-state: paused;
+}
+
+
+/* Mobile */
+@media (max-width: 768px) {
+
+  .national-ticker {
+    height: 34px;
+  }
+
+  .national-ticker-track {
+    animation-duration: 28s;
+  }
+
+  .national-ticker-track span {
+    font-size: 10px;
+    line-height: 34px;
+    letter-spacing: 0.08em;
+    padding-right: 55px;
+  }
+}
