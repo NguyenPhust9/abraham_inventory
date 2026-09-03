@@ -32,7 +32,7 @@ const COLOR_MAP = [
 let PRODUCTS = [];
 let activeCat = 'Tất cả';
 let onlyInStock = false;
-let sortPriceOrder = '';
+let sortStockOrder = '';
 
 const els = {
   search: document.getElementById('search'),
@@ -42,7 +42,7 @@ const els = {
   summaryText: document.getElementById('summaryText'),
   summaryStock: document.getElementById('summaryStock'),
   onlyStock: document.getElementById('onlyStock'),
-  sortPrice: document.getElementById('sortPrice'),
+  sortStock: document.getElementById('sortStock'),
   modal: document.getElementById('productModal'),
   modalTitle: document.getElementById('modalTitle'),
   modalSub: document.getElementById('modalSub'),
@@ -194,6 +194,12 @@ function getGroupPrice(variants) {
   });
 
   return withPrice ? withPrice.price : null;
+}
+
+function getGroupAvailable(variants) {
+  return variants.reduce((total, variant) => {
+    return total + Number(variant.available || 0);
+  }, 0);
 }
 
 function getGroupImage(variants) {
@@ -518,17 +524,12 @@ function render() {
 
   const groups = groupByModel(filtered);
 
-  if (sortPriceOrder === 'asc' || sortPriceOrder === 'desc') {
+  if (sortStockOrder === 'asc' || sortStockOrder === 'desc') {
     groups.sort((a, b) => {
-      const priceA = getGroupPrice(a.variants);
-      const priceB = getGroupPrice(b.variants);
+      const stockA = getGroupAvailable(a.variants);
+      const stockB = getGroupAvailable(b.variants);
 
-      // Sản phẩm chưa có giá ("Liên hệ") luôn xếp cuối, bất kể chiều sắp xếp
-      if (priceA === null && priceB === null) return 0;
-      if (priceA === null) return 1;
-      if (priceB === null) return -1;
-
-      return sortPriceOrder === 'asc' ? priceA - priceB : priceB - priceA;
+      return sortStockOrder === 'asc' ? stockA - stockB : stockB - stockA;
     });
   } else {
     groups.sort((a, b) => a.model.localeCompare(b.model, 'vi'));
@@ -651,9 +652,9 @@ if (els.onlyStock) {
   });
 }
 
-if (els.sortPrice) {
-  els.sortPrice.addEventListener('change', () => {
-    sortPriceOrder = els.sortPrice.value;
+if (els.sortStock) {
+  els.sortStock.addEventListener('change', () => {
+    sortStockOrder = els.sortStock.value;
     render();
   });
 }

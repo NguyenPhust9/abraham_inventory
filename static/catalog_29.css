@@ -1301,3 +1301,142 @@
   }
 
 }
+
+/* =========================================================
+   BLUE INVENTORY THEME
+========================================================= */
+
+.catalog-page {
+  --nd-red: #1687d9;
+  --nd-red-2: #0871c1;
+  --nd-red-3: #075a9b;
+  --nd-red-4: #073c6b;
+  --nd-gold: #55c8f2;
+  --nd-gold-bright: #9be7ff;
+  --nd-gold-soft: #dff7ff;
+  --nd-cream: #edf8ff;
+  --nd-paper: #fbfeff;
+  --nd-ink: #10344f;
+  --nd-muted: #5f7e91;
+  --nd-line: rgba(12, 105, 170, .16);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(98, 210, 255, .24), transparent 24%),
+    linear-gradient(180deg, #edf8ff 0%, #f8fcff 58%, #eaf6fd 100%);
+  color: var(--nd-ink);
+}
+
+.national-ticker {
+  background: linear-gradient(90deg, #07508d 0%, #1687d9 48%, #0871c1 100%);
+  border-color: rgba(164, 235, 255, .5);
+  color: #e6faff;
+  box-shadow: 0 5px 20px rgba(4, 76, 130, .18);
+}
+
+.national-ticker::before {
+  background: linear-gradient(90deg, #07508d 0%, rgba(7, 80, 141, 0) 100%);
+}
+
+.national-ticker::after {
+  background: linear-gradient(270deg, #07508d 0%, rgba(7, 80, 141, 0) 100%);
+}
+
+.national-ticker-track span { color: #e6faff; }
+
+.catalog-controls {
+  border-color: rgba(12, 105, 170, .16);
+  background: rgba(251, 254, 255, .95);
+  box-shadow: 0 24px 70px rgba(7, 74, 120, .13);
+}
+
+.control-kicker,
+.catalog-page .price-row .price { color: var(--nd-red-2); }
+
+.control-badge {
+  border-color: rgba(22, 135, 217, .18);
+  background: #eaf8ff;
+  color: #075a9b;
+}
+
+.catalog-page .catalog-search input:focus {
+  border-color: rgba(22, 135, 217, .55);
+  box-shadow: 0 0 0 4px rgba(22, 135, 217, .1);
+}
+
+.catalog-page .pill:hover:not(.active) {
+  border-color: rgba(22, 135, 217, .35);
+  color: var(--nd-red-2);
+  background: #f0faff;
+}
+
+.catalog-page .pill.active,
+.copy-all-btn {
+  border-color: var(--nd-red-2);
+  background: linear-gradient(135deg, var(--nd-red), var(--nd-red-2));
+  box-shadow: 0 8px 18px rgba(8, 113, 193, .18);
+}
+
+.catalog-page .pills-arrow:hover {
+  background: #eefaff;
+  border-color: rgba(22, 135, 217, .3);
+}
+
+.check-inline input { accent-color: var(--nd-red); }
+.sort-select:focus { border-color: rgba(22, 135, 217, .5); }
+
+.catalog-page .card {
+  border-color: rgba(12, 105, 170, .14);
+  background: linear-gradient(145deg, #fbfeff 0%, #f2faff 100%);
+  box-shadow: 0 10px 30px rgba(7, 74, 120, .07);
+}
+
+.catalog-page .card::before {
+  background: linear-gradient(90deg, var(--nd-red), var(--nd-gold), transparent 78%);
+}
+
+.catalog-page .card:hover {
+  border-color: rgba(22, 135, 217, .3);
+  box-shadow: 0 20px 46px rgba(7, 74, 120, .13);
+}
+
+.catalog-page .cat-tag {
+  border-color: rgba(22, 135, 217, .2);
+  background: #eaf8ff;
+  color: #075a9b;
+}
+
+.catalog-page .card-img,
+.modal-image-wrap {
+  border-color: rgba(12, 105, 170, .14);
+  background: linear-gradient(135deg, #fff, #eaf7ff);
+}
+
+.product-modal::backdrop { background: rgba(4, 47, 82, .58); }
+
+.modal-head {
+  border-bottom-color: rgba(12, 105, 170, .14);
+  background:
+    radial-gradient(circle at 90% 15%, rgba(155, 231, 255, .22), transparent 24%),
+    linear-gradient(135deg, #075a9b, #0871c1 72%, #1687d9);
+}
+
+.modal-box { border-color: rgba(155, 231, 255, .25); }
+.copy-all-btn:hover { background: linear-gradient(135deg, #1b96e8, #075a9b); }
+
+.catalog-hero-image { background: #0871c1; }
+
+.hero-banner-img {
+  height: clamp(220px, 30vw, 380px);
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero-manage-overlay {
+  border-color: rgba(183, 241, 255, .55);
+  background: rgba(4, 83, 142, .36);
+  color: #e6faff;
+}
+
+.hero-manage-overlay:hover {
+  background: rgba(4, 83, 142, .62);
+  border-color: #a3eaff;
+}

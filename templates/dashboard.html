@@ -1,203 +1,53 @@
 {% extends "base.html" %}
 {% block content %}
 
-<style>
-  .admin-page{ --stat-blue:#3d6b8c; --stat-blue-soft:#e7eff3; }
 
-  .admin-page{ padding:0; }
-
-  .topbar{
-    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-  }
-  .top-actions{ display:flex; gap:10px; }
-  .link-btn{
-    min-height:36px; padding:0 14px; border-radius:999px; display:inline-flex; align-items:center;
-    justify-content:center; text-decoration:none; background:var(--card); color:var(--ink);
-    border:1px solid var(--line); font-family:'IBM Plex Mono', monospace; font-size:12.5px; font-weight:600;
-  }
-  .link-btn:hover{ border-color:var(--ink-soft); }
-
-  .stats-grid{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
-  .stat-card{
-    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-    box-shadow:var(--shadow); padding:14px 16px; border-left:4px solid var(--accent);
-  }
-  .stat-card.blue{ border-left-color:var(--stat-blue); }
-  .stat-card.green{ border-left-color:var(--good); }
-  .stat-label{
-    font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); margin-bottom:4px;
-  }
-  .stat-value{ font-family:'Space Grotesk', sans-serif; font-size:26px; font-weight:700; }
-
-  .form-grid-wrap{ display:grid; grid-template-columns:0.85fr 1.15fr; gap:14px; margin-bottom:16px; }
-
-  .inline-form{ display:grid; grid-template-columns:1fr auto; gap:10px; margin-top:12px; }
-  .grid-form{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; margin-top:12px; }
-  .grid-form .wide{ grid-column:span 2; }
-  .add-btn{ background:var(--good); }
-  .add-btn:hover{ background:#245038; }
-
-  .import-divider{
-    border:none; border-top:1px dashed var(--line); margin:14px 0;
-  }
-  .price-import-form{ display:grid; grid-template-columns:1fr auto; gap:10px; margin-top:10px; }
-  .price-btn{ background:var(--stat-blue); }
-  .price-btn:hover{ background:#2e5570; }
-
-  .list-panel{ padding:0; overflow:hidden; }
-  .list-head{
-    padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center;
-    justify-content:space-between; gap:12px; flex-wrap:wrap;
-  }
-  .list-title h2{ margin:0; }
-  .search-box{ width:min(320px, 100%); }
-  .search-box input{
-    width:100%; padding:9px 12px; border-radius:999px; border:1px solid var(--line);
-    font-family:'Inter'; font-size:13.5px; outline:none;
-  }
-  .search-box input:focus{ border-color:var(--accent); }
-
-  table{ min-width:980px; }
-  th{ position:sticky; top:0; background:var(--card); z-index:1; }
-  th.num, td.num{ text-align:right; }
-  .code-line{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .code-badge{
-    font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600;
-    background:rgba(232,96,28,0.1); color:var(--accent); padding:4px 9px; border-radius:999px; white-space:nowrap;
-  }
-  .edit-btn{ background:var(--stat-blue); padding:6px 11px; font-size:12px; border-radius:999px; }
-  .edit-btn:hover{ background:#2e5570; }
-
-  .model-cell strong{ font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:14px; }
-  .color-pill{
-    font-family:'IBM Plex Mono', monospace; font-size:11.5px; font-weight:500;
-    background:var(--card); border:1px solid var(--chip-border); color:var(--ink-soft);
-    padding:4px 9px; border-radius:999px; white-space:nowrap;
-  }
-  .muted-text{ color:var(--ink-soft); font-size:12.5px; }
-  .price-text{ font-family:'IBM Plex Mono', monospace; font-weight:600; color:var(--ink); white-space:nowrap; }
-
-  .del-btn{ min-height:32px; font-size:12px; padding:0 12px; }
-.delete-cell{ display:flex; align-items:center; gap:8px; }
-.delete-cell form{ margin:0; display:inline; }
-  .empty-state{ padding:40px 20px; text-align:center; color:var(--ink-soft); font-family:'IBM Plex Mono', monospace; font-size:13px; }
-
-  .pagination-bar{
-    display:flex; justify-content:center; padding:14px 12px; gap:8px; flex-wrap:wrap;
-    border-top:1px solid var(--line); background:rgba(23,32,28,0.015);
-  }
-  .pagination{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
-  .page-link{
-    display:inline-flex; align-items:center; justify-content:center; min-width:36px; height:36px;
-    padding:0 10px; border-radius:999px; font-family:'IBM Plex Mono', monospace; font-size:12.5px;
-    font-weight:600; text-decoration:none; color:var(--ink-soft); background:var(--card); border:1px solid var(--line);
-  }
-  .page-link:hover:not(.current):not(.disabled){ border-color:var(--ink-soft); }
-  .page-link.current{ background:var(--ink); color:#f2f1ea; border-color:var(--ink); }
-  .page-link.disabled{ opacity:.45; pointer-events:none; }
-
-  /* ---- Modal (Sửa sản phẩm) ---- */
-  .edit-dialog{
-    width:min(720px, calc(100% - 24px)); border:0; border-radius:16px; padding:0;
-    box-shadow:0 30px 90px rgba(23,32,28,0.32); overflow:hidden;
-  }
-  .edit-dialog::backdrop{ background:rgba(23,32,28,0.45); backdrop-filter:blur(2px); }
-  .modal-card{ background:var(--card); padding:18px; }
-  .modal-head{
-    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
-    border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:14px;
-  }
-  .modal-head h3{ margin:0; font-family:'Space Grotesk'; font-size:18px; }
-  .close-btn{
-    background:transparent; color:var(--ink-soft); border:1px solid var(--line);
-    min-width:34px; height:34px; padding:0; font-size:17px; border-radius:999px;
-  }
-  .close-btn:hover{ border-color:var(--ink-soft); background:transparent; }
-
-  /* Khối quản lý ảnh trong modal */
-  .image-manager{
-    display:flex; align-items:center; gap:14px; padding:12px; border:1px solid var(--line);
-    border-radius:12px; background:rgba(23,32,28,0.02); margin-bottom:14px; flex-wrap:wrap;
-  }
-  .image-manager .thumb{ width:76px; height:76px; border-radius:10px; }
-  .image-manager .thumb.placeholder{ width:76px; height:76px; }
-  .image-manager-info{ flex:1; min-width:180px; }
-  .preview-name{ font-family:'Space Grotesk'; font-weight:600; font-size:15px; }
-  .preview-code{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--ink-soft); margin-top:3px; }
-  .del-img-btn{
-    background:var(--out-bg); color:var(--out); border:1px solid rgba(172,58,46,0.25);
-    padding:6px 12px; font-size:12px; border-radius:999px;
-  }
-  .del-img-btn:hover{ background:#efd2ce; }
-
-  .edit-form-grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
-  .field label{
-    display:block; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); margin-bottom:5px;
-  }
-  .field.full{ grid-column:1 / -1; }
-  .modal-actions{
-    display:flex; justify-content:flex-end; gap:10px; margin-top:16px; padding-top:12px;
-    border-top:1px solid var(--line);
-  }
-  .cancel-btn{ background:var(--card); color:var(--ink); border:1px solid var(--line); }
-  .cancel-btn:hover{ background:rgba(23,32,28,0.04); }
-
-  @media (max-width: 980px){
-    .form-grid-wrap{ grid-template-columns:1fr; }
-    .grid-form{ grid-template-columns:repeat(2, minmax(0,1fr)); }
-  }
-
-  @media (max-width: 720px){
-    .top-actions{ width:100%; }
-    .link-btn{ flex:1; }
-    .stats-grid, .grid-form{ grid-template-columns:1fr; }
-    .grid-form .wide{ grid-column:auto; }
-    .list-head{ flex-direction:column; align-items:stretch; }
-    .search-box{ width:100%; }
-    .table-wrap{ overflow:visible; }
-    table, thead, tbody, tr, td{ display:block; width:100%; min-width:0; }
-    thead{ display:none; }
-    tbody{ display:grid; gap:12px; padding:12px; background:rgba(23,32,28,0.02); }
-    tr{ background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-    td{ display:grid; grid-template-columns:110px 1fr; gap:8px; align-items:center; padding:10px 12px; }
-    td::before{
-      content:attr(data-label); font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft);
-    }
-    .num{ text-align:left; }
-    .edit-form-grid{ grid-template-columns:1fr; }
-    .field.full{ grid-column:auto; }
-    .modal-actions{ display:grid; grid-template-columns:1fr; }
-    .price-import-form{ grid-template-columns:1fr; }
-  }
-</style>
 
 <div class="admin-page">
 
-  <header class="topbar" style="margin-bottom:16px;">
-    <div class="brand">
-      <span class="dot"></span>
-      Kho Xe Đạp
-      <span class="admin-tag">ADMIN</span>
+  <section class="admin-hero">
+    <div class="admin-nav">
+      <div class="admin-brand">
+        <span class="brand-mark" aria-hidden="true">★</span>
+        <div class="admin-brand-copy">
+          <strong>ABRAHAM BIKE</strong>
+          <small>QUẢN LÝ TỒN KHO</small>
+        </div>
+        <span class="admin-tag">ADMIN</span>
+      </div>
+
+      <div class="top-actions">
+        <a class="link-btn" href="{{ url_for('catalog') }}" target="_blank">Xem trang khách</a>
+        <a class="link-btn logout" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
+      </div>
     </div>
 
-    <div class="top-actions">
-      <a class="link-btn" href="{{ url_for('catalog') }}" target="_blank">Xem trang khách</a>
-      <a class="link-btn" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
+    <div class="national-strip">
+      <div>
+        <div class="national-kicker">Chào mừng Quốc khánh Việt Nam</div>
+        <h1 class="national-title">Quản lý kho Abraham Bike</h1>
+      </div>
+      <div class="national-date">02<span>/</span>09</div>
     </div>
-  </header>
+  </section>
+
+  <div class="admin-content">
 
   <section class="stats-grid">
     <div class="stat-card blue">
       <div class="stat-label">TỔNG SẢN PHẨM</div>
       <div class="stat-value">{{ total_products }}</div>
+      <div class="stat-caption">Mã sản phẩm đang quản lý</div>
     </div>
     <div class="stat-card green">
       <div class="stat-label">TỔNG TỒN KHO</div>
       <div class="stat-value">{{ total_stock }}</div>
+      <div class="stat-caption">Tổng số lượng trong kho</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">CÓ THỂ BÁN</div>
       <div class="stat-value">{{ total_available }}</div>
+      <div class="stat-caption">Số lượng có thể bán ngay</div>
     </div>
   </section>
 
@@ -214,7 +64,7 @@
 
       <hr class="import-divider">
 
-      <h2 style="font-size:15px;">Cập nhật giá nhanh</h2>
+      <h2>Cập nhật giá nhanh</h2>
       <p class="hint">Chỉ cập nhật cột giá theo mã hàng, không đổi tên/tồn kho. Nhanh hơn nhiều với file lớn.</p>
 
       <form method="POST" action="{{ url_for('admin_import_price') }}" enctype="multipart/form-data" class="price-import-form">
@@ -277,7 +127,8 @@
             <th class="num">Đã đặt</th>
             <th class="num">Có thể bán</th>
             <th class="num">Giá</th>
-<th>Thao tác</th>          </tr>
+            <th>Thao tác</th>
+          </tr>
         </thead>
 
         <tbody id="productTableBody">
@@ -422,13 +273,13 @@
               {% endif %}
             </td>
 
-           <td data-label="Thao tác" class="delete-cell">
-  <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')">Sửa</button>
-  <form method="POST" action="{{ url_for('admin_delete_product', product_id=p.id) }}"
-        onsubmit="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?');" style="display:inline;">
-    <button type="submit" class="del-btn">Xóa</button>
-  </form>
-</td>
+            <td data-label="Thao tác" class="delete-cell">
+              <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')">Sửa</button>
+              <form method="POST" action="{{ url_for('admin_delete_product', product_id=p.id) }}"
+                    onsubmit="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?');">
+                <button type="submit" class="del-btn">Xóa</button>
+              </form>
+            </td>
           </tr>
 
           {% else %}
@@ -464,6 +315,8 @@
         {% endif %}
     </div>
   </section>
+
+  </div>
 
 </div>
 

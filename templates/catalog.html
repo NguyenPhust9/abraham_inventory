@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=3"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=4"
 >
 {% endblock %}
 
@@ -13,15 +13,15 @@
 {% block content %}
 
 <!-- =========================================================
-     TICKER QUỐC KHÁNH 2/9
+  TICKER THONG TIN KHO
 ========================================================= -->
 <div class="national-ticker">
   <div class="national-ticker-track">
 
     <span>
-      ★ CHÀO MỪNG QUỐC KHÁNH 2/9
+      ★ ABRAHAM BIKE
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TỰ HÀO VIỆT NAM
+      XE ĐẠP CHÍNH HÃNG
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
       ABRAHAM BIKE – ĐỒNG HÀNH CÙNG MỌI HÀNH TRÌNH
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
@@ -31,9 +31,9 @@
 
     <!-- Lặp lại để chạy vô hạn -->
     <span aria-hidden="true">
-      ★ CHÀO MỪNG QUỐC KHÁNH 2/9
+      ★ ABRAHAM BIKE
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TỰ HÀO VIỆT NAM
+      XE ĐẠP CHÍNH HÃNG
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
       ABRAHAM BIKE – ĐỒNG HÀNH CÙNG MỌI HÀNH TRÌNH
       &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
@@ -47,14 +47,14 @@
 
 <div class="catalog-page">
 
-  <!-- =========================================================
-       HERO IMAGE 2/9
-  ========================================================= -->
+    <!-- =========================================================
+      HERO IMAGE
+    ========================================================= -->
   <section class="catalog-hero-image">
 
     <img
-      src="{{ url_for('static', filename='uploads/hero-2-9.png') }}"
-      alt="Abraham Bike - Chào mừng Quốc khánh 2/9"
+      src="{{ url_for('static', filename='uploads/heroo.png') }}"
+      alt="Abraham Bike - Xe đạp chính hãng"
       class="hero-banner-img"
     >
 
@@ -171,10 +171,10 @@
         </label>
 
 
-        <!-- Sắp xếp giá -->
+        <!-- Sắp xếp số lượng tồn -->
         <label
           class="sort-wrap"
-          for="sortPrice"
+          for="sortStock"
         >
 
           <span>
@@ -183,7 +183,7 @@
 
           <select
             class="sort-select"
-            id="sortPrice"
+            id="sortStock"
           >
 
             <option value="">
@@ -191,11 +191,11 @@
             </option>
 
             <option value="asc">
-              Giá: Thấp → Cao
+              Tồn: Ít → Nhiều
             </option>
 
             <option value="desc">
-              Giá: Cao → Thấp
+              Tồn: Nhiều → Ít
             </option>
 
           </select>
