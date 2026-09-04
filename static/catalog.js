@@ -33,6 +33,8 @@ let PRODUCTS = [];
 let activeCat = 'Tất cả';
 let onlyInStock = false;
 let sortStockOrder = '';
+let minPrice = null;
+let maxPrice = null;
 
 const els = {
   search: document.getElementById('search'),
@@ -43,6 +45,8 @@ const els = {
   summaryStock: document.getElementById('summaryStock'),
   onlyStock: document.getElementById('onlyStock'),
   sortStock: document.getElementById('sortStock'),
+  minPrice: document.getElementById('minPrice'),
+  maxPrice: document.getElementById('maxPrice'),
   modal: document.getElementById('productModal'),
   modalTitle: document.getElementById('modalTitle'),
   modalSub: document.getElementById('modalSub'),
@@ -204,6 +208,13 @@ function getGroupAvailable(variants) {
 
 function getGroupImage(variants) {
   return variants.find(v => v.image_url) || variants[0] || null;
+}
+
+function readPriceFilter(input) {
+  if (!input || input.value === '') return null;
+
+  const value = Number(input.value);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 function sortVariants(variants) {
@@ -518,8 +529,12 @@ function render() {
     const matchesCat = activeCat === 'Tất cả' || p.category === activeCat;
     const matchesQ = matchesSearch(p, q);
     const matchesStock = !onlyInStock || Number(p.available || 0) > 0;
+    const price = Number(p.price);
+    const hasPrice = Number.isFinite(price) && price > 0;
+    const matchesMinPrice = minPrice === null || (hasPrice && price >= minPrice);
+    const matchesMaxPrice = maxPrice === null || (hasPrice && price <= maxPrice);
 
-    return matchesCat && matchesQ && matchesStock;
+    return matchesCat && matchesQ && matchesStock && matchesMinPrice && matchesMaxPrice;
   });
 
   const groups = groupByModel(filtered);
@@ -530,6 +545,13 @@ function render() {
       const stockB = getGroupAvailable(b.variants);
 
       return sortStockOrder === 'asc' ? stockA - stockB : stockB - stockA;
+    });
+  } else if (sortStockOrder === 'price-asc' || sortStockOrder === 'price-desc') {
+    groups.sort((a, b) => {
+      const priceA = Number(getGroupPrice(a.variants) || 0);
+      const priceB = Number(getGroupPrice(b.variants) || 0);
+
+      return sortStockOrder === 'price-asc' ? priceA - priceB : priceB - priceA;
     });
   } else {
     groups.sort((a, b) => a.model.localeCompare(b.model, 'vi'));
@@ -655,6 +677,20 @@ if (els.onlyStock) {
 if (els.sortStock) {
   els.sortStock.addEventListener('change', () => {
     sortStockOrder = els.sortStock.value;
+    render();
+  });
+}
+
+if (els.minPrice) {
+  els.minPrice.addEventListener('input', () => {
+    minPrice = readPriceFilter(els.minPrice);
+    render();
+  });
+}
+
+if (els.maxPrice) {
+  els.maxPrice.addEventListener('input', () => {
+    maxPrice = readPriceFilter(els.maxPrice);
     render();
   });
 }

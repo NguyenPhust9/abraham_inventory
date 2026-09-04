@@ -558,6 +558,33 @@
 }
 .sort-select:focus{ border-color:rgba(201,23,36,.42); }
 
+.price-filter{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#856d6f;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  font-weight:600;
+}
+
+.price-input{
+  width:96px;
+  min-height:36px;
+  padding:0 10px;
+  border:1px solid var(--nd-line);
+  border-radius:999px;
+  background:#fff;
+  color:#563c3f;
+  font-family:'Inter',sans-serif;
+  font-size:12px;
+  outline:none;
+}
+
+.price-input:focus{ border-color:rgba(201,23,36,.42); }
+.price-input::placeholder{ color:#aa9596; }
+.price-separator{ color:#b79ea0; }
+
 /* =============================
    MAIN / SUMMARY
    ============================= */
@@ -963,6 +990,8 @@
   .extra-filters{ align-items:flex-start; }
   .sort-wrap{ width:100%; justify-content:space-between; }
   .sort-select{ flex:1; max-width:230px; }
+  .price-filter{ width:100%; }
+  .price-input{ flex:1; min-width:0; }
 
   .catalog-main{ padding-top:26px; }
   .catalog-summary{ font-size:9.5px; }

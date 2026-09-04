@@ -198,9 +198,49 @@
               Tồn: Nhiều → Ít
             </option>
 
+            <option value="price-desc">
+              Giá: Cao → Thấp
+            </option>
+
+            <option value="price-asc">
+              Giá: Thấp → Cao
+            </option>
+
           </select>
 
         </label>
+
+        <div class="price-filter" aria-label="Lọc theo giá bán">
+
+          <span class="price-filter-label">
+            Giá
+          </span>
+
+          <input
+            class="price-input"
+            id="minPrice"
+            type="number"
+            min="0"
+            step="1000"
+            inputmode="numeric"
+            placeholder="Từ"
+            aria-label="Giá thấp nhất"
+          >
+
+          <span class="price-separator">-</span>
+
+          <input
+            class="price-input"
+            id="maxPrice"
+            type="number"
+            min="0"
+            step="1000"
+            inputmode="numeric"
+            placeholder="Đến"
+            aria-label="Giá cao nhất"
+          >
+
+        </div>
 
       </div>
 
