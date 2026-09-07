@@ -274,22 +274,34 @@ input[type="text"],input[type="number"],input[type="password"],input[type="email
 
 /* ---------- Login ---------- */
 .login-wrap{
+  position:relative;
+  isolation:isolate;
   min-height:100vh;
   display:flex;
   align-items:center;
   justify-content:center;
   padding:20px;
   background:
-    radial-gradient(circle at 75% 15%,rgba(255,215,104,.18),transparent 24%),
-    linear-gradient(135deg,var(--accent-deep),var(--accent-dark) 45%,var(--accent));
+    linear-gradient(rgba(7,28,50,.28),rgba(7,28,50,.42)),
+    url('/static/uploads/vuitrungthu.png') center/cover no-repeat;
+}
+.login-wrap::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  background:
+    radial-gradient(circle at 50% 18%,rgba(255,216,117,.18),transparent 28%),
+    linear-gradient(180deg,rgba(7,28,50,.08),rgba(7,28,50,.28));
+  pointer-events:none;
 }
 .login-card{
   position:relative;
   overflow:hidden;
-  background:rgba(255,255,255,.97);
-  border:1px solid rgba(255,255,255,.5);
+  background:rgba(255,250,240,.95);
+  border:1px solid rgba(255,216,117,.58);
   border-radius:22px;
-  box-shadow:0 30px 80px rgba(63,4,9,.28);
+  box-shadow:0 30px 80px rgba(7,28,50,.38),0 0 0 4px rgba(255,216,117,.1);
   padding:30px 28px;
   width:100%;
   max-width:360px;
