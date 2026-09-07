@@ -52,7 +52,7 @@
 }
 
 .catalog-hero::after{
-  content:"VIỆT NAM";
+  content:"TRUNG THU";
   position:absolute;
   right:-22px;
   bottom:-54px;
@@ -684,9 +684,11 @@
   max-height:220px;
   object-fit:contain;
   order:-1;
-  border:1px solid rgba(107,21,28,.10);
+  border:1px solid rgba(233,173,61,.32);
   border-radius:13px;
-  background:linear-gradient(135deg,#fff,#f8f0e3);
+  background:
+    radial-gradient(circle at 76% 24%, rgba(255,216,117,.22), transparent 18%),
+    linear-gradient(145deg,#173f66,#102f52);
 }
 
 .catalog-page .colorlist{ display:flex; flex-direction:column; gap:6px; }
@@ -811,12 +813,12 @@
 }
 
 .modal-head::after{
-  content:"★";
+  content:"☾";
   position:absolute;
   right:78px;
   top:-35px;
-  font-size:118px;
-  color:rgba(255,221,113,.10);
+  font-size:132px;
+  color:rgba(255,221,113,.16);
 }
 
 .modal-kicker{
@@ -869,13 +871,26 @@
   display:grid;
   place-items:center;
   overflow:hidden;
-  border:1px solid rgba(116,20,29,.10);
+  position:relative;
+  border:1px solid rgba(233,173,61,.38);
   border-radius:18px;
-  background:linear-gradient(145deg,#fff,#f6eee1);
+  background:
+    radial-gradient(circle at 72% 24%, rgba(255,216,117,.28), transparent 22%),
+    radial-gradient(circle at 18% 88%, rgba(201,85,39,.22), transparent 30%),
+    linear-gradient(145deg,#173f66,#102f52);
 }
 
 .modal-image{ width:100%; height:auto; max-height:420px; object-fit:contain; display:block; }
-.modal-no-image{ color:#9a8587; font-weight:700; }
+.modal-no-image{
+  position:relative;
+  z-index:1;
+  padding:20px;
+  color:#ffe5a0;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:15px;
+  font-weight:700;
+  text-align:center;
+}
 
 .modal-info-grid{
   display:grid;
@@ -1274,6 +1289,106 @@
   object-fit: cover;
 }
 
+/* Thỏ chibi ngồi yên, đưa lồng đèn lên xuống */
+.hero-chibi-bunny {
+  position: absolute;
+  z-index: 2;
+  left: 8%;
+  bottom: 5%;
+  width: clamp(90px, 12vw, 160px);
+  height: clamp(90px, 12vw, 160px);
+  pointer-events: none;
+}
+
+.hero-chibi-bunny__character {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 7px 5px rgba(4, 54, 91, .25));
+}
+
+.hero-bunny-ear {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: hero-bunny-ear 2.6s ease-in-out infinite;
+}
+
+.hero-bunny-arm {
+  transform-box: view-box;
+  transform-origin: 96px 99px;
+  animation: hero-bunny-wave 1.8s ease-in-out infinite;
+}
+
+.hero-bunny-lantern {
+  transform-box: view-box;
+  transform-origin: 130px 94px;
+  animation: hero-lantern-sway 1.8s ease-in-out infinite;
+}
+
+.hero-chibi-bunny__shadow {
+  position: absolute;
+  right: 10%;
+  bottom: 3px;
+  left: 10%;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(4, 54, 91, .22);
+  filter: blur(3px);
+}
+
+.hero-chibi-bunny__spark {
+  position: absolute;
+  color: #fff6a8;
+  font-family: sans-serif;
+  font-weight: 700;
+  text-shadow: 0 1px 7px rgba(255, 255, 255, .8);
+  animation: hero-rider-spark 1.4s ease-in-out infinite;
+}
+
+.hero-chibi-bunny__spark--one {
+  top: 8%;
+  right: -2%;
+  font-size: 18px;
+}
+
+.hero-chibi-bunny__spark--two {
+  top: 40%;
+  left: -8%;
+  font-size: 25px;
+  animation-delay: .45s;
+}
+
+@keyframes hero-bunny-wave {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(13deg); }
+}
+
+@keyframes hero-lantern-sway {
+  0%, 100% { transform: rotate(-4deg) translateY(1px); }
+  50% { transform: rotate(7deg) translateY(-3px); }
+}
+
+@keyframes hero-bunny-ear {
+  0%, 100% { transform: rotate(0); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes hero-bunny-spark {
+  0%, 100% { opacity: .25; transform: scale(.75) rotate(0); }
+  50% { opacity: 1; transform: scale(1.15) rotate(18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-bunny-ear,
+  .hero-bunny-arm,
+  .hero-bunny-lantern,
+  .hero-chibi-bunny__spark {
+    animation: none;
+  }
+}
+
 
 /* Nút quản lý nằm trên ảnh */
 .hero-manage-overlay {
@@ -1332,90 +1447,91 @@
 }
 
 /* =========================================================
-   BLUE INVENTORY THEME
+   MID-AUTUMN INVENTORY THEME
 ========================================================= */
 
 .catalog-page {
-  --nd-red: #1687d9;
-  --nd-red-2: #0871c1;
-  --nd-red-3: #075a9b;
-  --nd-red-4: #073c6b;
-  --nd-gold: #55c8f2;
-  --nd-gold-bright: #9be7ff;
-  --nd-gold-soft: #dff7ff;
-  --nd-cream: #edf8ff;
-  --nd-paper: #fbfeff;
-  --nd-ink: #10344f;
-  --nd-muted: #5f7e91;
-  --nd-line: rgba(12, 105, 170, .16);
+  --nd-red: #e97832;
+  --nd-red-2: #c95527;
+  --nd-red-3: #174b76;
+  --nd-red-4: #102f52;
+  --nd-gold: #e9ad3d;
+  --nd-gold-bright: #ffd875;
+  --nd-gold-soft: #fff0bd;
+  --nd-cream: #f8efdd;
+  --nd-paper: #fffaf0;
+  --nd-ink: #173552;
+  --nd-muted: #687888;
+  --nd-line: rgba(23, 75, 118, .16);
   background:
-    radial-gradient(circle at 18% 12%, rgba(98, 210, 255, .24), transparent 24%),
-    linear-gradient(180deg, #edf8ff 0%, #f8fcff 58%, #eaf6fd 100%);
+    radial-gradient(circle at 82% 8%, rgba(233, 173, 61, .2), transparent 20%),
+    radial-gradient(circle at 12% 48%, rgba(23, 75, 118, .1), transparent 28%),
+    linear-gradient(180deg, #f8efdd 0%, #fffaf0 58%, #f2e5d0 100%);
   color: var(--nd-ink);
 }
 
 .national-ticker {
-  background: linear-gradient(90deg, #07508d 0%, #1687d9 48%, #0871c1 100%);
-  border-color: rgba(164, 235, 255, .5);
-  color: #e6faff;
-  box-shadow: 0 5px 20px rgba(4, 76, 130, .18);
+  background: linear-gradient(90deg, #102f52 0%, #174b76 48%, #c95527 100%);
+  border-color: rgba(255, 216, 117, .5);
+  color: #fff0bd;
+  box-shadow: 0 5px 20px rgba(16, 47, 82, .2);
 }
 
 .national-ticker::before {
-  background: linear-gradient(90deg, #07508d 0%, rgba(7, 80, 141, 0) 100%);
+  background: linear-gradient(90deg, #102f52 0%, rgba(16, 47, 82, 0) 100%);
 }
 
 .national-ticker::after {
-  background: linear-gradient(270deg, #07508d 0%, rgba(7, 80, 141, 0) 100%);
+  background: linear-gradient(270deg, #c95527 0%, rgba(201, 85, 39, 0) 100%);
 }
 
-.national-ticker-track span { color: #e6faff; }
+.national-ticker-track span { color: #fff0bd; }
 
 .catalog-controls {
-  border-color: rgba(12, 105, 170, .16);
-  background: rgba(251, 254, 255, .95);
-  box-shadow: 0 24px 70px rgba(7, 74, 120, .13);
+  border-color: rgba(23, 75, 118, .16);
+  background: rgba(255, 250, 240, .96);
+  box-shadow: 0 24px 70px rgba(16, 47, 82, .14);
 }
 
 .control-kicker,
 .catalog-page .price-row .price { color: var(--nd-red-2); }
 
 .control-badge {
-  border-color: rgba(22, 135, 217, .18);
-  background: #eaf8ff;
-  color: #075a9b;
+  border-color: rgba(201, 85, 39, .2);
+  background: #fff0d0;
+  color: #a54a25;
 }
 
 .catalog-page .catalog-search input:focus {
-  border-color: rgba(22, 135, 217, .55);
-  box-shadow: 0 0 0 4px rgba(22, 135, 217, .1);
+  border-color: rgba(201, 85, 39, .55);
+  box-shadow: 0 0 0 4px rgba(201, 85, 39, .1);
 }
 
 .catalog-page .pill:hover:not(.active) {
-  border-color: rgba(22, 135, 217, .35);
+  border-color: rgba(201, 85, 39, .35);
   color: var(--nd-red-2);
-  background: #f0faff;
+  background: #fff6e5;
 }
 
 .catalog-page .pill.active,
 .copy-all-btn {
   border-color: var(--nd-red-2);
   background: linear-gradient(135deg, var(--nd-red), var(--nd-red-2));
-  box-shadow: 0 8px 18px rgba(8, 113, 193, .18);
+  box-shadow: 0 8px 18px rgba(201, 85, 39, .2);
 }
 
 .catalog-page .pills-arrow:hover {
-  background: #eefaff;
-  border-color: rgba(22, 135, 217, .3);
+  background: #fff6e5;
+  border-color: rgba(201, 85, 39, .3);
 }
 
 .check-inline input { accent-color: var(--nd-red); }
-.sort-select:focus { border-color: rgba(22, 135, 217, .5); }
+.sort-select:focus { border-color: rgba(201, 85, 39, .5); }
 
 .catalog-page .card {
-  border-color: rgba(12, 105, 170, .14);
-  background: linear-gradient(145deg, #fbfeff 0%, #f2faff 100%);
-  box-shadow: 0 10px 30px rgba(7, 74, 120, .07);
+  border-color: rgba(23, 75, 118, .14);
+  background: linear-gradient(145deg, #fffaf0 0%, #f8efdd 100%);
+  box-shadow: 0 10px 30px rgba(16, 47, 82, .09);
 }
 
 .catalog-page .card::before {
@@ -1423,35 +1539,37 @@
 }
 
 .catalog-page .card:hover {
-  border-color: rgba(22, 135, 217, .3);
-  box-shadow: 0 20px 46px rgba(7, 74, 120, .13);
+  border-color: rgba(201, 85, 39, .3);
+  box-shadow: 0 20px 46px rgba(16, 47, 82, .14);
 }
 
 .catalog-page .cat-tag {
-  border-color: rgba(22, 135, 217, .2);
-  background: #eaf8ff;
-  color: #075a9b;
+  border-color: rgba(201, 85, 39, .2);
+  background: #fff0d0;
+  color: #a54a25;
 }
 
 .catalog-page .card-img,
 .modal-image-wrap {
-  border-color: rgba(12, 105, 170, .14);
-  background: linear-gradient(135deg, #fff, #eaf7ff);
+  border-color: rgba(233, 173, 61, .38);
+  background:
+    radial-gradient(circle at 76% 24%, rgba(255, 216, 117, .22), transparent 20%),
+    linear-gradient(145deg, #173f66, #102f52);
 }
 
-.product-modal::backdrop { background: rgba(4, 47, 82, .58); }
+.product-modal::backdrop { background: rgba(16, 32, 56, .62); }
 
 .modal-head {
-  border-bottom-color: rgba(12, 105, 170, .14);
+  border-bottom-color: rgba(255, 216, 117, .2);
   background:
-    radial-gradient(circle at 90% 15%, rgba(155, 231, 255, .22), transparent 24%),
-    linear-gradient(135deg, #075a9b, #0871c1 72%, #1687d9);
+    radial-gradient(circle at 90% 15%, rgba(255, 216, 117, .2), transparent 24%),
+    linear-gradient(135deg, #102f52, #174b76 72%, #c95527);
 }
 
-.modal-box { border-color: rgba(155, 231, 255, .25); }
-.copy-all-btn:hover { background: linear-gradient(135deg, #1b96e8, #075a9b); }
+.modal-box { border-color: rgba(255, 216, 117, .25); }
+.copy-all-btn:hover { background: linear-gradient(135deg, #f28a3e, #a94323); }
 
-.catalog-hero-image { background: #0871c1; }
+.catalog-hero-image { background: #102f52; }
 
 .hero-banner-img {
   height: clamp(220px, 30vw, 380px);
@@ -1460,12 +1578,12 @@
 }
 
 .hero-manage-overlay {
-  border-color: rgba(183, 241, 255, .55);
-  background: rgba(4, 83, 142, .36);
-  color: #e6faff;
+  border-color: rgba(255, 216, 117, .6);
+  background: rgba(16, 47, 82, .42);
+  color: #fff0bd;
 }
 
 .hero-manage-overlay:hover {
-  background: rgba(4, 83, 142, .62);
-  border-color: #a3eaff;
+  background: rgba(201, 85, 39, .72);
+  border-color: #ffd875;
 }

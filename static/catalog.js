@@ -54,6 +54,55 @@ const els = {
   modalClose: document.getElementById('modalClose'),
 };
 
+let audioContext = null;
+
+function unlockAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+}
+
+function playUISound(kind = 'click') {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  unlockAudio();
+
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+
+  const settings = {
+    click: { frequency: 520, endFrequency: 700, duration: .07, volume: .065 },
+    open: { frequency: 620, endFrequency: 920, duration: .16, volume: .085 },
+    close: { frequency: 420, endFrequency: 260, duration: .12, volume: .07 },
+    lantern: { frequency: 760, endFrequency: 1120, duration: .13, volume: .07 },
+  }[kind] || { frequency: 520, endFrequency: 700, duration: .07, volume: .065 };
+
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(settings.frequency, now);
+  oscillator.frequency.exponentialRampToValueAtTime(settings.endFrequency, now + settings.duration);
+  gain.gain.setValueAtTime(.0001, now);
+  gain.gain.exponentialRampToValueAtTime(settings.volume, now + .01);
+  gain.gain.exponentialRampToValueAtTime(.0001, now + settings.duration);
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start(now);
+  oscillator.stop(now + settings.duration + .02);
+}
+
 // Dong bo trang thai loc voi checkbox tren giao dien ngay tu dau,
 // tranh viec checkbox hien tick san (checked trong HTML) nhung
 // bien onlyInStock van la false cho den khi nguoi dung bam doi.
@@ -395,6 +444,7 @@ function toPngBlob(blob) {
 }
 
 function openProductModal(group) {
+  playUISound('open');
   const variants = sortVariants(group.variants);
   const imgVariant = getGroupImage(variants);
   const groupPrice = getGroupPrice(variants);
@@ -499,6 +549,7 @@ function openProductModal(group) {
   els.modalBody.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', event => {
       event.stopPropagation();
+      playUISound('lantern');
       copyText(btn.dataset.copy || '');
     });
   });
@@ -507,6 +558,7 @@ function openProductModal(group) {
   if (copyImageBtn) {
     copyImageBtn.addEventListener('click', event => {
       event.stopPropagation();
+      playUISound('lantern');
       copyProductImage(group);
     });
   }
@@ -515,6 +567,7 @@ function openProductModal(group) {
   if (copyTextBtn) {
     copyTextBtn.addEventListener('click', event => {
       event.stopPropagation();
+      playUISound('lantern');
       copyProductText(group);
     });
   }
@@ -630,6 +683,7 @@ function buildPills() {
 
   els.pills.querySelectorAll('.pill').forEach(el => {
     el.addEventListener('click', () => {
+      playUISound('click');
       activeCat = el.dataset.cat;
 
       els.pills.querySelectorAll('.pill').forEach(p => {
@@ -669,6 +723,7 @@ if (els.search) {
 
 if (els.onlyStock) {
   els.onlyStock.addEventListener('change', () => {
+    playUISound('click');
     onlyInStock = els.onlyStock.checked;
     render();
   });
@@ -676,6 +731,7 @@ if (els.onlyStock) {
 
 if (els.sortStock) {
   els.sortStock.addEventListener('change', () => {
+    playUISound('click');
     sortStockOrder = els.sortStock.value;
     render();
   });
@@ -697,6 +753,7 @@ if (els.maxPrice) {
 
 if (els.modalClose) {
   els.modalClose.addEventListener('click', () => {
+    playUISound('close');
     els.modal.close();
   });
 }
@@ -704,6 +761,7 @@ if (els.modalClose) {
 if (els.modal) {
   els.modal.addEventListener('click', event => {
     if (event.target === els.modal) {
+      playUISound('close');
       els.modal.close();
     }
   });
@@ -711,9 +769,20 @@ if (els.modal) {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && els.modal && els.modal.open) {
+    playUISound('close');
     els.modal.close();
   }
 });
+
+document.addEventListener('click', event => {
+  if (event.target.closest('.pills-arrow')) {
+    playUISound('click');
+  }
+});
+
+// Mobile browsers require audio to be initialized from a real touch gesture.
+document.addEventListener('pointerdown', unlockAudio, { once: true, passive: true });
+document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
 load();
 
