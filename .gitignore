@@ -6,8 +6,6 @@ env/
 .env
 shop.db
 *.db
-static/uploads/*
-!static/uploads/.gitkeep
 .DS_Store
 Thumbs.db
 
