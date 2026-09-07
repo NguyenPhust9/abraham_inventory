@@ -666,7 +666,10 @@ function render() {
 function buildPills() {
   const categories = PRODUCTS
     .map(p => p.category)
-    .filter(c => c && String(c).trim());
+    .filter(c => {
+      const category = normalizeText(c);
+      return category.startsWith('xe đạp') || category.startsWith('phụ tùng');
+    });
 
   const cats = [
     'Tất cả',
