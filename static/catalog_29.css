@@ -1587,3 +1587,162 @@
   background: rgba(201, 85, 39, .72);
   border-color: #ffd875;
 }
+
+/* =========================================================
+   PRODUCT CARD - MID AUTUMN FESTIVAL STYLE
+========================================================= */
+
+.catalog-page .card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(222, 158, 55, .65);
+  background:
+    linear-gradient(145deg, #fffdf7 0%, #fff8e8 45%, #f9e9c6 100%);
+  box-shadow:
+    0 12px 30px rgba(63, 36, 15, .16),
+    0 0 0 4px rgba(255, 215, 132, .1),
+    inset 0 1px 0 rgba(255, 255, 255, .9);
+  transition: transform .35s ease, box-shadow .35s ease;
+}
+
+.catalog-page .card::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(135deg, #f8d07c, #fff5cc, #d88728, #f8d07c);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: .7;
+}
+
+.catalog-page .card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(222, 158, 55, .8);
+  box-shadow:
+    0 25px 45px rgba(57, 32, 12, .24),
+    0 0 35px rgba(255, 176, 42, .22);
+}
+
+.catalog-page .card-top {
+  position: relative;
+  z-index: 2;
+}
+
+.catalog-page .card-img {
+  position: relative;
+  overflow: hidden;
+  margin: 16px 16px 10px;
+  width: calc(100% - 32px);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 211, 120, .45);
+  background:
+    radial-gradient(circle at 75% 20%, rgba(255, 226, 141, .4), transparent 25%),
+    linear-gradient(135deg, #132b4a, #1e4569);
+  transition: transform .45s ease, filter .45s ease;
+}
+
+.catalog-page .card:hover .card-img {
+  transform: scale(1.035);
+  filter: saturate(1.05);
+}
+
+.catalog-page .model {
+  color: #6f2919;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+.catalog-page .cat-tag {
+  border-color: #e4ad55;
+  background: linear-gradient(135deg, #fff8e5, #f9dfab);
+  color: #8d481f;
+  box-shadow: 0 3px 10px rgba(170, 100, 25, .1);
+}
+
+.catalog-page .colorlist {
+  position: relative;
+  z-index: 2;
+  padding: 0 16px;
+}
+
+.catalog-page .colorrow {
+  padding: 11px 13px;
+  border: 1px solid rgba(203, 157, 85, .28);
+  border-radius: 14px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .9), rgba(255, 241, 207, .75));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+  transition: transform .25s ease, background .25s ease;
+}
+
+.catalog-page .colorrow:hover {
+  transform: translateX(5px);
+  background: linear-gradient(90deg, #fffdf7, #ffedc4);
+}
+
+.catalog-page .swatch {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 3px 8px rgba(50, 30, 10, .22), inset 0 1px 2px rgba(255, 255, 255, .5);
+}
+
+.catalog-page .cname {
+  color: #6f4a3d;
+}
+
+.catalog-page .stockbadge {
+  padding: 6px 12px;
+  color: #41734e;
+  background: linear-gradient(135deg, #e8f5e8, #d6ead5);
+  box-shadow: 0 2px 8px rgba(53, 110, 70, .08);
+}
+
+.catalog-page .stockbadge.low {
+  color: #9a6516;
+  background: linear-gradient(135deg, #fff1ca, #ffe2a0);
+}
+
+.catalog-page .price-row {
+  position: relative;
+  z-index: 2;
+  margin: 15px 16px 0;
+  padding: 14px 0 18px;
+  border-top-color: rgba(177, 112, 41, .45);
+}
+
+.catalog-page .price-row span:first-child {
+  padding: 7px 15px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #d3542c, #a92e1d);
+  color: #fff9df;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(150, 45, 20, .2);
+}
+
+.catalog-page .price-row .price {
+  color: #a9341e;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: .5px;
+  text-shadow: 0 1px 0 #fff;
+}
+
+.catalog-page .card::after {
+  content: "☁";
+  position: absolute;
+  right: -8px;
+  bottom: -18px;
+  z-index: 1;
+  color: rgba(232, 184, 105, .18);
+  font-size: 70px;
+  transform: rotate(-10deg);
+  pointer-events: none;
+}
