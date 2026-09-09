@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -92,6 +93,40 @@ def normalize_code(value: Any) -> str:
     return " ".join(
         str(value or "").strip().split()
     ).casefold()
+
+
+def first_text(item: dict[str, Any], *keys: str) -> str:
+    """Lay gia tri text dau tien, khong phan biet kieu viet ten truong."""
+    normalized_items = {
+        re.sub(r"[^a-z0-9]", "", str(key).casefold()): value
+        for key, value in item.items()
+    }
+
+    for key in keys:
+        value = item.get(key)
+
+        if value is None:
+            value = normalized_items.get(
+                re.sub(r"[^a-z0-9]", "", key.casefold())
+            )
+
+        text_value = str(value or "").strip()
+
+        if text_value:
+            return " ".join(text_value.split())
+
+    return ""
+
+
+def split_model_color(value: str) -> tuple[str, str]:
+    """Tach ten/mau tu dang 'PASSION 20 - CAM'."""
+    text_value = " ".join(str(value or "").strip().split())
+    parts = re.split(r"\s+-\s+", text_value)
+
+    if len(parts) >= 2 and parts[-1].strip():
+        return " - ".join(parts[:-1]).strip(), parts[-1].strip()
+
+    return text_value, ""
 
 
 def to_integer(value: Any) -> int:
@@ -409,9 +444,14 @@ def build_inventory_map(
     inventory_map: dict[str, dict[str, Any]] = {}
 
     for item in inventory:
-        original_code = str(
-            item.get("product_code") or ""
-        ).strip()
+        original_code = first_text(
+            item,
+            "product_code",
+            "ProductCode",
+            "inventory_item_code",
+            "InventoryItemCode",
+            "code",
+        )
 
         normalized_code = normalize_code(original_code)
 
@@ -430,8 +470,54 @@ def build_inventory_map(
             item.get("order_quantity")
         )
 
+        product_name = first_text(
+            item,
+            "product_name",
+            "ProductName",
+            "inventory_item_name",
+            "InventoryItemName",
+            "name",
+        )
+        explicit_model = first_text(
+            item,
+            "model",
+            "model_name",
+            "ModelName",
+        )
+        explicit_color = first_text(
+            item,
+            "color",
+            "colour",
+            "color_name",
+            "ColorName",
+        )
+        parsed_model, parsed_color = split_model_color(
+            product_name or original_code
+        )
+
         inventory_map[normalized_code] = {
             "code": original_code,
+            # Cot model trong he thong la bat buoc. Neu AMIS khong tra ten
+            # san pham, tach model/mau truc tiep tu ma hang lam du lieu du phong.
+            "model": explicit_model or parsed_model or original_code,
+            "color": explicit_color or parsed_color,
+            "category": first_text(
+                item,
+                "category_name",
+                "CategoryName",
+                "product_category_name",
+                "ProductCategoryName",
+                "group_name",
+                "GroupName",
+            ),
+            "unit": first_text(
+                item,
+                "unit_name",
+                "UnitName",
+                "main_unit_name",
+                "MainUnitName",
+                "unit",
+            ) or "Chiếc",
             "stock": stock,
             "reserved": reserved,
             "available": available,
@@ -449,6 +535,7 @@ def update_supabase(
     )
 
     updated_count = 0
+    inserted_count = 0
     unchanged_count = 0
     missing_in_amis: list[str] = []
 
@@ -463,12 +550,16 @@ def update_supabase(
             )
         ).mappings().all()
 
-        for product in products:
+        existing_by_code = {
+            normalize_code(product["code"]): product
+            for product in products
+            if normalize_code(product["code"])
+        }
+
+        for normalized_code, product in existing_by_code.items():
             product_code = str(
                 product["code"] or ""
             ).strip()
-
-            normalized_code = normalize_code(product_code)
 
             amis_item = inventory_map.get(normalized_code)
 
@@ -496,7 +587,7 @@ def update_supabase(
                     SET
                         stock = :stock,
                         reserved = :reserved,
-                        updated_at = NOW()
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE id = :product_id
                     """
                 ),
@@ -509,6 +600,52 @@ def update_supabase(
 
             updated_count += 1
 
+        # Vong lap cu chi duyet cac ma da co trong database nen ma moi tren
+        # AMIS bi bo qua. Duyet nguoc lai inventory_map de them cac ma con thieu.
+        for normalized_code, amis_item in inventory_map.items():
+            if normalized_code in existing_by_code:
+                continue
+
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO products (
+                        code,
+                        model,
+                        color,
+                        category,
+                        unit,
+                        stock,
+                        reserved,
+                        updated_at
+                    )
+                    VALUES (
+                        :code,
+                        :model,
+                        :color,
+                        :category,
+                        :unit,
+                        :stock,
+                        :reserved,
+                        CURRENT_TIMESTAMP
+                    )
+                    """
+                ),
+                {
+                    "code": amis_item["code"],
+                    "model": amis_item["model"],
+                    "color": amis_item["color"],
+                    "category": amis_item["category"],
+                    "unit": amis_item["unit"],
+                    "stock": amis_item["stock"],
+                    "reserved": amis_item["reserved"],
+                },
+            )
+
+            inserted_count += 1
+
+    engine.dispose()
+
     print("\n========================================")
     print("DONG BO SUPABASE THANH CONG")
     print("Da cap nhat:", updated_count)
@@ -518,6 +655,12 @@ def update_supabase(
         len(missing_in_amis),
     )
     print("========================================")
+
+    if inserted_count:
+        print(
+            f"\nGHI CHÚ: Đã thêm mới {inserted_count} "
+            "mã hàng từ AMIS."
+        )
 
     if missing_in_amis:
         print("\n20 MA KHONG TIM THAY TREN AMIS:")
