@@ -60,6 +60,7 @@ const els = {
   zoomLevel: document.getElementById('imageZoomLevel'),
   zoomViewport: document.getElementById('imageZoomViewport'),
   zoomStage: document.getElementById('imageZoomStage'),
+  zoomCopy: document.getElementById('imageZoomCopy'),
   zoomIn: document.getElementById('imageZoomIn'),
   zoomOut: document.getElementById('imageZoomOut'),
   zoomClose: document.getElementById('imageZoomClose'),
@@ -68,6 +69,7 @@ const els = {
 let audioContext = null;
 let imageZoom = 1;
 let zoomDrag = null;
+let zoomGroup = null;
 
 function layoutImageZoom() {
   const image = els.zoomImage;
@@ -106,8 +108,9 @@ function setImageZoom(value) {
   layoutImageZoom();
 }
 
-function openImageZoom(imageUrl, title) {
+function openImageZoom(imageUrl, title, group) {
   if (!imageUrl || !els.zoomDialog) return;
+  zoomGroup = group;
   els.zoomStage.style.width = '0px';
   els.zoomStage.style.height = '0px';
   els.zoomImage.src = imageUrl;
@@ -620,7 +623,7 @@ function openProductModal(group) {
   const copyImageBtn = document.getElementById('copyProductImageBtn');
   const zoomBtn = document.getElementById('modalZoomBtn');
   if (zoomBtn) {
-    zoomBtn.addEventListener('click', () => openImageZoom(imgVariant.image_url, group.model));
+    zoomBtn.addEventListener('click', () => openImageZoom(imgVariant.image_url, group.model, group));
   }
 
   if (copyImageBtn) {
@@ -840,6 +843,10 @@ if (els.zoomDialog) {
     if (els.zoomDialog.open) layoutImageZoom();
   });
   els.zoomClose.addEventListener('click', () => els.zoomDialog.close());
+  els.zoomCopy.addEventListener('click', () => {
+    if (zoomGroup) copyProductImage(zoomGroup);
+  });
+  els.zoomDialog.addEventListener('close', () => { zoomGroup = null; });
   els.zoomIn.addEventListener('click', () => setImageZoom(imageZoom + .5));
   els.zoomOut.addEventListener('click', () => setImageZoom(imageZoom - .5));
   els.zoomDialog.addEventListener('click', event => {

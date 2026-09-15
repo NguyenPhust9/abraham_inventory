@@ -1918,6 +1918,15 @@
   cursor: pointer;
 }
 
+.image-zoom-actions #imageZoomCopy {
+  width: auto;
+  min-width: 76px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .image-zoom-actions button:disabled { opacity: .4; cursor: default; }
 .image-zoom-actions button:not(:disabled):hover { background: rgba(255, 255, 255, .25); }
 .image-zoom-actions span { min-width: 48px; text-align: center; font-size: 12px; }
@@ -1965,7 +1974,7 @@
   .modal-image-wrap .modal-no-image { margin: auto; }
   .image-zoom-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
   .image-zoom-toolbar { padding: 6px 10px; gap: 6px; }
-  .image-zoom-title { font-size: 12px; }
+  .image-zoom-title { display: none; }
   .image-zoom-actions { gap: 4px; }
   .image-zoom-actions button { width: 44px; height: 44px; }
   .image-zoom-actions span { min-width: 40px; }
