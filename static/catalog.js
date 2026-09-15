@@ -59,6 +59,7 @@ const els = {
   zoomTitle: document.getElementById('imageZoomTitle'),
   zoomLevel: document.getElementById('imageZoomLevel'),
   zoomViewport: document.getElementById('imageZoomViewport'),
+  zoomStage: document.getElementById('imageZoomStage'),
   zoomIn: document.getElementById('imageZoomIn'),
   zoomOut: document.getElementById('imageZoomOut'),
   zoomClose: document.getElementById('imageZoomClose'),
@@ -66,24 +67,55 @@ const els = {
 
 let audioContext = null;
 let imageZoom = 1;
+let zoomDrag = null;
+
+function layoutImageZoom() {
+  const image = els.zoomImage;
+  const viewport = els.zoomViewport;
+  const stage = els.zoomStage;
+  if (!image.naturalWidth || !image.naturalHeight || !viewport.clientWidth || !viewport.clientHeight) return;
+
+  // Keep the same point centered while the image or screen size changes.
+  const oldWidth = stage.offsetWidth;
+  const oldHeight = stage.offsetHeight;
+  const centerX = oldWidth
+    ? Math.max(0, Math.min(1, (viewport.scrollLeft + viewport.clientWidth / 2 - stage.offsetLeft) / oldWidth))
+    : .5;
+  const centerY = oldHeight
+    ? Math.max(0, Math.min(1, (viewport.scrollTop + viewport.clientHeight / 2 - stage.offsetTop) / oldHeight))
+    : .5;
+
+  const fit = Math.min(viewport.clientWidth / image.naturalWidth, viewport.clientHeight / image.naturalHeight);
+  stage.style.width = `${Math.round(image.naturalWidth * fit * imageZoom)}px`;
+  stage.style.height = `${Math.round(image.naturalHeight * fit * imageZoom)}px`;
+
+  requestAnimationFrame(() => {
+    viewport.scrollTo(
+      stage.offsetLeft + stage.offsetWidth * centerX - viewport.clientWidth / 2,
+      stage.offsetTop + stage.offsetHeight * centerY - viewport.clientHeight / 2
+    );
+  });
+}
 
 function setImageZoom(value) {
   imageZoom = Math.max(1, Math.min(3, value));
-  els.zoomImage.style.width = `${imageZoom * 100}%`;
-  els.zoomImage.classList.toggle('is-enlarged', imageZoom > 1);
   els.zoomLevel.textContent = `${Math.round(imageZoom * 100)}%`;
   els.zoomOut.disabled = imageZoom === 1;
   els.zoomIn.disabled = imageZoom === 3;
+  els.zoomViewport.classList.toggle('can-pan', imageZoom > 1);
+  layoutImageZoom();
 }
 
 function openImageZoom(imageUrl, title) {
   if (!imageUrl || !els.zoomDialog) return;
+  els.zoomStage.style.width = '0px';
+  els.zoomStage.style.height = '0px';
   els.zoomImage.src = imageUrl;
   els.zoomImage.alt = title;
   els.zoomTitle.textContent = title;
-  setImageZoom(1);
-  els.zoomViewport.scrollTo(0, 0);
   els.zoomDialog.showModal();
+  setImageZoom(1);
+  requestAnimationFrame(layoutImageZoom);
 }
 
 function unlockAudio() {
@@ -804,11 +836,42 @@ if (els.modalClose) {
 }
 
 if (els.zoomDialog) {
+  els.zoomImage.addEventListener('load', () => {
+    if (els.zoomDialog.open) layoutImageZoom();
+  });
   els.zoomClose.addEventListener('click', () => els.zoomDialog.close());
   els.zoomIn.addEventListener('click', () => setImageZoom(imageZoom + .5));
   els.zoomOut.addEventListener('click', () => setImageZoom(imageZoom - .5));
   els.zoomDialog.addEventListener('click', event => {
     if (event.target === els.zoomDialog) els.zoomDialog.close();
+  });
+  els.zoomViewport.addEventListener('pointerdown', event => {
+    if (imageZoom === 1 || event.pointerType === 'touch' || event.button !== 0) return;
+    zoomDrag = {
+      x: event.clientX,
+      y: event.clientY,
+      left: els.zoomViewport.scrollLeft,
+      top: els.zoomViewport.scrollTop,
+    };
+    els.zoomViewport.setPointerCapture(event.pointerId);
+    els.zoomViewport.classList.add('is-dragging');
+    event.preventDefault();
+  });
+  els.zoomViewport.addEventListener('pointermove', event => {
+    if (!zoomDrag) return;
+    els.zoomViewport.scrollTo(
+      zoomDrag.left - (event.clientX - zoomDrag.x),
+      zoomDrag.top - (event.clientY - zoomDrag.y)
+    );
+  });
+  const stopZoomDrag = () => {
+    zoomDrag = null;
+    els.zoomViewport.classList.remove('is-dragging');
+  };
+  els.zoomViewport.addEventListener('pointerup', stopZoomDrag);
+  els.zoomViewport.addEventListener('pointercancel', stopZoomDrag);
+  window.addEventListener('resize', () => {
+    if (els.zoomDialog.open) layoutImageZoom();
   });
 }
 

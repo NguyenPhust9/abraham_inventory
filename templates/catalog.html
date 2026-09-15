@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=12"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=13"
 >
 {% endblock %}
 
@@ -386,7 +386,9 @@
         </div>
       </div>
       <div id="imageZoomViewport" class="image-zoom-viewport">
-        <img id="imageZoomImage" class="image-zoom-image" alt="">
+        <div id="imageZoomStage" class="image-zoom-stage">
+          <img id="imageZoomImage" class="image-zoom-image" alt="">
+        </div>
       </div>
     </div>
   </dialog>
@@ -418,7 +420,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=13"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=14"></script>
 {% else %}
 <script>
   setInterval(async () => {
