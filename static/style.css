@@ -764,3 +764,64 @@ tbody tr:hover{background:rgba(201,21,34,.018);}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;}
 }
+
+.admin-price-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-price-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(105, 19, 27, .2);
+  background: #fff;
+  color: #760812;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+
+.admin-price-tab.active {
+  background: #a80c18;
+  border-color: #a80c18;
+  color: #fff;
+}
+
+.retail-visibility-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.retail-visibility-panel h2 { margin-bottom: 5px; }
+.retail-visibility-panel .hint { margin-bottom: 0; }
+.retail-visibility-btn {
+  white-space: nowrap;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 0;
+  color: #fff;
+  background: #a80c18;
+  font-weight: 700;
+  cursor: pointer;
+}
+.retail-visibility-btn.is-on { background: #5f080f; }
+
+.admin-price-tab:hover,
+.admin-price-tab:focus-visible {
+  border-color: #a80c18;
+}
+
+@media (max-width: 520px) {
+  .admin-price-tab { flex: 1; padding: 0 10px; }
+  .retail-visibility-panel { align-items: stretch; flex-direction: column; }
+  .retail-visibility-btn { width: 100%; }
+}

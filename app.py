@@ -9,7 +9,7 @@ from flask_login import (  # type: ignore
     LoginManager, UserMixin, login_user, logout_user,
     login_required
 )
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text, func  # type: ignore
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text, func, inspect  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
@@ -68,6 +68,7 @@ class Product(Base):
     stock = Column(Integer, default=0)
     reserved = Column(Integer, default=0)
     price = Column(Float, nullable=True)
+    retail_price = Column(Float, nullable=True)
     image_filename = Column(String, default="")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -93,7 +94,25 @@ class Product(Base):
         }
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String, nullable=False)
+
+
 Base.metadata.create_all(engine)
+
+
+def ensure_retail_price_column():
+    """Add the retail price to existing SQLite and PostgreSQL databases."""
+    columns = {column["name"] for column in inspect(engine).get_columns("products")}
+    if "retail_price" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE products ADD COLUMN retail_price FLOAT"))
+
+
+ensure_retail_price_column()
 
 
 # ---------- Upload folder ----------
@@ -259,13 +278,48 @@ def seed_if_empty():
 
 
 # ---------- Public routes ----------
+def retail_prices_visible(db):
+    setting = db.query(AppSetting).filter_by(key="retail_prices_visible").first()
+    return setting is not None and setting.value == "1"
+
+
+def render_catalog_page(price_type):
+    db = SessionLocal()
+    try:
+        visible = retail_prices_visible(db)
+    finally:
+        db.close()
+    return render_template(
+        "catalog.html",
+        price_type=price_type,
+        price_label="Giá lẻ" if price_type == "retail" else "Giá đại lý",
+        retail_visible=visible,
+    )
+
+
 @app.route("/")
 def catalog():
-    return render_template("catalog.html")
+    return render_catalog_page("dealer")
+
+
+@app.route("/gia-le")
+def retail_catalog():
+    return render_catalog_page("retail")
+
+
+@app.route("/api/retail-status")
+def api_retail_status():
+    db = SessionLocal()
+    try:
+        visible = retail_prices_visible(db)
+    finally:
+        db.close()
+    return jsonify({"visible": visible})
 
 
 @app.route("/api/products")
-def api_products():
+@app.route("/api/products/<price_type>")
+def api_products(price_type="dealer"):
     """
     API cho trang khách.
 
@@ -274,14 +328,24 @@ def api_products():
     - API trả model đã chuẩn hóa để frontend tự gộp chung card.
     - original_model giữ lại tên gốc nếu sau này cần xem/debug.
     """
+    if price_type not in ("dealer", "retail"):
+        return jsonify({"error": "Loại giá không hợp lệ"}), 404
+
     db = SessionLocal()
     try:
+        visible = retail_prices_visible(db) if price_type == "retail" else True
+        if price_type == "retail" and not visible:
+            response = jsonify([])
+            response.headers["X-Retail-Prices-Visible"] = "0"
+            return response
         products = db.query(Product).order_by(Product.model, Product.color).all()
 
         out = []
 
         for p in products:
             d = p.to_dict()
+            if price_type == "retail":
+                d["price"] = p.retail_price if visible else None
 
             d["original_model"] = p.model
             d["model"] = normalize_model_name(p.model)
@@ -290,7 +354,9 @@ def api_products():
 
             out.append(d)
 
-        return jsonify(out)
+        response = jsonify(out)
+        response.headers["X-Retail-Prices-Visible"] = "1" if visible else "0"
+        return response
 
     finally:
         db.close()
@@ -325,6 +391,9 @@ def admin_logout():
 def admin_dashboard():
     page = request.args.get("page", "1")
     q = request.args.get("q", "").strip()
+    price_type = request.args.get("price_type", "dealer")
+    if price_type not in ("dealer", "retail"):
+        price_type = "dealer"
 
     try:
         page = max(1, int(page))
@@ -367,6 +436,8 @@ def admin_dashboard():
         total_available = sum([p.available for p in all_products])
 
         total_pages = max(1, (total_products + per_page - 1) // per_page)
+        retail_visible = retail_prices_visible(db)
+        retail_priced_count = db.query(Product).filter(Product.retail_price > 0).count()
 
         return render_template(
             "dashboard.html",
@@ -379,10 +450,36 @@ def admin_dashboard():
             total_available=total_available,
             per_page=per_page,
             q=q,
+            price_type=price_type,
+            retail_visible=retail_visible,
+            retail_priced_count=retail_priced_count,
         )
 
     finally:
         db.close()
+
+
+@app.route("/admin/retail-visibility", methods=["POST"])
+@login_required
+def admin_retail_visibility():
+    enabled = request.form.get("enabled")
+    if enabled not in ("0", "1"):
+        flash("Trạng thái hiển thị không hợp lệ.")
+        return redirect(url_for("admin_dashboard", price_type="retail"))
+
+    db = SessionLocal()
+    try:
+        setting = db.query(AppSetting).filter_by(key="retail_prices_visible").first()
+        if setting is None:
+            setting = AppSetting(key="retail_prices_visible", value=enabled)
+            db.add(setting)
+        else:
+            setting.value = enabled
+        db.commit()
+        flash("Đã bật module Giá lẻ." if enabled == "1" else "Đã tạm ẩn module Giá lẻ.")
+    finally:
+        db.close()
+    return redirect(url_for("admin_dashboard", price_type="retail"))
 
 
 @app.route("/admin/products/add", methods=["POST"])
@@ -417,6 +514,7 @@ def admin_add_product():
             stock=safe_int(request.form.get("stock")),
             reserved=safe_int(request.form.get("reserved")),
             price=safe_float(price),
+            retail_price=safe_float(request.form.get("retail_price", "").strip()),
         )
 
         db.add(p)
@@ -478,6 +576,7 @@ def admin_edit_product(product_id):
         p.stock = safe_int(request.form.get("stock"))
         p.reserved = safe_int(request.form.get("reserved"))
         p.price = safe_float(request.form.get("price", "").strip())
+        p.retail_price = safe_float(request.form.get("retail_price", "").strip())
 
         file = request.files.get("image")
         image_name = save_product_image(file, p.id)
@@ -702,17 +801,21 @@ def admin_import():
 @login_required
 def admin_import_price():
     """
-    Nhap gia rieng, sieu nhanh.
-
-    Chi cap nhat cot 'Đơn giá bán' theo 'Mã hàng hóa', dung SQL thuan
-    gop nhieu dong thanh 1 cau UPDATE duy nhat (theo tung chunk) thay
-    vi executemany tung dong rieng le, tranh bi timeout khi file lon.
+    Import dealer or retail prices by product code. PostgreSQL batches updates;
+    SQLite uses individual updates for compatibility.
     """
+    price_type = request.form.get("price_type", "dealer")
+    if price_type not in ("dealer", "retail"):
+        flash("Loại giá không hợp lệ.")
+        return redirect(url_for("admin_dashboard"))
+    price_column = "retail_price" if price_type == "retail" else "price"
+    price_label = "Giá lẻ" if price_type == "retail" else "Giá đại lý"
+
     file = request.files.get("file")
 
     if not file or file.filename == "":
         flash("Chưa chọn file để nhập giá.")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", price_type=price_type))
 
     try:
         if file.filename.lower().endswith(".csv"):
@@ -721,11 +824,11 @@ def admin_import_price():
             df = pd.read_excel(file)
     except Exception as e:
         flash(f"Không đọc được file: {e}")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", price_type=price_type))
 
     if "Mã hàng hóa" not in df.columns or "Đơn giá bán" not in df.columns:
         flash("File thiếu cột bắt buộc: Mã hàng hóa hoặc Đơn giá bán.")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", price_type=price_type))
 
     df = df[["Mã hàng hóa", "Đơn giá bán"]]
 
@@ -744,7 +847,7 @@ def admin_import_price():
 
     if not rows:
         flash("Không có dòng nào hợp lệ để cập nhật giá.")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_dashboard", price_type=price_type))
 
     try:
         # Gop nhieu dong thanh 1 cau UPDATE duy nhat cho moi chunk,
@@ -756,6 +859,13 @@ def admin_import_price():
             for i in range(0, len(rows), CHUNK):
                 chunk = rows[i:i + CHUNK]
 
+                if engine.dialect.name == "sqlite":
+                    statement = text(f"UPDATE products SET {price_column} = :price WHERE code = :code")
+                    for code, price in chunk:
+                        result = conn.execute(statement, {"code": code, "price": price})
+                        matched += result.rowcount or 0
+                    continue
+
                 values_sql = ", ".join(
                     f"(:code{j}, :price{j})" for j in range(len(chunk))
                 )
@@ -766,7 +876,7 @@ def admin_import_price():
 
                 sql = text(f"""
                     UPDATE products AS p
-                    SET price = c.price
+                    SET {price_column} = c.price
                     FROM (VALUES {values_sql}) AS c(code, price)
                     WHERE p.code = c.code
                 """)
@@ -774,7 +884,7 @@ def admin_import_price():
                 result = conn.execute(sql, params)
                 matched += result.rowcount or 0
 
-        message = f"Đã cập nhật giá cho {matched} mã hàng."
+        message = f"Đã cập nhật {price_label} cho {matched} mã hàng."
         if skipped:
             message += f" Bỏ qua {skipped} dòng thiếu mã hoặc giá."
         flash(message)
@@ -782,7 +892,7 @@ def admin_import_price():
     except Exception as e:
         flash(f"Lỗi khi cập nhật giá: {e}")
 
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_dashboard", price_type=price_type))
 
 
 if __name__ == "__main__":

@@ -33,6 +33,24 @@
 
   <div class="admin-content">
 
+  <nav class="admin-price-tabs" aria-label="Chọn bảng giá quản lý">
+    <a href="{{ url_for('admin_dashboard', price_type='dealer', q=q) }}" class="admin-price-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
+    <a href="{{ url_for('admin_dashboard', price_type='retail', q=q) }}" class="admin-price-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
+  </nav>
+
+  {% if price_type == 'retail' %}
+  <section class="panel retail-visibility-panel">
+    <div>
+      <h2>Hiển thị module Giá lẻ trên trang khách</h2>
+      <p class="hint">{{ retail_priced_count }}/{{ total_products }} mã đã có Giá lẻ. Trạng thái: <strong>{{ 'Đang hiển thị' if retail_visible else 'Đang cập nhật' }}</strong>.</p>
+    </div>
+    <form method="POST" action="{{ url_for('admin_retail_visibility') }}">
+      <input type="hidden" name="enabled" value="{{ '0' if retail_visible else '1' }}">
+      <button type="submit" class="retail-visibility-btn {{ 'is-on' if retail_visible else '' }}">{{ 'Tạm ẩn module Giá lẻ' if retail_visible else 'Bật hiển thị module Giá lẻ' }}</button>
+    </form>
+  </section>
+  {% endif %}
+
   <section class="stats-grid">
     <div class="stat-card blue">
       <div class="stat-label">TỔNG SẢN PHẨM</div>
@@ -64,10 +82,11 @@
 
       <hr class="import-divider">
 
-      <h2>Cập nhật giá nhanh</h2>
+      <h2>Cập nhật {{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }} nhanh</h2>
       <p class="hint">Chỉ cập nhật cột giá theo mã hàng, không đổi tên/tồn kho. Nhanh hơn nhiều với file lớn.</p>
 
       <form method="POST" action="{{ url_for('admin_import_price') }}" enctype="multipart/form-data" class="price-import-form">
+        <input type="hidden" name="price_type" value="{{ price_type }}">
         <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
         <button type="submit" class="price-btn">Cập nhật giá</button>
       </form>
@@ -93,7 +112,8 @@
 
         <input name="stock" type="number" inputmode="numeric" placeholder="Tồn kho" value="0">
         <input name="reserved" type="number" inputmode="numeric" placeholder="Đã đặt" value="0">
-        <input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá bán">
+        <input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá đại lý">
+        <input name="retail_price" type="number" inputmode="numeric" step="1000" placeholder="Giá lẻ">
         <button type="submit" class="add-btn">Thêm sản phẩm</button>
       </form>
     </section>
@@ -108,6 +128,7 @@
       </div>
         <div class="search-box">
           <form method="GET" action="{{ url_for('admin_dashboard') }}" id="searchForm">
+            <input type="hidden" name="price_type" value="{{ price_type }}">
             <input id="productSearch" name="q" type="text"
                   placeholder="Tìm mã, mẫu xe, màu, loại..." value="{{ q or '' }}">
           </form>
@@ -126,7 +147,7 @@
             <th class="num">Tồn</th>
             <th class="num">Đã đặt</th>
             <th class="num">Có thể bán</th>
-            <th class="num">Giá</th>
+            <th class="num">{{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }}</th>
             <th>Thao tác</th>
           </tr>
         </thead>
@@ -206,8 +227,13 @@
                       </div>
 
                       <div class="field">
-                        <label>Giá bán</label>
+                        <label>Giá đại lý</label>
                         <input name="price" type="number" inputmode="numeric" step="1000" value="{{ p.price or '' }}" placeholder="Liên hệ">
+                      </div>
+
+                      <div class="field">
+                        <label>Giá lẻ</label>
+                        <input name="retail_price" type="number" inputmode="numeric" step="1000" value="{{ p.retail_price or '' }}" placeholder="Liên hệ">
                       </div>
 
                       <div class="field full">
@@ -265,9 +291,10 @@
               {% endif %}
             </td>
 
-            <td data-label="Giá" class="num">
-              {% if p.price %}
-                <span class="price-text">{{ "{:,.0f}".format(p.price|float).replace(",", ".") }}đ</span>
+            {% set shown_price = p.retail_price if price_type == 'retail' else p.price %}
+            <td data-label="{{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }}" class="num">
+              {% if shown_price %}
+                <span class="price-text">{{ "{:,.0f}".format(shown_price|float).replace(",", ".") }}đ</span>
               {% else %}
                 <span class="muted-text">Liên hệ</span>
               {% endif %}
@@ -295,7 +322,7 @@
 
     <div class="pagination-bar">
           {% if page > 1 %}
-          <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1, q=q) }}">‹</a>
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page-1, q=q, price_type=price_type) }}">‹</a>
         {% else %}
           <span class="page-link disabled">‹</span>
         {% endif %}
@@ -304,12 +331,12 @@
           {% if num == page %}
             <span class="page-link current">{{ num }}</span>
           {% else %}
-            <a class="page-link" href="{{ url_for('admin_dashboard', page=num, q=q) }}">{{ num }}</a>
+            <a class="page-link" href="{{ url_for('admin_dashboard', page=num, q=q, price_type=price_type) }}">{{ num }}</a>
           {% endif %}
         {% endfor %}
 
         {% if page < total_pages %}
-          <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1, q=q) }}">›</a>
+          <a class="page-link" href="{{ url_for('admin_dashboard', page=page+1, q=q, price_type=price_type) }}">›</a>
         {% else %}
           <span class="page-link disabled">›</span>
         {% endif %}

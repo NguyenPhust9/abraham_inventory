@@ -11,3 +11,5 @@ Thumbs.db
 
 .vercel
 .env*
+server.stdout.log
+server.stderr.log

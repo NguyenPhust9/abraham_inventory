@@ -1746,3 +1746,212 @@
   transform: rotate(-10deg);
   pointer-events: none;
 }
+
+.price-module-tabs {
+  width: min(1160px, calc(100% - 36px));
+  margin: 20px auto 0;
+  display: flex;
+  gap: 10px;
+  position: relative;
+  z-index: 7;
+}
+
+.price-module-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(105, 19, 27, .2);
+  background: #fffdf8;
+  color: #760812;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 5px 18px rgba(77, 6, 12, .09);
+}
+
+.price-module-tab:hover,
+.price-module-tab:focus-visible {
+  border-color: #a80c18;
+}
+
+.price-module-tab.active {
+  background: #a80c18;
+  border-color: #a80c18;
+  color: #fff;
+}
+
+.module-pending-tag {
+  margin-left: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .8;
+}
+
+.retail-pending-module {
+  width: min(1160px, calc(100% - 36px));
+  min-height: 300px;
+  margin: 16px auto 48px;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 24px;
+  border: 1px solid rgba(105, 19, 27, .13);
+  background: #fffdf8;
+  box-shadow: 0 24px 70px rgba(77, 6, 12, .12);
+}
+
+.retail-pending-kicker {
+  color: #a80c18;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.retail-pending-module h1 {
+  margin: 12px 0;
+  color: #760812;
+  font-size: clamp(30px, 5vw, 48px);
+}
+
+.retail-pending-module p {
+  margin: 0;
+  color: #806d6f;
+}
+
+.catalog-page .catalog-controls-shell {
+  margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .price-module-tabs {
+    width: calc(100% - 24px);
+  }
+  .price-module-tab {
+    flex: 1;
+    padding: 0 10px;
+  }
+  .module-pending-tag { margin-left: 5px; font-size: 10px; }
+  .retail-pending-module { width: calc(100% - 24px); min-height: 240px; }
+}
+
+.modal-zoom-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: 999px;
+  background: #fffdf8;
+  color: #173f66;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+  font: 700 13px 'Space Grotesk', sans-serif;
+  cursor: pointer;
+}
+
+.modal-zoom-btn:hover, .modal-zoom-btn:focus-visible {
+  background: #ffe5a0;
+}
+
+.image-zoom-dialog {
+  width: min(1100px, calc(100vw - 24px));
+  height: min(900px, calc(100dvh - 24px));
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: #102f52;
+  color: #fff;
+}
+
+.image-zoom-dialog::backdrop {
+  background: rgba(8, 20, 35, .88);
+}
+
+.image-zoom-box {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.image-zoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  padding: 8px 16px;
+  background: #173f66;
+}
+
+.image-zoom-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.image-zoom-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.image-zoom-actions button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .35);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.image-zoom-actions button:disabled { opacity: .4; cursor: default; }
+.image-zoom-actions button:not(:disabled):hover { background: rgba(255, 255, 255, .25); }
+.image-zoom-actions span { min-width: 48px; text-align: center; font-size: 12px; }
+
+.image-zoom-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  background: #102f52;
+  touch-action: pan-x pan-y;
+}
+
+.image-zoom-image {
+  width: 100%;
+  max-height: calc(100dvh - 100px);
+  object-fit: contain;
+  display: block;
+  margin: auto;
+}
+
+.image-zoom-image.is-enlarged {
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .image-zoom-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
+  .image-zoom-toolbar { padding: 6px 10px; gap: 6px; }
+  .image-zoom-title { font-size: 12px; }
+  .image-zoom-actions { gap: 4px; }
+  .image-zoom-actions button { width: 44px; height: 44px; }
+  .image-zoom-actions span { min-width: 40px; }
+}

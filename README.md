@@ -1,7 +1,7 @@
 # Kho Xe Đạp — Web quản lý tồn kho
 
 Ứng dụng web Python (Flask) gồm:
-- **Trang khách xem** (`/`): xem danh sách xe, giá, màu, tồn kho — **không cần đăng nhập**.
+- **Giá đại lý** (`/`) và **Giá lẻ** (`/gia-le`): hai trang tra cứu cùng danh sách xe, màu và tồn kho; mỗi trang hiển thị giá riêng — **không cần đăng nhập**.
 - **Trang quản lý** (`/admin`): thêm / sửa / xóa sản phẩm, nhập dữ liệu hàng loạt từ file Excel/CSV — **cần đăng nhập**.
 
 ## 1. Cài đặt (chạy trên máy của bạn)
@@ -55,7 +55,7 @@ Vào `/admin` → mục "Nhập dữ liệu hàng loạt" → chọn file `.xlsx
 
 - Mã hàng hóa đã tồn tại → **cập nhật** thông tin.
 - Mã hàng hóa mới → **thêm mới** vào hệ thống.
-- Giá bán không nằm trong file import — sau khi nhập, vào bảng danh sách sửa giá thủ công (hoặc thêm cột "Giá" và mình có thể chỉnh code để đọc thêm cột đó).
+- Giá hiện tại là **Giá đại lý**. Toàn bộ module **Giá lẻ** hiển thị "Đang cập nhật" cho khách cho đến khi admin bật hiển thị trong tab Giá lẻ; danh sách, bộ lọc và tồn kho của module này được tạm ẩn. Giá lẻ vẫn có thể được nhập và xem trong admin trước khi bật. Hai loại giá có thể sửa trong form sản phẩm hoặc nhập riêng bằng file có cột `Mã hàng hóa` và `Đơn giá bán` sau khi chọn tab giá tương ứng.
 
 ## 5. Đưa lên mạng để khách quét QR dùng thật (deploy)
 

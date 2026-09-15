@@ -30,6 +30,8 @@ const COLOR_MAP = [
 ];
 
 let PRODUCTS = [];
+const priceType = document.querySelector('.catalog-page')?.dataset.priceType === 'retail' ? 'retail' : 'dealer';
+const priceLabel = priceType === 'retail' ? 'Giá lẻ' : 'Giá đại lý';
 let activeCat = 'Tất cả';
 let onlyInStock = false;
 let sortStockOrder = '';
@@ -52,9 +54,37 @@ const els = {
   modalSub: document.getElementById('modalSub'),
   modalBody: document.getElementById('modalBody'),
   modalClose: document.getElementById('modalClose'),
+  zoomDialog: document.getElementById('imageZoomDialog'),
+  zoomImage: document.getElementById('imageZoomImage'),
+  zoomTitle: document.getElementById('imageZoomTitle'),
+  zoomLevel: document.getElementById('imageZoomLevel'),
+  zoomViewport: document.getElementById('imageZoomViewport'),
+  zoomIn: document.getElementById('imageZoomIn'),
+  zoomOut: document.getElementById('imageZoomOut'),
+  zoomClose: document.getElementById('imageZoomClose'),
 };
 
 let audioContext = null;
+let imageZoom = 1;
+
+function setImageZoom(value) {
+  imageZoom = Math.max(1, Math.min(3, value));
+  els.zoomImage.style.width = `${imageZoom * 100}%`;
+  els.zoomImage.classList.toggle('is-enlarged', imageZoom > 1);
+  els.zoomLevel.textContent = `${Math.round(imageZoom * 100)}%`;
+  els.zoomOut.disabled = imageZoom === 1;
+  els.zoomIn.disabled = imageZoom === 3;
+}
+
+function openImageZoom(imageUrl, title) {
+  if (!imageUrl || !els.zoomDialog) return;
+  els.zoomImage.src = imageUrl;
+  els.zoomImage.alt = title;
+  els.zoomTitle.textContent = title;
+  setImageZoom(1);
+  els.zoomViewport.scrollTo(0, 0);
+  els.zoomDialog.showModal();
+}
 
 function unlockAudio() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -314,7 +344,7 @@ function buildShareText(group) {
 
   const price = fmtPrice(getGroupPrice(group.variants));
 
-  return `${group.model}${group.category ? ' - ' + group.category : ''}, còn màu: ${colorNames}. Giá bán: ${price}`;
+  return `${group.model}${group.category ? ' - ' + group.category : ''}, còn màu: ${colorNames}. ${priceLabel}: ${price}`;
 }
 
 async function copyText(text) {
@@ -457,7 +487,8 @@ function openProductModal(group) {
   els.modalSub.textContent = group.category || 'Chưa phân loại';
 
   const imageHTML = imgVariant && imgVariant.image_url
-    ? `<img class="modal-image" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(group.model)}">`
+    ? `<img class="modal-image" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(group.model)}">
+       <button type="button" class="modal-zoom-btn" id="modalZoomBtn" aria-label="Phóng to ảnh ${escapeHTML(group.model)}">⌕ Phóng to</button>`
     : `<div class="modal-no-image">Chưa có ảnh sản phẩm</div>`;
 
   const variantRows = variants.map(v => {
@@ -514,7 +545,7 @@ function openProductModal(group) {
         </div>
 
         <div class="modal-stat">
-          <div class="modal-stat-label">Giá bán</div>
+          <div class="modal-stat-label">${priceLabel}</div>
           <div class="modal-stat-value">${escapeHTML(fmtPrice(groupPrice))}</div>
         </div>
 
@@ -555,6 +586,11 @@ function openProductModal(group) {
   });
 
   const copyImageBtn = document.getElementById('copyProductImageBtn');
+  const zoomBtn = document.getElementById('modalZoomBtn');
+  if (zoomBtn) {
+    zoomBtn.addEventListener('click', () => openImageZoom(imgVariant.image_url, group.model));
+  }
+
   if (copyImageBtn) {
     copyImageBtn.addEventListener('click', event => {
       event.stopPropagation();
@@ -650,7 +686,7 @@ function render() {
       </div>
 
       <div class="price-row">
-        <span>Giá bán</span>
+        <span>${priceLabel}</span>
         <span class="price">${escapeHTML(fmtPrice(groupPrice))}</span>
       </div>
     `;
@@ -702,9 +738,15 @@ function buildPills() {
 
 async function load() {
   try {
-    const res = await fetch('/api/products', {
+    const res = await fetch(`/api/products/${priceType}`, {
       cache: 'no-store'
     });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (priceType === 'retail' && res.headers.get('X-Retail-Prices-Visible') !== '1') {
+      window.location.reload();
+      return;
+    }
 
     const data = await res.json();
 
@@ -761,6 +803,15 @@ if (els.modalClose) {
   });
 }
 
+if (els.zoomDialog) {
+  els.zoomClose.addEventListener('click', () => els.zoomDialog.close());
+  els.zoomIn.addEventListener('click', () => setImageZoom(imageZoom + .5));
+  els.zoomOut.addEventListener('click', () => setImageZoom(imageZoom - .5));
+  els.zoomDialog.addEventListener('click', event => {
+    if (event.target === els.zoomDialog) els.zoomDialog.close();
+  });
+}
+
 if (els.modal) {
   els.modal.addEventListener('click', event => {
     if (event.target === els.modal) {
@@ -771,6 +822,11 @@ if (els.modal) {
 }
 
 document.addEventListener('keydown', event => {
+  if (els.zoomDialog && els.zoomDialog.open) {
+    if (event.key === '+' || event.key === '=') setImageZoom(imageZoom + .5);
+    if (event.key === '-') setImageZoom(imageZoom - .5);
+    return;
+  }
   if (event.key === 'Escape' && els.modal && els.modal.open) {
     playUISound('close');
     els.modal.close();

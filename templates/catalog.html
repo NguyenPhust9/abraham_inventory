@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Kho Xe Đạp | Abraham Bike{% endblock %}
+{% block title %}{{ price_label }} | Abraham Bike{% endblock %}
 
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=11"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=12"
 >
 {% endblock %}
 
@@ -45,7 +45,7 @@
 </div>
 
 
-<div class="catalog-page">
+<div class="catalog-page" data-price-type="{{ price_type }}">
 
     <!-- =========================================================
       HERO IMAGE
@@ -67,6 +67,21 @@
 
   </section>
 
+
+  <nav class="price-module-tabs" aria-label="Chọn bảng giá">
+    <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
+    <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ{% if not retail_visible %}<small class="module-pending-tag">Đang cập nhật</small>{% endif %}</a>
+  </nav>
+
+  {% if price_type == 'retail' and not retail_visible %}
+  <section class="retail-pending-module" role="status">
+    <span class="retail-pending-kicker">GIÁ LẺ</span>
+    <h1>Đang cập nhật</h1>
+    <p>Bảng Giá lẻ sẽ hiển thị khi cửa hàng cập nhật xong.</p>
+  </section>
+  {% endif %}
+
+  {% if price_type != 'retail' or retail_visible %}
 
   <!-- =========================================================
        SEARCH + FILTER
@@ -359,6 +374,23 @@
 
   </dialog>
 
+  <dialog id="imageZoomDialog" class="image-zoom-dialog" aria-label="Ảnh sản phẩm phóng to">
+    <div class="image-zoom-box">
+      <div class="image-zoom-toolbar">
+        <span id="imageZoomTitle" class="image-zoom-title"></span>
+        <div class="image-zoom-actions">
+          <button type="button" id="imageZoomOut" aria-label="Thu nhỏ ảnh">−</button>
+          <span id="imageZoomLevel" aria-live="polite">100%</span>
+          <button type="button" id="imageZoomIn" aria-label="Phóng to ảnh">+</button>
+          <button type="button" id="imageZoomClose" class="image-zoom-close" aria-label="Đóng ảnh phóng to">×</button>
+        </div>
+      </div>
+      <div id="imageZoomViewport" class="image-zoom-viewport">
+        <img id="imageZoomImage" class="image-zoom-image" alt="">
+      </div>
+    </div>
+  </dialog>
+
 
   <!-- =========================================================
        FOOTER
@@ -377,6 +409,7 @@
     </span>
 
   </footer>
+  {% endif %}
 
 </div>
 
@@ -384,9 +417,20 @@
 <!-- =========================================================
      CATALOG JS
 ========================================================= -->
-<script
-  src="{{ url_for('static', filename='catalog.js') }}?v=9">
+{% if price_type != 'retail' or retail_visible %}
+<script src="{{ url_for('static', filename='catalog.js') }}?v=13"></script>
+{% else %}
+<script>
+  setInterval(async () => {
+    try {
+      const response = await fetch('{{ url_for('api_retail_status') }}', { cache: 'no-store' });
+      if (response.ok && (await response.json()).visible) location.reload();
+    } catch (error) {
+      // Keep the update message while the service is unavailable.
+    }
+  }, 30000);
 </script>
+{% endif %}
 
 
 <!-- =========================================================
