@@ -887,30 +887,6 @@ function renderReorderSuggestions() {
 
 }
 
-function renderInventoryUpdatedAt(value) {
-  const target = document.getElementById('reorderUpdatedAt');
-  if (!target) return;
-
-  if (!value) {
-    target.textContent = 'Chưa có thời gian cập nhật tồn kho';
-    return;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    target.textContent = 'Chưa xác định thời gian cập nhật';
-    return;
-  }
-
-  target.textContent = `Tồn kho cập nhật: ${date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })}`;
-}
-
 async function loadReorderSuggestions() {
   const list = document.getElementById('reorderList');
   if (!list || reorderRefreshInFlight) return;
@@ -922,7 +898,6 @@ async function loadReorderSuggestions() {
     const data = await response.json();
     REORDER_ITEMS = Array.isArray(data.items) ? data.items : [];
     reorderLastLoadedAt = Date.now();
-    renderInventoryUpdatedAt(data.inventory_updated_at);
     renderReorderSuggestions();
   } catch (error) {
     console.error('Không tải được gợi ý nhập hàng:', error);

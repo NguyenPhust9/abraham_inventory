@@ -340,7 +340,6 @@
       </div>
       <div class="reorder-tools">
         <input id="reorderSearch" type="search" placeholder="Tìm sản phẩm cần nhập…" autocomplete="off" aria-label="Tìm trong danh sách cần nhập">
-        <span id="reorderUpdatedAt">Đang kiểm tra thời gian cập nhật…</span>
       </div>
       <div id="reorderList" class="reorder-list" aria-live="polite">
         <div class="reorder-loading">Đang tính mức dự trữ…</div>
@@ -455,7 +454,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=21"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=22"></script>
 {% else %}
 <script>
   setInterval(async () => {
