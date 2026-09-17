@@ -1,5 +1,6 @@
 import os
 import re
+import unicodedata
 import cloudinary  # type: ignore
 import cloudinary.uploader  # type: ignore
 from datetime import datetime
@@ -14,11 +15,25 @@ from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
+from openpyxl import load_workbook  # type: ignore
 
 
 # ---------- Config ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "shop.db")
+
+# Local development secrets are kept outside Git and loaded before DB setup.
+LOCAL_ENV_PATH = os.path.join(BASE_DIR, ".env.local")
+if os.path.exists(LOCAL_ENV_PATH):
+    with open(LOCAL_ENV_PATH, encoding="utf-8") as env_file:
+        for env_line in env_file:
+            env_line = env_line.strip()
+            if not env_line or env_line.startswith("#") or "=" not in env_line:
+                continue
+            env_key, env_value = env_line.split("=", 1)
+            env_key = env_key.strip()
+            if not os.environ.get(env_key):
+                os.environ[env_key] = env_value.strip()
 
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "bike123")
@@ -118,6 +133,7 @@ ensure_retail_price_column()
 # ---------- Upload folder ----------
 IMAGE_UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(IMAGE_UPLOAD_DIR, exist_ok=True)
+SALES_HISTORY_FILE = os.path.join(BASE_DIR, "data", "san_pham_da_ban_12_thang.xlsm")
 
 
 def ensure_columns():
@@ -186,6 +202,47 @@ def normalize_model_name(model_name: str):
     name = re.sub(r"\s+", " ", name).strip()
 
     return name
+
+
+def product_match_key(value):
+    """Build a conservative key shared by Excel sales names and product models."""
+    normalized = normalize_model_name(str(value or "")).casefold()
+    normalized = unicodedata.normalize("NFD", normalized)
+    normalized = "".join(
+        char for char in normalized
+        if unicodedata.category(char) != "Mn"
+    )
+    return re.sub(r"[^a-z0-9]+", "", normalized)
+
+
+def load_monthly_sales():
+    """Read net sales from the bundled 12-month workbook, grouped by model."""
+    if not os.path.exists(SALES_HISTORY_FILE):
+        return {}
+
+    workbook = load_workbook(
+        SALES_HISTORY_FILE,
+        read_only=True,
+        data_only=True,
+        keep_vba=True,
+    )
+    monthly_sales = {}
+    try:
+        sheet = workbook[workbook.sheetnames[0]]
+        for row_number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+            if row_number < 7 or not row or not row[0]:
+                continue
+
+            key = product_match_key(row[0])
+            if not key:
+                continue
+
+            sold_12_months = max(safe_float(row[7] if len(row) > 7 else 0) or 0, 0)
+            monthly_sales[key] = monthly_sales.get(key, 0) + sold_12_months / 12
+    finally:
+        workbook.close()
+
+    return monthly_sales
 
 
 def split_model_color(name: str):
@@ -455,6 +512,73 @@ def admin_dashboard():
             retail_priced_count=retail_priced_count,
         )
 
+    finally:
+        db.close()
+
+
+@app.route("/api/reorder-suggestions")
+def api_reorder_suggestions():
+    """Suggest replenishment when stock is below two months of average sales."""
+    try:
+        monthly_sales = load_monthly_sales()
+    except Exception as error:
+        print(f"Khong doc duoc file lich su ban hang: {error}")
+        return jsonify({"items": [], "matched_models": 0, "error": "sales_file_unavailable"}), 500
+
+    db = SessionLocal()
+    try:
+        latest_inventory_update = db.query(func.max(Product.updated_at)).scalar()
+        grouped = {}
+        for product in db.query(Product).order_by(Product.model, Product.color).all():
+            key = product_match_key(product.model)
+            if not key:
+                continue
+
+            if key not in grouped:
+                grouped[key] = {
+                    "model": normalize_model_name(product.model),
+                    "category": product.category or "",
+                    "stock": 0,
+                    "image_url": None,
+                }
+
+            grouped[key]["stock"] += max(product.stock or 0, 0)
+            if not grouped[key]["image_url"] and product.image_filename:
+                grouped[key]["image_url"] = product.image_filename
+
+        suggestions = []
+        matched_models = 0
+        for key, product in grouped.items():
+            average_monthly = monthly_sales.get(key)
+            if average_monthly is None:
+                continue
+
+            matched_models += 1
+            reserve_exact = average_monthly * 2
+            if product["stock"] >= reserve_exact:
+                continue
+
+            suggestions.append({
+                **product,
+                "average_monthly_sales": round(average_monthly, 1),
+                "reserve_target": math.ceil(reserve_exact),
+                "reorder_quantity": math.ceil(reserve_exact - product["stock"]),
+            })
+
+        suggestions.sort(
+            key=lambda item: (item["reorder_quantity"], item["average_monthly_sales"]),
+            reverse=True,
+        )
+        return jsonify({
+            "items": suggestions,
+            "matched_models": matched_models,
+            "reserve_months": 2,
+            "inventory_updated_at": (
+                latest_inventory_update.isoformat()
+                + ("Z" if latest_inventory_update.tzinfo is None else "")
+                if latest_inventory_update else None
+            ),
+        })
     finally:
         db.close()
 

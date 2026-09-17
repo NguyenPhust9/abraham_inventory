@@ -30,6 +30,10 @@ const COLOR_MAP = [
 ];
 
 let PRODUCTS = [];
+let REORDER_ITEMS = [];
+let reorderQuery = '';
+let reorderRefreshInFlight = false;
+let reorderLastLoadedAt = 0;
 const priceType = document.querySelector('.catalog-page')?.dataset.priceType === 'retail' ? 'retail' : 'dealer';
 const priceLabel = priceType === 'retail' ? 'Giá lẻ' : 'Giá đại lý';
 let activeCat = 'Tất cả';
@@ -771,7 +775,7 @@ function buildPills() {
   });
 }
 
-async function load() {
+async function load(includeReorderSuggestions = true) {
   try {
     const res = await fetch(`/api/products/${priceType}`, {
       cache: 'no-store'
@@ -789,6 +793,7 @@ async function load() {
 
     buildPills();
     render();
+    if (includeReorderSuggestions) loadReorderSuggestions();
   } catch (error) {
     console.error('Không tải được dữ liệu sản phẩm:', error);
     els.grid.innerHTML = '';
@@ -837,6 +842,149 @@ if (els.modalClose) {
     els.modal.close();
   });
 }
+
+function renderReorderSuggestions() {
+  const list = document.getElementById('reorderList');
+  const mobileCount = document.getElementById('reorderMobileCount');
+  if (!list) return;
+
+  if (!REORDER_ITEMS.length) {
+    list.innerHTML = '<div class="reorder-empty">Tồn kho hiện tại đang đủ mức dự trữ 2 tháng.</div>';
+    if (mobileCount) mobileCount.textContent = 'Tồn kho đang đủ';
+    return;
+  }
+
+  if (mobileCount) mobileCount.textContent = `${REORDER_ITEMS.length} sản phẩm cần nhập`;
+
+  const filteredItems = REORDER_ITEMS.filter(item => {
+    if (!reorderQuery) return true;
+    return normalizeText(`${item.model || ''} ${item.category || ''}`).includes(reorderQuery);
+  });
+
+  if (!filteredItems.length) {
+    list.innerHTML = '<div class="reorder-empty">Không tìm thấy sản phẩm cần nhập phù hợp.</div>';
+    return;
+  }
+
+  list.innerHTML = filteredItems.map(item => `
+    <article class="reorder-item">
+      <div class="reorder-thumb">
+        ${item.image_url
+          ? `<img src="${escapeHTML(item.image_url)}" alt="${escapeHTML(item.model)}">`
+          : '<span aria-hidden="true">□</span>'}
+      </div>
+      <div class="reorder-copy">
+        <strong>${escapeHTML(item.model)}</strong>
+        <span>Tồn kho: <b>${Number(item.stock).toLocaleString('vi-VN')}</b></span>
+        <span>Bán TB/tháng: ${Number(item.average_monthly_sales).toLocaleString('vi-VN')}</span>
+      </div>
+      <div class="reorder-needed">
+        <span>Cần nhập</span>
+        <strong>${Number(item.reorder_quantity).toLocaleString('vi-VN')}</strong>
+      </div>
+    </article>
+  `).join('');
+
+}
+
+function renderInventoryUpdatedAt(value) {
+  const target = document.getElementById('reorderUpdatedAt');
+  if (!target) return;
+
+  if (!value) {
+    target.textContent = 'Chưa có thời gian cập nhật tồn kho';
+    return;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    target.textContent = 'Chưa xác định thời gian cập nhật';
+    return;
+  }
+
+  target.textContent = `Tồn kho cập nhật: ${date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })}`;
+}
+
+async function loadReorderSuggestions() {
+  const list = document.getElementById('reorderList');
+  if (!list || reorderRefreshInFlight) return;
+  reorderRefreshInFlight = true;
+
+  try {
+    const response = await fetch('/api/reorder-suggestions', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    REORDER_ITEMS = Array.isArray(data.items) ? data.items : [];
+    reorderLastLoadedAt = Date.now();
+    renderInventoryUpdatedAt(data.inventory_updated_at);
+    renderReorderSuggestions();
+  } catch (error) {
+    console.error('Không tải được gợi ý nhập hàng:', error);
+    list.innerHTML = '<div class="reorder-empty reorder-error">Chưa thể tính gợi ý nhập hàng.</div>';
+  } finally {
+    reorderRefreshInFlight = false;
+  }
+}
+
+const reorderPanel = document.getElementById('reorderPanel');
+const catalogContentLayout = document.querySelector('.catalog-content-layout');
+const reorderDesktopToggle = document.getElementById('reorderDesktopToggle');
+const reorderMobileTrigger = document.getElementById('reorderMobileTrigger');
+const reorderMobileClose = document.getElementById('reorderMobileClose');
+const reorderBackdrop = document.getElementById('reorderBackdrop');
+const reorderSearch = document.getElementById('reorderSearch');
+
+function setReorderPanelOpen(open) {
+  if (!reorderPanel || !reorderMobileTrigger) return;
+  reorderPanel.classList.toggle('mobile-open', open);
+  document.body.classList.toggle('reorder-sheet-open', open);
+  reorderMobileTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+if (reorderMobileTrigger) {
+  reorderMobileTrigger.addEventListener('click', () => setReorderPanelOpen(true));
+}
+
+if (reorderMobileClose) {
+  reorderMobileClose.addEventListener('click', () => setReorderPanelOpen(false));
+}
+
+if (reorderBackdrop) {
+  reorderBackdrop.addEventListener('click', () => setReorderPanelOpen(false));
+}
+
+if (reorderSearch) {
+  reorderSearch.addEventListener('input', () => {
+    reorderQuery = normalizeText(reorderSearch.value);
+    renderReorderSuggestions();
+  });
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') setReorderPanelOpen(false);
+});
+
+if (reorderDesktopToggle && catalogContentLayout) {
+  reorderDesktopToggle.addEventListener('click', () => {
+    const collapsed = catalogContentLayout.classList.toggle('reorder-collapsed');
+    reorderDesktopToggle.textContent = collapsed ? '‹' : '›';
+    reorderDesktopToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    reorderDesktopToggle.setAttribute('aria-label', collapsed ? 'Mở gợi ý nhập hàng' : 'Thu gọn gợi ý nhập hàng');
+  });
+}
+
+setInterval(loadReorderSuggestions, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
+    loadReorderSuggestions();
+  }
+});
 
 if (els.zoomDialog) {
   els.zoomImage.addEventListener('load', () => {
@@ -915,4 +1063,4 @@ document.addEventListener('touchstart', unlockAudio, { once: true, passive: true
 
 load();
 
-setInterval(load, 30000);
+setInterval(() => load(false), 30000);

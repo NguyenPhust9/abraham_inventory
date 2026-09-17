@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=15"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=21"
 >
 {% endblock %}
 
@@ -82,6 +82,8 @@
   {% endif %}
 
   {% if price_type != 'retail' or retail_visible %}
+
+  <div class="catalog-content-layout">
 
   <!-- =========================================================
        SEARCH + FILTER
@@ -317,6 +319,38 @@
 
   </main>
 
+  <button type="button" id="reorderMobileTrigger" class="reorder-mobile-trigger" aria-controls="reorderPanel" aria-expanded="false">
+    <span>⚠ Cảnh báo nhập hàng</span>
+    <strong id="reorderMobileCount">Đang tính…</strong>
+  </button>
+  <button type="button" id="reorderBackdrop" class="reorder-backdrop" aria-label="Đóng gợi ý nhập hàng"></button>
+
+  <aside id="reorderPanel" class="reorder-panel" aria-labelledby="reorderPanelTitle">
+    <button type="button" id="reorderDesktopToggle" class="reorder-desktop-toggle" aria-label="Thu gọn gợi ý nhập hàng" aria-expanded="true">›</button>
+    <button type="button" id="reorderMobileClose" class="reorder-mobile-close" aria-label="Đóng">×</button>
+    <section class="reorder-intro">
+      <span class="reorder-kicker">✦ Gợi ý tồn kho</span>
+      <h2>Một số sản phẩm cần nhập hàng</h2>
+      <p>Dựa trên tồn kho hiện tại và lượng bán trung bình, hệ thống cảnh báo khi hàng không đủ dự trữ trong 2 tháng.</p>
+    </section>
+
+    <section class="reorder-list-card">
+      <div class="reorder-list-head">
+        <h3 id="reorderPanelTitle">Gợi ý cần đặt hàng</h3>
+      </div>
+      <div class="reorder-tools">
+        <input id="reorderSearch" type="search" placeholder="Tìm sản phẩm cần nhập…" autocomplete="off" aria-label="Tìm trong danh sách cần nhập">
+        <span id="reorderUpdatedAt">Đang kiểm tra thời gian cập nhật…</span>
+      </div>
+      <div id="reorderList" class="reorder-list" aria-live="polite">
+        <div class="reorder-loading">Đang tính mức dự trữ…</div>
+      </div>
+    </section>
+
+  </aside>
+
+  </div>
+
 
   <!-- =========================================================
        PRODUCT MODAL
@@ -421,7 +455,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=15"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=21"></script>
 {% else %}
 <script>
   setInterval(async () => {
