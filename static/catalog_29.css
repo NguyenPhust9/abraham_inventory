@@ -1003,8 +1003,25 @@
   .control-badge{ display:inline-flex; margin-top:10px; }
 
   .extra-filters{ align-items:flex-start; }
-  .sort-wrap{ width:100%; justify-content:space-between; }
-  .sort-select{ flex:1; max-width:230px; }
+  .sort-wrap{
+    width:100%;
+    justify-content:flex-start;
+    gap:10px;
+  }
+  .sort-wrap > span,
+  .price-filter-label{
+    flex:0 0 50px;
+  }
+  .sort-select{
+    flex:1;
+    width:100%;
+    min-width:0;
+    max-width:none;
+    height:42px;
+    min-height:42px;
+    padding-top:0;
+    padding-bottom:0;
+  }
   .price-filter{ width:100%; }
   .price-input{ flex:1; min-width:0; }
 
@@ -1026,7 +1043,26 @@
   .catalog-controls-shell{ width:calc(100% - 16px); }
   .catalog-main,.catalog-footer{ width:calc(100% - 20px); }
   .catalog-controls{ padding:14px; }
-  .catalog-page .pills-arrow{ width:32px !important; height:32px !important; max-width:32px; }
+  .pills-wrap{ gap:6px; }
+  .catalog-page .pills{
+    gap:6px;
+    padding:1px 0;
+    scroll-snap-type:x mandatory;
+  }
+  .catalog-page .pill{
+    flex:0 0 calc((100% - 6px) / 2);
+    min-width:0;
+    padding:0 8px;
+    min-height:36px;
+    scroll-snap-align:start;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .catalog-page .pills-arrow{
+    width:36px !important;
+    height:36px !important;
+    max-width:36px;
+  }
 }
 /* =========================================================
    NATIONAL DAY RUNNING TICKER
