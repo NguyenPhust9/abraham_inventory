@@ -1,16 +1,18 @@
 import os
 import re
+import json
 import unicodedata
+from io import BytesIO
 import cloudinary  # type: ignore
 import cloudinary.uploader  # type: ignore
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash  # type: ignore
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_file  # type: ignore
 from flask_login import (  # type: ignore
     LoginManager, UserMixin, login_user, logout_user,
     login_required
 )
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text, func, inspect  # type: ignore
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text, func, inspect, or_  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
@@ -114,6 +116,46 @@ class AppSetting(Base):
 
     key = Column(String, primary_key=True)
     value = Column(String, nullable=False)
+
+
+class Supplier(Base):
+    __tablename__ = "suppliers"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    phone = Column(String, default="")
+    email = Column(String, default="")
+    address = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PurchaseReceipt(Base):
+    __tablename__ = "purchase_receipts"
+
+    id = Column(Integer, primary_key=True)
+    receipt_number = Column(String, unique=True, nullable=False)
+    supplier_id = Column(Integer, nullable=True)
+    supplier_name = Column(String, nullable=False)
+    received_at = Column(DateTime, default=datetime.utcnow)
+    notes = Column(String, default="")
+    total_amount = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PurchaseReceiptItem(Base):
+    __tablename__ = "purchase_receipt_items"
+
+    id = Column(Integer, primary_key=True)
+    receipt_id = Column(Integer, nullable=False)
+    product_id = Column(Integer, nullable=False)
+    product_code = Column(String, nullable=False)
+    product_name = Column(String, nullable=False)
+    color = Column(String, default="")
+    unit = Column(String, default="Chiếc")
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Float, default=0)
+    line_total = Column(Float, default=0)
 
 
 Base.metadata.create_all(engine)
@@ -443,6 +485,392 @@ def admin_logout():
 
 
 # ---------- Admin dashboard ----------
+@app.route("/admin/purchases/new", methods=["GET", "POST"])
+@login_required
+def admin_purchase_new():
+    db = SessionLocal()
+    try:
+        if request.method == "POST":
+            supplier_name = request.form.get("supplier_name", "").strip()
+            supplier_code = request.form.get("supplier_code", "").strip()
+            supplier_phone = request.form.get("supplier_phone", "").strip()
+            supplier_email = request.form.get("supplier_email", "").strip()
+            supplier_address = request.form.get("supplier_address", "").strip()
+            receipt_number = request.form.get("receipt_number", "").strip()
+            received_date = request.form.get("received_date", "").strip()
+            notes = request.form.get("notes", "").strip()
+
+            try:
+                items = json.loads(request.form.get("items_json", "[]"))
+            except (TypeError, json.JSONDecodeError):
+                items = []
+
+            if not supplier_name:
+                flash("Vui lòng nhập tên nhà cung cấp.")
+                return redirect(url_for("admin_purchase_new"))
+            if not receipt_number:
+                flash("Vui lòng nhập mã phiếu nhập.")
+                return redirect(url_for("admin_purchase_new"))
+            if db.query(PurchaseReceipt).filter_by(receipt_number=receipt_number).first():
+                flash(f"Mã phiếu '{receipt_number}' đã tồn tại.")
+                return redirect(url_for("admin_purchase_new"))
+            if not items:
+                flash("Phiếu nhập cần có ít nhất một sản phẩm.")
+                return redirect(url_for("admin_purchase_new"))
+
+            supplier = None
+            if supplier_code:
+                supplier = db.query(Supplier).filter_by(code=supplier_code).first()
+            if supplier is None:
+                generated_code = supplier_code or f"NCC{(db.query(Supplier).count() + 1):04d}"
+                supplier = Supplier(code=generated_code, name=supplier_name)
+                db.add(supplier)
+                db.flush()
+            supplier.name = supplier_name
+            supplier.phone = supplier_phone
+            supplier.email = supplier_email
+            supplier.address = supplier_address
+
+            try:
+                received_at = datetime.fromisoformat(received_date) if received_date else datetime.utcnow()
+            except ValueError:
+                received_at = datetime.utcnow()
+
+            receipt = PurchaseReceipt(
+                receipt_number=receipt_number,
+                supplier_id=supplier.id,
+                supplier_name=supplier.name,
+                received_at=received_at,
+                notes=notes,
+                total_amount=0,
+            )
+            db.add(receipt)
+            db.flush()
+
+            total_amount = 0.0
+            valid_lines = 0
+            for raw_item in items:
+                product_id = safe_int(raw_item.get("product_id"))
+                quantity = max(0, safe_int(raw_item.get("quantity")))
+                unit_price = max(0.0, safe_float(raw_item.get("unit_price")) or 0.0)
+                product = db.query(Product).get(product_id) if product_id > 0 else None
+                product_code = (product.code if product else str(raw_item.get("code", "")).strip())
+                product_name = (product.model if product else str(raw_item.get("name", "")).strip())
+                color = (product.color if product else str(raw_item.get("color", "")).strip())
+                unit = (product.unit if product else str(raw_item.get("unit", "Chiếc")).strip()) or "Chiếc"
+                if quantity <= 0 or not product_code or not product_name:
+                    continue
+                line_total = quantity * unit_price
+                db.add(PurchaseReceiptItem(
+                    receipt_id=receipt.id,
+                    product_id=product.id if product else 0,
+                    product_code=product_code,
+                    product_name=product_name,
+                    color=color or "",
+                    unit=unit,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    line_total=line_total,
+                ))
+                total_amount += line_total
+                valid_lines += 1
+
+            if valid_lines == 0:
+                db.rollback()
+                flash("Không có dòng sản phẩm hợp lệ trong phiếu nhập.")
+                return redirect(url_for("admin_purchase_new"))
+
+            receipt.total_amount = total_amount
+            db.commit()
+            flash(f"Đã lưu phiếu {receipt_number} với {valid_lines} sản phẩm. Tồn kho hiện tại không bị thay đổi.")
+            return redirect(url_for("admin_purchase_new"))
+
+        products = db.query(Product).order_by(Product.model, Product.color, Product.code).all()
+        product_options = [
+            {
+                "id": p.id,
+                "code": p.code,
+                "name": p.model,
+                "color": p.color or "",
+                "unit": p.unit or "Chiếc",
+                "price": p.price or 0,
+            }
+            for p in products
+        ]
+        suppliers = db.query(Supplier).order_by(Supplier.name).all()
+        receipt_q = request.args.get("receipt_q", "").strip()
+        supplier_q = request.args.get("supplier_q", "").strip()
+        date_from = request.args.get("date_from", "").strip()
+        date_to = request.args.get("date_to", "").strip()
+        try:
+            receipt_page = max(1, int(request.args.get("receipt_page", "1")))
+        except ValueError:
+            receipt_page = 1
+        receipts_per_page = 20
+        receipt_query = db.query(PurchaseReceipt)
+        if receipt_q:
+            receipt_query = receipt_query.filter(PurchaseReceipt.receipt_number.ilike(f"%{receipt_q}%"))
+        if supplier_q:
+            receipt_query = receipt_query.filter(PurchaseReceipt.supplier_name.ilike(f"%{supplier_q}%"))
+        try:
+            if date_from:
+                receipt_query = receipt_query.filter(PurchaseReceipt.received_at >= datetime.fromisoformat(date_from))
+            if date_to:
+                receipt_query = receipt_query.filter(PurchaseReceipt.received_at < datetime.fromisoformat(date_to) + timedelta(days=1))
+        except ValueError:
+            date_from = ""
+            date_to = ""
+        receipt_total = receipt_query.count()
+        receipt_total_pages = max(1, (receipt_total + receipts_per_page - 1) // receipts_per_page)
+        if receipt_page > receipt_total_pages:
+            receipt_page = receipt_total_pages
+        recent_receipts = (
+            receipt_query.order_by(PurchaseReceipt.received_at.desc(), PurchaseReceipt.id.desc())
+            .offset((receipt_page - 1) * receipts_per_page)
+            .limit(receipts_per_page)
+            .all()
+        )
+        next_receipt_number = datetime.now().strftime("PN%Y%m%d-%H%M%S")
+        return render_template(
+            "purchase_form.html",
+            products=products,
+            product_options=product_options,
+            suppliers=suppliers,
+            recent_receipts=recent_receipts,
+            receipt_q=receipt_q,
+            supplier_q=supplier_q,
+            date_from=date_from,
+            date_to=date_to,
+            receipt_page=receipt_page,
+            receipt_total=receipt_total,
+            receipt_total_pages=receipt_total_pages,
+            next_receipt_number=next_receipt_number,
+            today=datetime.now().strftime("%Y-%m-%d"),
+        )
+    finally:
+        db.close()
+
+
+@app.route("/admin/purchases/<int:receipt_id>")
+@login_required
+def admin_purchase_detail(receipt_id):
+    db = SessionLocal()
+    try:
+        receipt = db.query(PurchaseReceipt).get(receipt_id)
+        if not receipt:
+            flash("Không tìm thấy phiếu nhập.")
+            return redirect(url_for("admin_purchase_new"))
+        supplier = db.query(Supplier).get(receipt.supplier_id) if receipt.supplier_id else None
+        items = db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).order_by(PurchaseReceiptItem.id).all()
+        return render_template("purchase_detail.html", receipt=receipt, supplier=supplier, items=items)
+    finally:
+        db.close()
+
+
+@app.route("/admin/purchases/<int:receipt_id>/edit", methods=["GET", "POST"])
+@login_required
+def admin_purchase_edit(receipt_id):
+    db = SessionLocal()
+    try:
+        receipt = db.query(PurchaseReceipt).get(receipt_id)
+        if not receipt:
+            flash("Không tìm thấy phiếu nhập.")
+            return redirect(url_for("admin_purchase_new"))
+
+        if request.method == "POST":
+            supplier_name = request.form.get("supplier_name", "").strip()
+            receipt_number = request.form.get("receipt_number", "").strip()
+            try:
+                submitted_items = json.loads(request.form.get("items_json", "[]"))
+            except (TypeError, json.JSONDecodeError):
+                submitted_items = []
+            duplicate = db.query(PurchaseReceipt).filter(
+                PurchaseReceipt.receipt_number == receipt_number,
+                PurchaseReceipt.id != receipt.id,
+            ).first()
+            if not supplier_name or not receipt_number or not submitted_items or duplicate:
+                flash("Vui lòng kiểm tra nhà cung cấp, mã phiếu và danh sách sản phẩm. Mã phiếu không được trùng.")
+                return redirect(url_for("admin_purchase_edit", receipt_id=receipt.id))
+
+            supplier_code = request.form.get("supplier_code", "").strip()
+            supplier = db.query(Supplier).filter_by(code=supplier_code).first() if supplier_code else None
+            if supplier is None:
+                supplier = Supplier(code=supplier_code or f"NCC{(db.query(Supplier).count() + 1):04d}", name=supplier_name)
+                db.add(supplier)
+                db.flush()
+            supplier.name = supplier_name
+            supplier.phone = request.form.get("supplier_phone", "").strip()
+            supplier.email = request.form.get("supplier_email", "").strip()
+            supplier.address = request.form.get("supplier_address", "").strip()
+
+            try:
+                received_at = datetime.fromisoformat(request.form.get("received_date", ""))
+            except ValueError:
+                received_at = receipt.received_at
+            receipt.receipt_number = receipt_number
+            receipt.supplier_id = supplier.id
+            receipt.supplier_name = supplier.name
+            receipt.received_at = received_at
+            receipt.notes = request.form.get("notes", "").strip()
+            db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).delete(synchronize_session=False)
+
+            total_amount = 0.0
+            valid_lines = 0
+            for raw_item in submitted_items:
+                product_id = safe_int(raw_item.get("product_id"))
+                product = db.query(Product).get(product_id) if product_id > 0 else None
+                quantity = max(0, safe_int(raw_item.get("quantity")))
+                unit_price = max(0.0, safe_float(raw_item.get("unit_price")) or 0.0)
+                product_code = product.code if product else str(raw_item.get("code", "")).strip()
+                product_name = product.model if product else str(raw_item.get("name", "")).strip()
+                color = product.color if product else str(raw_item.get("color", "")).strip()
+                unit = (product.unit if product else str(raw_item.get("unit", "Chiếc")).strip()) or "Chiếc"
+                if quantity <= 0 or not product_code or not product_name:
+                    continue
+                line_total = quantity * unit_price
+                db.add(PurchaseReceiptItem(receipt_id=receipt.id, product_id=product.id if product else 0, product_code=product_code, product_name=product_name, color=color or "", unit=unit, quantity=quantity, unit_price=unit_price, line_total=line_total))
+                total_amount += line_total
+                valid_lines += 1
+            if valid_lines == 0:
+                db.rollback()
+                flash("Phiếu nhập cần có ít nhất một dòng sản phẩm hợp lệ.")
+                return redirect(url_for("admin_purchase_edit", receipt_id=receipt.id))
+            receipt.total_amount = total_amount
+            db.commit()
+            flash(f"Đã cập nhật phiếu {receipt.receipt_number}. Tồn kho hiện tại không bị thay đổi.")
+            return redirect(url_for("admin_purchase_detail", receipt_id=receipt.id))
+
+        products = db.query(Product).order_by(Product.model, Product.color, Product.code).all()
+        product_options = [{"id": p.id, "code": p.code, "name": p.model, "color": p.color or "", "unit": p.unit or "Chiếc", "price": p.price or 0} for p in products]
+        suppliers = db.query(Supplier).order_by(Supplier.name).all()
+        edit_supplier = db.query(Supplier).get(receipt.supplier_id) if receipt.supplier_id else None
+        stored_items = db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).order_by(PurchaseReceiptItem.id).all()
+        initial_items = [{"product_id": item.product_id, "code": item.product_code, "name": item.product_name, "color": item.color or "", "unit": item.unit or "Chiếc", "quantity": item.quantity, "unit_price": item.unit_price or 0} for item in stored_items]
+        return render_template("purchase_form.html", products=products, product_options=product_options, suppliers=suppliers, edit_receipt=receipt, edit_supplier=edit_supplier, initial_items=initial_items, next_receipt_number=receipt.receipt_number, today=receipt.received_at.strftime("%Y-%m-%d"))
+    finally:
+        db.close()
+
+
+@app.route("/admin/purchases/<int:receipt_id>/delete", methods=["POST"])
+@login_required
+def admin_purchase_delete(receipt_id):
+    db = SessionLocal()
+    try:
+        receipt = db.query(PurchaseReceipt).get(receipt_id)
+        if not receipt:
+            flash("Không tìm thấy phiếu nhập.")
+        else:
+            receipt_number = receipt.receipt_number
+            db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).delete(synchronize_session=False)
+            db.delete(receipt)
+            db.commit()
+            flash(f"Đã xóa phiếu {receipt_number}. Tồn kho hiện tại không bị thay đổi.")
+    finally:
+        db.close()
+    return redirect(url_for("admin_purchase_history"))
+
+
+def purchase_history_query(db):
+    query = db.query(PurchaseReceipt)
+    keyword = request.args.get("q", "").strip()
+    supplier_id = request.args.get("supplier_id", "").strip()
+    month = request.args.get("month", "").strip()
+    year = request.args.get("year", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    if keyword:
+        like = f"%{keyword}%"
+        item_receipts = db.query(PurchaseReceiptItem.receipt_id).filter(
+            or_(PurchaseReceiptItem.product_name.ilike(like), PurchaseReceiptItem.product_code.ilike(like))
+        )
+        query = query.filter(or_(PurchaseReceipt.receipt_number.ilike(like), PurchaseReceipt.supplier_name.ilike(like), PurchaseReceipt.id.in_(item_receipts)))
+    if supplier_id.isdigit():
+        query = query.filter(PurchaseReceipt.supplier_id == int(supplier_id))
+    try:
+        if month:
+            query = query.filter(func.extract("month", PurchaseReceipt.received_at) == int(month))
+        if year:
+            query = query.filter(func.extract("year", PurchaseReceipt.received_at) == int(year))
+        if date_from:
+            query = query.filter(PurchaseReceipt.received_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            query = query.filter(PurchaseReceipt.received_at < datetime.fromisoformat(date_to) + timedelta(days=1))
+    except ValueError:
+        pass
+    return query
+
+
+@app.route("/admin/purchases")
+@login_required
+def admin_purchase_history():
+    db = SessionLocal()
+    try:
+        query = purchase_history_query(db)
+        try:
+            page = max(1, int(request.args.get("page", "1")))
+        except ValueError:
+            page = 1
+        try:
+            per_page = int(request.args.get("per_page", "10"))
+        except ValueError:
+            per_page = 10
+        if per_page not in (10, 20, 50):
+            per_page = 10
+        total_receipts = query.count()
+        total_pages = max(1, (total_receipts + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        receipts = query.order_by(PurchaseReceipt.received_at.desc(), PurchaseReceipt.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        all_receipts = query.all()
+        receipt_ids = [receipt.id for receipt in all_receipts]
+        total_amount = sum((receipt.total_amount or 0) for receipt in all_receipts)
+        supplier_count = len({receipt.supplier_id or receipt.supplier_name for receipt in all_receipts})
+        item_totals = {}
+        total_quantity = 0
+        if receipt_ids:
+            grouped_items = db.query(PurchaseReceiptItem.receipt_id, func.count(PurchaseReceiptItem.id), func.sum(PurchaseReceiptItem.quantity)).filter(PurchaseReceiptItem.receipt_id.in_(receipt_ids)).group_by(PurchaseReceiptItem.receipt_id).all()
+            item_totals = {rid: {"lines": int(lines or 0), "quantity": int(quantity or 0)} for rid, lines, quantity in grouped_items}
+            total_quantity = sum(value["quantity"] for value in item_totals.values())
+        supplier_summary = {}
+        for receipt in all_receipts:
+            key = receipt.supplier_name
+            row = supplier_summary.setdefault(key, {"name": key, "receipts": 0, "lines": 0, "quantity": 0, "amount": 0})
+            row["receipts"] += 1
+            row["lines"] += item_totals.get(receipt.id, {}).get("lines", 0)
+            row["quantity"] += item_totals.get(receipt.id, {}).get("quantity", 0)
+            row["amount"] += receipt.total_amount or 0
+        supplier_summary = sorted(supplier_summary.values(), key=lambda row: row["amount"], reverse=True)
+        chart_summary = supplier_summary[:5]
+        if len(supplier_summary) > 5:
+            chart_summary = chart_summary + [{"name": "Khác", "amount": sum(row["amount"] for row in supplier_summary[5:])}]
+        chart_labels = [row["name"] for row in chart_summary]
+        chart_values = [row["amount"] for row in chart_summary]
+        suppliers = db.query(Supplier).order_by(Supplier.name).all()
+        years = sorted({receipt.received_at.year for receipt in db.query(PurchaseReceipt).all() if receipt.received_at}, reverse=True)
+        filter_args = {key: value for key, value in request.args.items() if key not in ("page", "per_page") and value}
+        return render_template("purchase_history.html", receipts=receipts, item_totals=item_totals, supplier_summary=supplier_summary, chart_labels=chart_labels, chart_values=chart_values, suppliers=suppliers, years=years, total_receipts=total_receipts, total_amount=total_amount, total_quantity=total_quantity, supplier_count=supplier_count, page=page, per_page=per_page, total_pages=total_pages, filters=request.args, filter_args=filter_args)
+    finally:
+        db.close()
+
+
+@app.route("/admin/purchases/export")
+@login_required
+def admin_purchase_export():
+    db = SessionLocal()
+    try:
+        receipts = purchase_history_query(db).order_by(PurchaseReceipt.received_at.desc()).all()
+        rows = []
+        for receipt in receipts:
+            items = db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).all()
+            for item in items:
+                rows.append({"Mã phiếu": receipt.receipt_number, "Ngày nhập": receipt.received_at.strftime("%d/%m/%Y"), "Nhà cung cấp": receipt.supplier_name, "Mã hàng": item.product_code, "Sản phẩm": item.product_name, "Màu": item.color, "Đơn vị": item.unit, "Số lượng": item.quantity, "Giá nhập": item.unit_price, "Thành tiền": item.line_total, "Ghi chú": receipt.notes})
+        output = BytesIO()
+        pd.DataFrame(rows).to_excel(output, index=False, sheet_name="Lich su nhap hang")
+        output.seek(0)
+        return send_file(output, as_attachment=True, download_name=f"lich_su_nhap_hang_{datetime.now():%Y%m%d}.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    finally:
+        db.close()
+
+
 @app.route("/admin")
 @login_required
 def admin_dashboard():
@@ -472,7 +900,7 @@ def admin_dashboard():
                 (Product.category.ilike(like))
             )
 
-        total_products = base_query.count()
+        filtered_total = base_query.count()
 
         products = (
             base_query
@@ -489,10 +917,21 @@ def admin_dashboard():
             if p.category and str(p.category).strip()
         })
 
+        total_products = len(all_products)
         total_stock = db.query(Product).with_entities(func.sum(Product.stock)).scalar() or 0
         total_available = sum([p.available for p in all_products])
+        low_stock_products = sorted(
+            [p for p in all_products if p.available <= 5],
+            key=lambda p: (p.available, p.model or "", p.code or ""),
+        )[:5]
+        low_stock_count = sum(1 for p in all_products if p.available <= 5)
+        recent_products = sorted(
+            [p for p in all_products if p.updated_at],
+            key=lambda p: p.updated_at,
+            reverse=True,
+        )[:5]
 
-        total_pages = max(1, (total_products + per_page - 1) // per_page)
+        total_pages = max(1, (filtered_total + per_page - 1) // per_page)
         retail_visible = retail_prices_visible(db)
         retail_priced_count = db.query(Product).filter(Product.retail_price > 0).count()
 
@@ -505,6 +944,10 @@ def admin_dashboard():
             total_products=total_products,
             total_stock=total_stock,
             total_available=total_available,
+            low_stock_products=low_stock_products,
+            low_stock_count=low_stock_count,
+            recent_products=recent_products,
+            filtered_total=filtered_total,
             per_page=per_page,
             q=q,
             price_type=price_type,

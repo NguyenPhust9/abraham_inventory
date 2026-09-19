@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Tạo phiếu nhập hàng | Abraham Bike{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/lucide@latest" defer></script>
+{% endblock %}
+{% block content %}
+<div class="purchase-page">
+  <header class="purchase-topbar">
+    <a class="purchase-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark"><i data-lucide="bike"></i></span><span><strong>ABRAHAM BIKE</strong><small>QUẢN LÝ NHẬP HÀNG</small></span></a>
+    <nav><a href="{{ url_for('admin_dashboard') }}"><i data-lucide="house"></i>Dashboard</a><a class="active" href="{{ url_for('admin_purchase_new') }}"><i data-lucide="truck"></i>Nhập hàng</a><a href="{{ url_for('admin_purchase_history') }}"><i data-lucide="history"></i>Lịch sử</a><a href="{{ url_for('admin_logout') }}"><i data-lucide="log-out"></i>Đăng xuất</a></nav>
+  </header>
+
+  <main class="purchase-content">
+    <div class="purchase-titlebar">
+      <div><p class="eyebrow">NHẬP HÀNG TỪ NHÀ CUNG CẤP</p><h1>{{ 'Chỉnh sửa phiếu nhập' if edit_receipt else 'Tạo phiếu nhập hàng' }}</h1><p>Lưu lại nhà cung cấp, giá nhập và số lượng. Phiếu này không thay đổi tồn kho hiện tại.</p></div>
+      <div class="purchase-breadcrumb"><i data-lucide="house"></i><span>›</span>Nhập hàng<span>›</span><strong>Tạo phiếu nhập</strong></div>
+    </div>
+
+    <form method="POST" id="purchaseForm" action="{{ url_for('admin_purchase_edit', receipt_id=edit_receipt.id) if edit_receipt else url_for('admin_purchase_new') }}">
+      <input type="hidden" name="items_json" id="itemsJson">
+      <div class="purchase-info-grid">
+        <section class="purchase-panel">
+          <div class="purchase-panel-title"><i data-lucide="truck"></i>Thông tin nhà cung cấp</div>
+          <div class="purchase-fields supplier-fields">
+            <label class="field-wide"><span>Nhà cung cấp <em>*</em></span>
+              <input name="supplier_name" id="supplierName" list="supplierList" required placeholder="Nhập hoặc chọn nhà cung cấp" value="{{ edit_receipt.supplier_name if edit_receipt else '' }}">
+              <datalist id="supplierList">{% for s in suppliers %}<option value="{{ s.name }}" data-code="{{ s.code }}" data-phone="{{ s.phone or '' }}" data-email="{{ s.email or '' }}" data-address="{{ s.address or '' }}">{% endfor %}</datalist>
+            </label>
+            <label>Mã NCC<input name="supplier_code" id="supplierCode" placeholder="Tự động nếu để trống" value="{{ edit_supplier.code if edit_supplier else '' }}"></label>
+            <label>Số điện thoại<input name="supplier_phone" id="supplierPhone" placeholder="Số điện thoại" value="{{ edit_supplier.phone if edit_supplier else '' }}"></label>
+            <label>Email<input name="supplier_email" id="supplierEmail" type="email" placeholder="email@company.vn" value="{{ edit_supplier.email if edit_supplier else '' }}"></label>
+            <label class="field-full">Địa chỉ<input name="supplier_address" id="supplierAddress" placeholder="Địa chỉ nhà cung cấp" value="{{ edit_supplier.address if edit_supplier else '' }}"></label>
+          </div>
+        </section>
+
+        <section class="purchase-panel">
+          <div class="purchase-panel-title"><i data-lucide="clipboard-list"></i>Thông tin phiếu</div>
+          <div class="purchase-fields receipt-fields">
+            <label><span>Mã phiếu nhập <em>*</em></span><input name="receipt_number" value="{{ edit_receipt.receipt_number if edit_receipt else next_receipt_number }}" required></label>
+            <label><span>Ngày nhập <em>*</em></span><input name="received_date" type="date" value="{{ edit_receipt.received_at.strftime('%Y-%m-%d') if edit_receipt else today }}" required></label>
+            <label class="field-full">Ghi chú<textarea name="notes" rows="3" placeholder="Nhập ghi chú (nếu có)...">{{ edit_receipt.notes if edit_receipt else '' }}</textarea></label>
+          </div>
+        </section>
+      </div>
+
+      <section class="purchase-panel product-picker">
+        <div class="purchase-panel-title"><i data-lucide="package-plus"></i>Thêm sản phẩm vào phiếu</div>
+        <div class="purchase-add-row">
+          <label class="product-select-field"><span>Sản phẩm <em>*</em></span>
+            <span class="product-search-wrap">
+              <i data-lucide="search"></i>
+              <input id="purchaseProduct" autocomplete="off" placeholder="Gõ để tìm hoặc bấm mũi tên để chọn...">
+              <button type="button" class="product-dropdown-toggle" id="productDropdownToggle" aria-label="Mở danh sách sản phẩm"><i data-lucide="chevron-down"></i></button>
+              <span class="product-search-results" id="productSearchResults" hidden></span>
+            </span>
+          </label>
+          <label><span>Mã hàng <em>*</em></span><input id="purchaseCode" placeholder="Nhập mã mới nếu chưa có"></label>
+          <label><span>Giá nhập (VNĐ) <em>*</em></span><input id="purchasePrice" type="number" min="0" step="1000" placeholder="0"></label>
+          <label><span>Số lượng <em>*</em></span><input id="purchaseQuantity" type="number" min="1" value="1"></label>
+          <label>Đơn vị tính<input id="purchaseUnit" value="Chiếc" placeholder="Chiếc"></label>
+          <button type="button" class="purchase-add-btn" id="addPurchaseItem"><i data-lucide="plus"></i>Thêm vào danh sách</button>
+        </div>
+        <p class="purchase-note"><i data-lucide="info"></i>Số lượng và giá nhập chỉ được lưu trong lịch sử phiếu, không cộng vào tồn kho đồng bộ hiện tại.</p>
+      </section>
+
+      <section class="purchase-panel purchase-list-panel">
+        <div class="purchase-panel-title"><i data-lucide="clipboard-list"></i>Danh sách sản phẩm nhập</div>
+        <div class="purchase-table-wrap">
+          <table class="purchase-table">
+            <thead><tr><th>STT</th><th>Sản phẩm</th><th>Màu</th><th>Mã hàng</th><th class="num">Giá nhập</th><th class="num">Số lượng</th><th>Đơn vị</th><th class="num">Thành tiền</th><th>Thao tác</th></tr></thead>
+            <tbody id="purchaseItemsBody"><tr class="purchase-empty"><td colspan="9">Chưa có sản phẩm nào trong phiếu nhập.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="purchase-total"><span>Tổng cộng:</span><strong id="purchaseTotal">0 đ</strong></div>
+      </section>
+
+      <div class="purchase-actions"><a href="{{ url_for('admin_purchase_detail', receipt_id=edit_receipt.id) if edit_receipt else url_for('admin_dashboard') }}"><i data-lucide="x"></i>Hủy</a><button type="submit"><i data-lucide="save"></i>{{ 'Lưu thay đổi' if edit_receipt else 'Lưu phiếu nhập' }}</button></div>
+    </form>
+
+    {% if not edit_receipt %}<section class="purchase-panel recent-receipts" id="receipt-history">
+      <div class="purchase-panel-title receipt-history-title"><span><i data-lucide="history"></i>Tra cứu phiếu nhập</span><small>{{ receipt_total }} phiếu phù hợp</small></div>
+      <form class="receipt-filters" method="GET" action="{{ url_for('admin_purchase_new') }}">
+        <label>Mã phiếu<span><i data-lucide="search"></i><input name="receipt_q" value="{{ receipt_q }}" placeholder="Tìm mã phiếu..."></span></label>
+        <label>Nhà cung cấp<span><i data-lucide="users"></i><input name="supplier_q" value="{{ supplier_q }}" placeholder="Tên nhà cung cấp..."></span></label>
+        <label>Từ ngày<input name="date_from" type="date" value="{{ date_from }}"></label>
+        <label>Đến ngày<input name="date_to" type="date" value="{{ date_to }}"></label>
+        <button type="submit"><i data-lucide="list-filter"></i>Lọc phiếu</button>
+        {% if receipt_q or supplier_q or date_from or date_to %}<a href="{{ url_for('admin_purchase_new') }}#receipt-history"><i data-lucide="rotate-ccw"></i>Xóa lọc</a>{% endif %}
+      </form>
+      <div class="purchase-table-wrap"><table class="purchase-table"><thead><tr><th>Mã phiếu</th><th>Nhà cung cấp</th><th>Ngày nhập</th><th class="num">Tổng tiền</th><th>Thao tác</th></tr></thead><tbody>
+      {% for receipt in recent_receipts %}<tr><td><span class="code-badge">{{ receipt.receipt_number }}</span></td><td>{{ receipt.supplier_name }}</td><td>{{ receipt.received_at.strftime('%d/%m/%Y') }}</td><td class="num"><strong>{{ "{:,.0f}".format(receipt.total_amount or 0).replace(",", ".") }} đ</strong></td><td><div class="receipt-row-actions"><a class="view" href="{{ url_for('admin_purchase_detail', receipt_id=receipt.id) }}"><i data-lucide="eye"></i>Xem</a><a class="edit" href="{{ url_for('admin_purchase_edit', receipt_id=receipt.id) }}"><i data-lucide="pencil"></i>Sửa</a><form method="POST" action="{{ url_for('admin_purchase_delete', receipt_id=receipt.id) }}" onsubmit="return confirm('Xóa phiếu {{ receipt.receipt_number }}? Dữ liệu phiếu sẽ không thể khôi phục.');"><button type="submit"><i data-lucide="trash-2"></i>Xóa</button></form></div></td></tr>{% else %}<tr><td colspan="5" class="purchase-empty-cell">Chưa có phiếu nhập nào.</td></tr>{% endfor %}
+      </tbody></table></div>
+      {% if receipt_total_pages > 1 %}
+      <nav class="receipt-pagination" aria-label="Phân trang phiếu nhập">
+        {% if receipt_page > 1 %}<a href="{{ url_for('admin_purchase_new', receipt_page=receipt_page-1, receipt_q=receipt_q, supplier_q=supplier_q, date_from=date_from, date_to=date_to) }}#receipt-history"><i data-lucide="chevron-left"></i>Trước</a>{% else %}<span class="disabled"><i data-lucide="chevron-left"></i>Trước</span>{% endif %}
+        <span>Trang <strong>{{ receipt_page }}</strong> / {{ receipt_total_pages }}</span>
+        {% if receipt_page < receipt_total_pages %}<a href="{{ url_for('admin_purchase_new', receipt_page=receipt_page+1, receipt_q=receipt_q, supplier_q=supplier_q, date_from=date_from, date_to=date_to) }}#receipt-history">Sau<i data-lucide="chevron-right"></i></a>{% else %}<span class="disabled">Sau<i data-lucide="chevron-right"></i></span>{% endif %}
+      </nav>
+      {% endif %}
+    </section>{% endif %}
+  </main>
+</div>
+
+<script type="application/json" id="productCatalogData">{{ product_options|tojson }}</script>
+<script>
+const productCatalog = JSON.parse(document.getElementById("productCatalogData").textContent);
+let selectedCatalogProduct = null;
+window.addEventListener("DOMContentLoaded", function () {
+  if (window.lucide) window.lucide.createIcons();
+});
+
+const purchaseItems = {{ initial_items|default([])|tojson }};
+const productSelect = document.getElementById("purchaseProduct");
+const priceInput = document.getElementById("purchasePrice");
+const quantityInput = document.getElementById("purchaseQuantity");
+const codeInput = document.getElementById("purchaseCode");
+const unitInput = document.getElementById("purchaseUnit");
+const productSearchResults = document.getElementById("productSearchResults");
+const productDropdownToggle = document.getElementById("productDropdownToggle");
+
+function money(value) { return new Intl.NumberFormat("vi-VN").format(value) + " đ"; }
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, function (char) {
+    return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char];
+  });
+}
+function chooseCatalogProduct(product) {
+  selectedCatalogProduct = product;
+  productSelect.value = product.name;
+  codeInput.value = product.code || "";
+  unitInput.value = product.unit || "Chiếc";
+  priceInput.value = Number(product.price) ? Number(product.price) : "";
+  productSearchResults.hidden = true;
+}
+function renderProductSearch(showAll) {
+  const query = productSelect.value.trim().toLocaleLowerCase("vi");
+  selectedCatalogProduct = null;
+  if (!query && !showAll) {
+    productSearchResults.hidden = true;
+    productSearchResults.innerHTML = "";
+    return;
+  }
+  const matches = (query ? productCatalog.filter(function (product) {
+    return [product.code, product.name, product.color].join(" ").toLocaleLowerCase("vi").includes(query);
+  }) : productCatalog).slice(0, showAll ? 50 : 10);
+  if (matches.length) {
+    productSearchResults.innerHTML = matches.map(function (product) {
+      return `<button type="button" data-product-id="${product.id}"><span><strong>${escapeHtml(product.name)}</strong><small>${escapeHtml(product.color || "Không màu")}</small></span><b>${escapeHtml(product.code)}</b></button>`;
+    }).join("");
+  } else {
+    productSearchResults.innerHTML = '<div class="product-no-result"><strong>Không tìm thấy sản phẩm</strong><small>Bạn có thể giữ tên vừa nhập và điền mã hàng mới.</small></div>';
+  }
+  productSearchResults.hidden = false;
+}
+function renderPurchaseItems() {
+  const body = document.getElementById("purchaseItemsBody");
+  if (!purchaseItems.length) {
+    body.innerHTML = '<tr class="purchase-empty"><td colspan="9">Chưa có sản phẩm nào trong phiếu nhập.</td></tr>';
+  } else {
+    body.innerHTML = purchaseItems.map(function (item, index) {
+      return `<tr><td>${index + 1}</td><td><strong>${escapeHtml(item.name)}</strong></td><td>${escapeHtml(item.color || "—")}</td><td><span class="code-badge">${escapeHtml(item.code)}</span></td><td class="num">${money(item.unit_price)}</td><td class="num">${item.quantity}</td><td>${escapeHtml(item.unit)}</td><td class="num"><strong>${money(item.quantity * item.unit_price)}</strong></td><td><button type="button" class="remove-line" data-index="${index}" aria-label="Xóa dòng"><i data-lucide="trash-2"></i></button></td></tr>`;
+    }).join("");
+  }
+  document.getElementById("purchaseTotal").textContent = money(purchaseItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0));
+  document.getElementById("itemsJson").value = JSON.stringify(purchaseItems);
+  if (window.lucide) window.lucide.createIcons();
+}
+productSelect.addEventListener("input", function () { renderProductSearch(false); });
+productSelect.addEventListener("focus", function () {
+  if (productSelect.value.trim()) renderProductSearch(false);
+});
+productDropdownToggle.addEventListener("click", function () {
+  if (!productSearchResults.hidden) {
+    productSearchResults.hidden = true;
+    return;
+  }
+  renderProductSearch(true);
+  productSelect.focus();
+});
+productSearchResults.addEventListener("click", function (event) {
+  const button = event.target.closest("button[data-product-id]");
+  if (!button) return;
+  const product = productCatalog.find(function (item) { return item.id === Number(button.dataset.productId); });
+  if (product) chooseCatalogProduct(product);
+});
+document.addEventListener("click", function (event) {
+  if (!event.target.closest(".product-search-wrap")) productSearchResults.hidden = true;
+});
+document.getElementById("supplierName").addEventListener("change", function () {
+  const enteredName = this.value;
+  const option = Array.from(document.querySelectorAll("#supplierList option")).find(function (item) { return item.value === enteredName; });
+  if (!option) return;
+  document.getElementById("supplierCode").value = option.dataset.code || "";
+  document.getElementById("supplierPhone").value = option.dataset.phone || "";
+  document.getElementById("supplierEmail").value = option.dataset.email || "";
+  document.getElementById("supplierAddress").value = option.dataset.address || "";
+});
+document.getElementById("addPurchaseItem").addEventListener("click", function () {
+  const quantity = Number(quantityInput.value);
+  const unitPrice = Number(priceInput.value);
+  const enteredName = productSelect.value.trim();
+  const enteredCode = codeInput.value.trim();
+  if (!enteredName) { alert("Vui lòng chọn hoặc nhập tên sản phẩm."); return; }
+  if (!enteredCode) { alert("Vui lòng nhập mã hàng."); return; }
+  if (!quantity || quantity < 1) { alert("Số lượng phải lớn hơn 0."); return; }
+  if (unitPrice < 0 || Number.isNaN(unitPrice)) { alert("Giá nhập không hợp lệ."); return; }
+  purchaseItems.push({
+    product_id: selectedCatalogProduct ? selectedCatalogProduct.id : 0,
+    code: enteredCode,
+    name: selectedCatalogProduct ? selectedCatalogProduct.name : enteredName,
+    color: selectedCatalogProduct ? selectedCatalogProduct.color : "",
+    unit: unitInput.value.trim() || "Chiếc",
+    quantity: quantity,
+    unit_price: unitPrice
+  });
+  renderPurchaseItems();
+  productSelect.value = "";
+  selectedCatalogProduct = null;
+  codeInput.value = "";
+  unitInput.value = "Chiếc";
+  priceInput.value = "";
+  quantityInput.value = 1;
+});
+document.getElementById("purchaseItemsBody").addEventListener("click", function (event) {
+  const button = event.target.closest(".remove-line");
+  if (!button) return;
+  purchaseItems.splice(Number(button.dataset.index), 1);
+  renderPurchaseItems();
+});
+document.getElementById("purchaseForm").addEventListener("submit", function (event) {
+  if (!purchaseItems.length) { event.preventDefault(); alert("Vui lòng thêm ít nhất một sản phẩm vào phiếu."); }
+});
+renderPurchaseItems();
+</script>
+{% endblock %}

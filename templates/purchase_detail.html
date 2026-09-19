@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ receipt.receipt_number }} | Phiếu nhập{% endblock %}
+{% block head %}<script src="https://unpkg.com/lucide@latest" defer></script>{% endblock %}
+{% block content %}
+<div class="purchase-page">
+  <header class="purchase-topbar">
+    <a class="purchase-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark"><i data-lucide="bike"></i></span><span><strong>ABRAHAM BIKE</strong><small>CHI TIẾT PHIẾU NHẬP</small></span></a>
+    <nav><a href="{{ url_for('admin_dashboard') }}"><i data-lucide="house"></i>Dashboard</a><a href="{{ url_for('admin_purchase_new') }}"><i data-lucide="truck"></i>Nhập hàng</a><a class="active" href="{{ url_for('admin_purchase_history') }}"><i data-lucide="history"></i>Lịch sử</a><a href="{{ url_for('admin_logout') }}"><i data-lucide="log-out"></i>Đăng xuất</a></nav>
+  </header>
+  <main class="purchase-content receipt-detail-page">
+    <div class="purchase-titlebar">
+      <div><p class="eyebrow">CHI TIẾT PHIẾU NHẬP</p><h1>{{ receipt.receipt_number }}</h1><p>Phiếu lưu lịch sử nhập hàng, không tác động đến tồn kho đồng bộ.</p></div>
+      <div class="detail-actions"><a href="{{ url_for('admin_purchase_new') }}#receipt-history"><i data-lucide="arrow-left"></i>Danh sách</a><a class="primary" href="{{ url_for('admin_purchase_edit', receipt_id=receipt.id) }}"><i data-lucide="pencil"></i>Chỉnh sửa</a><form method="POST" action="{{ url_for('admin_purchase_delete', receipt_id=receipt.id) }}" onsubmit="return confirm('Xóa phiếu {{ receipt.receipt_number }}? Dữ liệu phiếu sẽ không thể khôi phục.');"><button type="submit"><i data-lucide="trash-2"></i>Xóa phiếu</button></form></div>
+    </div>
+    <div class="receipt-detail-grid">
+      <section class="purchase-panel"><div class="purchase-panel-title"><i data-lucide="users"></i>Nhà cung cấp</div><dl class="detail-list"><div><dt>Tên nhà cung cấp</dt><dd>{{ receipt.supplier_name }}</dd></div><div><dt>Mã NCC</dt><dd>{{ supplier.code if supplier else '—' }}</dd></div><div><dt>Số điện thoại</dt><dd>{{ supplier.phone if supplier and supplier.phone else '—' }}</dd></div><div><dt>Email</dt><dd>{{ supplier.email if supplier and supplier.email else '—' }}</dd></div><div class="full"><dt>Địa chỉ</dt><dd>{{ supplier.address if supplier and supplier.address else '—' }}</dd></div></dl></section>
+      <section class="purchase-panel"><div class="purchase-panel-title"><i data-lucide="clipboard-list"></i>Thông tin phiếu</div><dl class="detail-list"><div><dt>Mã phiếu</dt><dd>{{ receipt.receipt_number }}</dd></div><div><dt>Ngày nhập</dt><dd>{{ receipt.received_at.strftime('%d/%m/%Y') }}</dd></div><div class="full"><dt>Ghi chú</dt><dd>{{ receipt.notes or 'Không có ghi chú' }}</dd></div></dl></section>
+    </div>
+    <section class="purchase-panel"><div class="purchase-panel-title"><i data-lucide="package"></i>Sản phẩm trong phiếu</div><div class="purchase-table-wrap"><table class="purchase-table"><thead><tr><th>STT</th><th>Sản phẩm</th><th>Màu</th><th>Mã hàng</th><th class="num">Giá nhập</th><th class="num">Số lượng</th><th>Đơn vị</th><th class="num">Thành tiền</th></tr></thead><tbody>{% for item in items %}<tr><td>{{ loop.index }}</td><td><strong>{{ item.product_name }}</strong></td><td>{{ item.color or '—' }}</td><td><span class="code-badge">{{ item.product_code }}</span></td><td class="num">{{ "{:,.0f}".format(item.unit_price or 0).replace(",", ".") }} đ</td><td class="num">{{ item.quantity }}</td><td>{{ item.unit }}</td><td class="num"><strong>{{ "{:,.0f}".format(item.line_total or 0).replace(",", ".") }} đ</strong></td></tr>{% else %}<tr><td colspan="8" class="purchase-empty-cell">Phiếu không có dòng sản phẩm.</td></tr>{% endfor %}</tbody></table></div><div class="purchase-total"><span>Tổng cộng:</span><strong>{{ "{:,.0f}".format(receipt.total_amount or 0).replace(",", ".") }} đ</strong></div></section>
+  </main>
+</div>
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide)window.lucide.createIcons();});</script>
+{% endblock %}

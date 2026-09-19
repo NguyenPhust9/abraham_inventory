@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử nhập hàng | Abraham Bike{% endblock %}
+{% block head %}<script src="https://unpkg.com/lucide@latest" defer></script><script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>{% endblock %}
+{% block content %}
+<div class="purchase-page history-page">
+  <header class="purchase-topbar">
+    <a class="purchase-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark"><i data-lucide="bike"></i></span><span><strong>ABRAHAM BIKE</strong><small>QUẢN LÝ TỒN KHO</small></span></a>
+    <nav><a href="{{ url_for('admin_dashboard') }}"><i data-lucide="house"></i>Dashboard</a><a href="{{ url_for('admin_purchase_new') }}"><i data-lucide="plus"></i>Tạo phiếu nhập</a><a class="active" href="{{ url_for('admin_purchase_history') }}"><i data-lucide="history"></i>Lịch sử nhập</a><a href="{{ url_for('admin_logout') }}"><i data-lucide="log-out"></i>Đăng xuất</a></nav>
+  </header>
+  <main class="purchase-content">
+    <div class="purchase-titlebar"><div><p class="eyebrow">NHẬP HÀNG</p><h1>Lịch sử nhập hàng</h1><p>Tra cứu và thống kê các phiếu theo thời gian, nhà cung cấp và giá trị.</p></div><a class="history-create-btn" href="{{ url_for('admin_purchase_new') }}"><i data-lucide="plus"></i>Tạo phiếu nhập mới</a></div>
+
+    <section class="purchase-panel history-filter-panel">
+      <div class="purchase-panel-title receipt-history-title"><span><i data-lucide="list-filter"></i>Bộ lọc tìm kiếm</span>{% if filters %}<a href="{{ url_for('admin_purchase_history') }}"><i data-lucide="rotate-ccw"></i>Xóa bộ lọc</a>{% endif %}</div>
+      <form class="history-filters" method="GET">
+        <label>Tháng<select name="month"><option value="">Tất cả</option>{% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if filters.get('month') == m|string else '' }}>Tháng {{ '%02d'|format(m) }}</option>{% endfor %}</select></label>
+        <label>Năm<select name="year"><option value="">Tất cả</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if filters.get('year') == y|string else '' }}>{{ y }}</option>{% endfor %}</select></label>
+        <label>Nhà cung cấp<select name="supplier_id"><option value="">Tất cả nhà cung cấp</option>{% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if filters.get('supplier_id') == s.id|string else '' }}>{{ s.name }}</option>{% endfor %}</select></label>
+        <label>Từ ngày<input type="date" name="date_from" value="{{ filters.get('date_from','') }}"></label>
+        <label>Đến ngày<input type="date" name="date_to" value="{{ filters.get('date_to','') }}"></label>
+        <label class="history-search">Tìm kiếm<span><i data-lucide="search"></i><input name="q" value="{{ filters.get('q','') }}" placeholder="Mã phiếu, NCC, sản phẩm..."></span></label>
+        <button type="submit"><i data-lucide="search"></i>Tìm kiếm</button>
+      </form>
+    </section>
+
+    <section class="history-stats">
+      <div class="history-stat blue"><span><i data-lucide="badge-dollar-sign"></i></span><div><small>TỔNG TIỀN NHẬP</small><strong>{{ "{:,.0f}".format(total_amount).replace(",", ".") }} đ</strong></div></div>
+      <div class="history-stat green"><span><i data-lucide="package"></i></span><div><small>TỔNG SỐ LƯỢNG</small><strong>{{ "{:,.0f}".format(total_quantity).replace(",", ".") }} sản phẩm</strong></div></div>
+      <div class="history-stat orange"><span><i data-lucide="clipboard-list"></i></span><div><small>SỐ PHIẾU NHẬP</small><strong>{{ total_receipts }} phiếu</strong></div></div>
+      <div class="history-stat purple"><span><i data-lucide="users"></i></span><div><small>SỐ NHÀ CUNG CẤP</small><strong>{{ supplier_count }} nhà cung cấp</strong></div></div>
+    </section>
+
+    <section class="purchase-panel history-list-panel">
+      <div class="purchase-panel-title receipt-history-title"><span><i data-lucide="clipboard-list"></i>Danh sách phiếu nhập hàng</span><span class="history-tools"><a href="{{ url_for('admin_purchase_export', **filter_args) }}"><i data-lucide="file-spreadsheet"></i>Xuất Excel</a><button type="button" onclick="window.print()"><i data-lucide="printer"></i>In báo cáo</button></span></div>
+      <div class="purchase-table-wrap"><table class="purchase-table history-table"><thead><tr><th>STT</th><th>Mã phiếu</th><th>Ngày nhập</th><th>Nhà cung cấp</th><th class="num">Số mặt hàng</th><th class="num">Tổng số lượng</th><th class="num">Tổng tiền</th><th>Thao tác</th></tr></thead><tbody>{% for receipt in receipts %}{% set totals=item_totals.get(receipt.id,{}) %}<tr><td>{{ (page-1)*per_page+loop.index }}</td><td><a class="receipt-code-link" href="{{ url_for('admin_purchase_detail', receipt_id=receipt.id) }}">{{ receipt.receipt_number }}</a></td><td>{{ receipt.received_at.strftime('%d/%m/%Y') }}</td><td>{{ receipt.supplier_name }}</td><td class="num">{{ totals.get('lines',0) }}</td><td class="num">{{ totals.get('quantity',0) }}</td><td class="num"><strong>{{ "{:,.0f}".format(receipt.total_amount or 0).replace(",", ".") }} đ</strong></td><td><div class="receipt-row-actions"><a class="view" href="{{ url_for('admin_purchase_detail', receipt_id=receipt.id) }}"><i data-lucide="eye"></i>Xem</a><a class="edit" href="{{ url_for('admin_purchase_edit', receipt_id=receipt.id) }}"><i data-lucide="pencil"></i>Sửa</a><form method="POST" action="{{ url_for('admin_purchase_delete', receipt_id=receipt.id) }}" onsubmit="return confirm('Xóa phiếu {{ receipt.receipt_number }}?');"><button type="submit"><i data-lucide="trash-2"></i>Xóa</button></form></div></td></tr>{% else %}<tr><td colspan="8" class="purchase-empty-cell">Không tìm thấy phiếu nhập phù hợp.</td></tr>{% endfor %}</tbody></table></div>
+      <div class="history-table-footer"><form method="GET">{% for key,value in filter_args.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<label>Hiển thị <select name="per_page" onchange="this.form.submit()">{% for size in (10,20,50) %}<option value="{{ size }}" {{ 'selected' if per_page==size else '' }}>{{ size }}</option>{% endfor %}</select> dòng/trang</label></form>{% if total_pages>1 %}<nav class="receipt-pagination">{% if page>1 %}<a href="{{ url_for('admin_purchase_history', page=page-1, per_page=per_page, **filter_args) }}"><i data-lucide="chevron-left"></i></a>{% endif %}<span>Trang <strong>{{ page }}</strong> / {{ total_pages }}</span>{% if page<total_pages %}<a href="{{ url_for('admin_purchase_history', page=page+1, per_page=per_page, **filter_args) }}"><i data-lucide="chevron-right"></i></a>{% endif %}</nav>{% endif %}</div>
+    </section>
+
+    <section class="purchase-panel supplier-summary-panel"><div class="purchase-panel-title"><i data-lucide="chart-no-axes-combined"></i>Tổng hợp theo nhà cung cấp</div><div class="supplier-summary-layout"><div class="purchase-table-wrap"><table class="purchase-table"><thead><tr><th>STT</th><th>Nhà cung cấp</th><th class="num">Số phiếu</th><th class="num">Số mặt hàng</th><th class="num">Tổng số lượng</th><th class="num">Tổng tiền</th><th>Tỷ trọng</th></tr></thead><tbody>{% for row in supplier_summary %}{% set percent=(row.amount/total_amount*100) if total_amount else 0 %}<tr><td>{{ loop.index }}</td><td><strong>{{ row.name }}</strong></td><td class="num">{{ row.receipts }}</td><td class="num">{{ row.lines }}</td><td class="num">{{ row.quantity }}</td><td class="num">{{ "{:,.0f}".format(row.amount).replace(",", ".") }} đ</td><td><div class="share-cell"><span><i style="width:{{ percent }}%"></i></span><b>{{ '%.1f'|format(percent) }}%</b></div></td></tr>{% else %}<tr><td colspan="7" class="purchase-empty-cell">Chưa có dữ liệu tổng hợp.</td></tr>{% endfor %}</tbody></table></div><div class="supplier-chart"><div class="chart-wrap"><canvas id="supplierChart"></canvas><div class="chart-center"><strong>{{ "{:,.0f}".format(total_amount / 1000000).replace(",", ".") }}M</strong><small>Tổng tiền nhập</small></div></div></div></div></section>
+  </main>
+</div>
+<script>
+window.addEventListener("DOMContentLoaded",function(){
+  if(window.lucide)window.lucide.createIcons();
+  const canvas=document.getElementById("supplierChart");
+  const values={{ chart_values|tojson }};
+  if(canvas&&window.Chart&&values.some(value=>value>0)){
+    new Chart(canvas,{type:"doughnut",data:{labels:{{ chart_labels|tojson }},datasets:[{data:values,backgroundColor:["#1687f8","#12b981","#ff9d3d","#8b5cf6","#ef4f78","#b8c6d9"],borderWidth:3,borderColor:"#fff",hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,usePointStyle:true,padding:14,font:{size:10}}},tooltip:{callbacks:{label:function(context){return context.label+": "+new Intl.NumberFormat("vi-VN").format(context.raw)+" đ";}}}}}});
+  }
+});
+</script>
+{% endblock %}

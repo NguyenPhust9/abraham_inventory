@@ -1,41 +1,136 @@
 {% extends "base.html" %}
+{% block head %}
+<script src="https://unpkg.com/lucide@latest" defer></script>
+{% endblock %}
 {% block content %}
 
 
 
 <div class="admin-page">
 
-  <section class="admin-hero">
+  <header class="admin-hero">
     <div class="admin-nav">
-      <div class="admin-brand">
-        <span class="brand-mark" aria-hidden="true">★</span>
-        <div class="admin-brand-copy">
+      <a class="admin-brand" href="#tong-quan" aria-label="Abraham Bike - Tổng quan">
+        <span class="brand-mark" aria-hidden="true"><i data-lucide="bike"></i></span>
+        <span class="admin-brand-copy">
           <strong>ABRAHAM BIKE</strong>
           <small>QUẢN LÝ TỒN KHO</small>
-        </div>
+        </span>
         <span class="admin-tag">ADMIN</span>
-      </div>
+      </a>
 
-      <div class="top-actions">
-        <a class="link-btn" href="{{ url_for('catalog') }}" target="_blank">Xem trang khách</a>
-        <a class="link-btn logout" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
+      <form class="admin-global-search" method="GET" action="{{ url_for('admin_dashboard') }}">
+        <input type="hidden" name="price_type" value="{{ price_type }}">
+        <span aria-hidden="true"><i data-lucide="search"></i></span>
+        <input name="q" type="search" value="{{ q or '' }}" placeholder="Tìm mã hàng, tên sản phẩm, màu sắc..." aria-label="Tìm kiếm sản phẩm">
+      </form>
+
+      <div class="admin-account">
+        <span class="account-avatar">A</span>
+        <span class="account-copy"><strong>Quản trị viên</strong><small>Administrator</small></span>
+        <a class="account-logout" href="{{ url_for('admin_logout') }}">Đăng xuất</a>
       </div>
     </div>
 
-    <div class="national-strip">
-      <div>
-        <div class="national-kicker">Chào mừng Quốc khánh Việt Nam</div>
-        <h1 class="national-title">Quản lý kho Abraham Bike</h1>
-      </div>
-      <div class="national-date">02<span>/</span>09</div>
+    <nav class="admin-main-nav" aria-label="Điều hướng quản trị">
+      <a class="active" href="#tong-quan"><i data-lucide="house"></i>Tổng quan</a>
+      <a href="#san-pham"><i data-lucide="package"></i>Sản phẩm</a>
+      <a href="{{ url_for('admin_purchase_new') }}"><i data-lucide="truck"></i>Nhập hàng</a>
+      <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="package-open"></i>Xuất hàng</a>
+      <a href="#ton-kho"><i data-lucide="warehouse"></i>Tồn kho</a>
+      <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="users"></i>Nhà cung cấp</a>
+      <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="chart-no-axes-combined"></i>Báo cáo</a>
+      <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="settings"></i>Cài đặt</a>
+    </nav>
+  </header>
+
+  <div class="admin-content" id="tong-quan">
+
+  <section class="dashboard-welcome">
+    <div>
+      <p class="eyebrow">TỔNG QUAN HỆ THỐNG</p>
+      <h1>Chào mừng bạn quay trở lại!</h1>
+      <p>Theo dõi hàng hóa và quản lý tồn kho Abraham Bike hiệu quả.</p>
+    </div>
+    <div class="today-card">
+      <span class="today-icon" aria-hidden="true"><i data-lucide="calendar-days"></i></span>
+      <span><strong id="currentDate">Hôm nay</strong><small>Chúc bạn một ngày làm việc hiệu quả!</small></span>
     </div>
   </section>
 
-  <div class="admin-content">
+  <section class="stats-grid">
+    <div class="stat-card stat-blue">
+      <span class="stat-icon" aria-hidden="true"><i data-lucide="package"></i></span>
+      <div><div class="stat-label">TỔNG SẢN PHẨM</div><div class="stat-value">{{ "{:,.0f}".format(total_products).replace(",", ".") }}</div>
+      <div class="stat-caption">Mã sản phẩm đang quản lý</div></div>
+    </div>
+    <div class="stat-card stat-green">
+      <span class="stat-icon" aria-hidden="true"><i data-lucide="warehouse"></i></span>
+      <div><div class="stat-label">TỔNG TỒN KHO</div><div class="stat-value">{{ "{:,.0f}".format(total_stock).replace(",", ".") }}</div>
+      <div class="stat-caption">Tổng số lượng trong kho</div></div>
+    </div>
+    <div class="stat-card stat-orange">
+      <span class="stat-icon" aria-hidden="true"><i data-lucide="shopping-cart"></i></span>
+      <div><div class="stat-label">CÓ THỂ BÁN</div><div class="stat-value">{{ "{:,.0f}".format(total_available).replace(",", ".") }}</div>
+      <div class="stat-caption">Số lượng có thể bán ngay</div></div>
+    </div>
+    <div class="stat-card stat-red">
+      <span class="stat-icon" aria-hidden="true"><i data-lucide="package-open"></i></span>
+      <div><div class="stat-label">SẮP HẾT HÀNG</div><div class="stat-value">{{ low_stock_count }}</div>
+      <div class="stat-caption">Sản phẩm còn không quá 5 chiếc</div></div>
+    </div>
+  </section>
+
+  <section class="quick-panel">
+    <div class="section-heading"><div><span class="section-heading-icon"><i data-lucide="layout-grid"></i></span><h2>Các chức năng chính</h2></div><span class="section-note">Truy cập nhanh</span></div>
+    <div class="quick-grid">
+      <a class="quick-card quick-blue" href="#san-pham"><span class="module-icon"><i data-lucide="package"></i></span><strong>Sản phẩm</strong><small>Thêm, sửa và quản lý danh sách sản phẩm</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-green" href="{{ url_for('admin_purchase_new') }}"><span class="module-icon"><i data-lucide="truck"></i></span><strong>Nhập hàng từ NCC</strong><small>Lưu nhà cung cấp, giá nhập và số lượng</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-orange" href="#ton-kho"><span class="module-icon"><i data-lucide="warehouse"></i></span><strong>Kho hàng</strong><small>Theo dõi tồn, hàng đã đặt và có thể bán</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-purple" href="{{ url_for('admin_dashboard', price_type='dealer') }}#san-pham"><span class="module-icon"><i data-lucide="badge-dollar-sign"></i></span><strong>Giá xuất xưởng</strong><small>Quản lý bảng giá dành cho đại lý</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-pink disabled" href="#" aria-disabled="true"><span class="module-icon"><i data-lucide="users"></i></span><strong>Nhà cung cấp</strong><small>Module đang được phát triển</small><b><i data-lucide="lock-keyhole"></i></b></a>
+      <a class="quick-card quick-cyan disabled" href="#" aria-disabled="true"><span class="module-icon"><i data-lucide="swatch-book"></i></span><strong>Mẫu mã NCC</strong><small>Module đang được phát triển</small><b><i data-lucide="lock-keyhole"></i></b></a>
+      <a class="quick-card quick-blue" href="{{ url_for('admin_purchase_history') }}"><span class="module-icon"><i data-lucide="clipboard-list"></i></span><strong>Lịch sử nhập hàng</strong><small>Tra cứu, thống kê và quản lý phiếu nhập</small><b><i data-lucide="arrow-right"></i></b></a>
+    </div>
+  </section>
+
+  <div class="overview-grid" id="ton-kho">
+    <section class="overview-card stock-alert-card">
+      <div class="section-heading"><div><span class="section-heading-icon warning"><i data-lucide="triangle-alert"></i></span><h2>Cảnh báo tồn kho</h2></div><a href="#san-pham">Xem tất cả</a></div>
+      <div class="compact-table-wrap">
+        <table class="compact-table">
+          <thead><tr><th>Mã hàng</th><th>Tên sản phẩm</th><th class="num">Có thể bán</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+          {% for item in low_stock_products %}
+            <tr><td><span class="code-badge">{{ item.code }}</span></td><td>{{ item.model }}</td><td class="num">{{ item.available }}</td><td><span class="stockbadge {{ 'out' if item.available == 0 else 'low' }}">{{ 'Hết hàng' if item.available == 0 else 'Sắp hết' }}</span></td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty-compact">Không có sản phẩm sắp hết hàng.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overview-card recent-card">
+      <div class="section-heading"><div><span class="section-heading-icon"><i data-lucide="clock-3"></i></span><h2>Cập nhật gần đây</h2></div><span class="section-note">5 sản phẩm mới nhất</span></div>
+      <div class="activity-list">
+      {% for item in recent_products %}
+        <div class="activity-item"><span class="activity-icon"><i data-lucide="refresh-cw"></i></span><span><strong>{{ item.model }}</strong><small>{{ item.code }} · Tồn {{ item.stock or 0 }} · Đã đặt {{ item.reserved or 0 }}</small></span><time>{{ item.updated_at.strftime('%d/%m') }}</time></div>
+      {% else %}
+        <p class="empty-compact">Chưa có dữ liệu cập nhật.</p>
+      {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="management-heading" id="san-pham">
+    <div><p class="eyebrow">QUẢN LÝ DỮ LIỆU</p><h2>Sản phẩm và bảng giá</h2></div>
+    <span>Giữ nguyên đầy đủ công cụ đang sử dụng</span>
+  </div>
 
   <nav class="admin-price-tabs" aria-label="Chọn bảng giá quản lý">
-    <a href="{{ url_for('admin_dashboard', price_type='dealer', q=q) }}" class="admin-price-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
-    <a href="{{ url_for('admin_dashboard', price_type='retail', q=q) }}" class="admin-price-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
+    <a href="{{ url_for('admin_dashboard', price_type='dealer', q=q) }}#san-pham" class="admin-price-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
+    <a href="{{ url_for('admin_dashboard', price_type='retail', q=q) }}#san-pham" class="admin-price-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
   </nav>
 
   {% if price_type == 'retail' %}
@@ -51,49 +146,31 @@
   </section>
   {% endif %}
 
-  <section class="stats-grid">
-    <div class="stat-card blue">
-      <div class="stat-label">TỔNG SẢN PHẨM</div>
-      <div class="stat-value">{{ total_products }}</div>
-      <div class="stat-caption">Mã sản phẩm đang quản lý</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-label">TỔNG TỒN KHO</div>
-      <div class="stat-value">{{ total_stock }}</div>
-      <div class="stat-caption">Tổng số lượng trong kho</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">CÓ THỂ BÁN</div>
-      <div class="stat-value">{{ total_available }}</div>
-      <div class="stat-caption">Số lượng có thể bán ngay</div>
-    </div>
-  </section>
-
   <div class="form-grid-wrap">
 
-    <section class="panel">
-      <h2>Nhập dữ liệu hàng loạt</h2>
+    <section class="panel" id="nhap-du-lieu">
+      <h2 class="icon-title"><span class="module-icon"><i data-lucide="upload"></i></span>Nhập dữ liệu hàng loạt</h2>
       <p class="hint">Hỗ trợ Excel/CSV. Trùng mã hàng sẽ cập nhật, mã mới sẽ được thêm.</p>
 
       <form method="POST" action="{{ url_for('admin_import') }}" enctype="multipart/form-data" class="inline-form">
         <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
-        <button type="submit">Nhập file</button>
+        <button type="submit"><i data-lucide="upload"></i>Nhập file</button>
       </form>
 
       <hr class="import-divider">
 
-      <h2>Cập nhật {{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }} nhanh</h2>
+      <h2 class="icon-title"><i data-lucide="badge-dollar-sign"></i>Cập nhật {{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }} nhanh</h2>
       <p class="hint">Chỉ cập nhật cột giá theo mã hàng, không đổi tên/tồn kho. Nhanh hơn nhiều với file lớn.</p>
 
       <form method="POST" action="{{ url_for('admin_import_price') }}" enctype="multipart/form-data" class="price-import-form">
         <input type="hidden" name="price_type" value="{{ price_type }}">
         <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
-        <button type="submit" class="price-btn">Cập nhật giá</button>
+        <button type="submit" class="price-btn"><i data-lucide="upload"></i>Cập nhật giá</button>
       </form>
     </section>
 
     <section class="panel">
-      <h2>Thêm sản phẩm mới</h2>
+      <h2 class="icon-title"><span class="module-icon"><i data-lucide="plus"></i></span>Thêm sản phẩm mới</h2>
       <p class="hint">Mỗi màu nên là một mã sản phẩm riêng để quản lý tồn kho chính xác.</p>
 
       <form method="POST" action="{{ url_for('admin_add_product') }}" class="grid-form" enctype="multipart/form-data">
@@ -114,7 +191,7 @@
         <input name="reserved" type="number" inputmode="numeric" placeholder="Đã đặt" value="0">
         <input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá đại lý">
         <input name="retail_price" type="number" inputmode="numeric" step="1000" placeholder="Giá lẻ">
-        <button type="submit" class="add-btn">Thêm sản phẩm</button>
+        <button type="submit" class="add-btn"><i data-lucide="plus"></i>Thêm sản phẩm</button>
       </form>
     </section>
 
@@ -123,7 +200,7 @@
   <section class="panel list-panel">
     <div class="list-head">
       <div class="list-title">
-        <h2>Danh sách sản phẩm</h2>
+        <h2 class="icon-title"><span class="module-icon"><i data-lucide="package"></i></span>Danh sách sản phẩm</h2>
         <p class="hint">Bấm Sửa để chỉnh thông tin và ảnh của từng mã hàng.</p>
       </div>
         <div class="search-box">
@@ -188,7 +265,7 @@
                     {% if img_url %}
                     <form method="POST" action="{{ url_for('admin_delete_product_image', product_id=p.id) }}"
                           onsubmit="return confirm('Xóa ảnh sản phẩm này? Ảnh sẽ bị xóa khỏi Cloudinary.');">
-                      <button type="submit" class="del-img-btn">Xóa ảnh</button>
+                      <button type="submit" class="del-img-btn"><i data-lucide="trash-2"></i>Xóa ảnh</button>
                     </form>
                     {% endif %}
                   </div>
@@ -245,7 +322,7 @@
 
                     <div class="modal-actions">
                       <button type="button" class="cancel-btn" onclick="closeEditModal('{{ p.id }}')">Hủy</button>
-                      <button type="submit" class="save-btn">Lưu thay đổi</button>
+                      <button type="submit" class="save-btn"><i data-lucide="save"></i>Lưu thay đổi</button>
                     </div>
                   </form>
                 </div>
@@ -301,10 +378,10 @@
             </td>
 
             <td data-label="Thao tác" class="delete-cell">
-              <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')">Sửa</button>
+              <button type="button" class="edit-btn" onclick="openEditModal('{{ p.id }}')"><i data-lucide="pencil"></i>Sửa</button>
               <form method="POST" action="{{ url_for('admin_delete_product', product_id=p.id) }}"
                     onsubmit="return confirm('Bạn chắc chắn muốn xóa sản phẩm này?');">
-                <button type="submit" class="del-btn">Xóa</button>
+                <button type="submit" class="del-btn"><i data-lucide="trash-2"></i>Xóa</button>
               </form>
             </td>
           </tr>
@@ -348,6 +425,21 @@
 </div>
 
 <script>
+  window.addEventListener("DOMContentLoaded", function () {
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  document.querySelectorAll('a[aria-disabled="true"]').forEach(function (link) {
+    link.addEventListener("click", function (event) { event.preventDefault(); });
+  });
+
+  const currentDate = document.getElementById("currentDate");
+  if (currentDate) {
+    currentDate.textContent = new Intl.DateTimeFormat("vi-VN", {
+      weekday: "long", day: "2-digit", month: "2-digit", year: "numeric"
+    }).format(new Date());
+  }
+
   const productSearch = document.getElementById("productSearch");
   const searchForm = document.getElementById("searchForm");
 
