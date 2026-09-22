@@ -871,6 +871,162 @@ def admin_purchase_export():
         db.close()
 
 
+@app.route("/admin/suppliers")
+@login_required
+def admin_suppliers():
+    db = SessionLocal()
+    try:
+        q = request.args.get("q", "").strip()
+        supplier_query = db.query(Supplier).join(PurchaseReceipt, PurchaseReceipt.supplier_id == Supplier.id).distinct()
+        if q:
+            like = f"%{q}%"
+            supplier_query = supplier_query.filter(or_(Supplier.name.ilike(like), Supplier.code.ilike(like), Supplier.phone.ilike(like), Supplier.email.ilike(like)))
+        suppliers = supplier_query.order_by(Supplier.name).all()
+        supplier_rows = []
+        all_product_codes = set()
+        total_value = 0.0
+        total_quantity = 0
+        for supplier in suppliers:
+            receipts = db.query(PurchaseReceipt).filter_by(supplier_id=supplier.id).order_by(PurchaseReceipt.received_at.desc()).all()
+            receipt_ids = [receipt.id for receipt in receipts]
+            items = db.query(PurchaseReceiptItem).filter(PurchaseReceiptItem.receipt_id.in_(receipt_ids)).all() if receipt_ids else []
+            product_codes = {item.product_code for item in items}
+            value = sum((receipt.total_amount or 0) for receipt in receipts)
+            quantity = sum((item.quantity or 0) for item in items)
+            all_product_codes.update(product_codes)
+            total_value += value
+            total_quantity += quantity
+            supplier_rows.append({"supplier": supplier, "receipt_count": len(receipts), "product_count": len(product_codes), "quantity": quantity, "value": value, "last_received": receipts[0].received_at if receipts else None})
+        supplier_rows.sort(key=lambda row: (row["last_received"] is not None, row["last_received"] or datetime.min), reverse=True)
+        return render_template("suppliers.html", supplier_rows=supplier_rows, q=q, total_suppliers=len(supplier_rows), total_products=len(all_product_codes), total_value=total_value, total_quantity=total_quantity)
+    finally:
+        db.close()
+
+
+@app.route("/admin/suppliers/<int:supplier_id>")
+@login_required
+def admin_supplier_detail(supplier_id):
+    db = SessionLocal()
+    try:
+        supplier = db.query(Supplier).get(supplier_id)
+        if not supplier:
+            flash("Không tìm thấy nhà cung cấp.")
+            return redirect(url_for("admin_suppliers"))
+        receipts = db.query(PurchaseReceipt).filter_by(supplier_id=supplier.id).order_by(PurchaseReceipt.received_at.desc()).all()
+        receipt_ids = [receipt.id for receipt in receipts]
+        records = []
+        if receipt_ids:
+            records = db.query(PurchaseReceiptItem, PurchaseReceipt).join(PurchaseReceipt, PurchaseReceipt.id == PurchaseReceiptItem.receipt_id).filter(PurchaseReceiptItem.receipt_id.in_(receipt_ids)).order_by(PurchaseReceipt.received_at.desc(), PurchaseReceiptItem.id.desc()).all()
+        grouped = {}
+        for item, receipt in records:
+            key = (item.product_code, item.product_name, item.color or "")
+            row = grouped.setdefault(key, {"code": item.product_code, "name": item.product_name, "color": item.color or "", "prices": [], "latest_price": item.unit_price or 0, "latest_date": receipt.received_at, "times": 0, "quantity": 0})
+            row["prices"].append(item.unit_price or 0)
+            row["times"] += 1
+            row["quantity"] += item.quantity or 0
+        price_rows = []
+        for row in grouped.values():
+            positive_prices = [price for price in row["prices"] if price > 0]
+            row["min_price"] = min(positive_prices) if positive_prices else 0
+            row["max_price"] = max(positive_prices) if positive_prices else 0
+            row["avg_price"] = sum(positive_prices) / len(positive_prices) if positive_prices else 0
+            price_rows.append(row)
+        price_rows.sort(key=lambda row: (row["name"], row["color"], row["code"]))
+        total_value = sum((receipt.total_amount or 0) for receipt in receipts)
+        total_quantity = sum((item.quantity or 0) for item, _ in records)
+        return render_template("supplier_detail.html", supplier=supplier, receipts=receipts[:20], price_rows=price_rows, receipt_count=len(receipts), product_count=len(price_rows), total_value=total_value, total_quantity=total_quantity, first_received=receipts[-1].received_at if receipts else None, last_received=receipts[0].received_at if receipts else None)
+    finally:
+        db.close()
+
+
+@app.route("/admin/suppliers/catalog")
+@login_required
+def admin_supplier_catalog():
+    db = SessionLocal()
+    try:
+        q = request.args.get("q", "").strip().lower()
+        suppliers = db.query(Supplier).join(PurchaseReceipt, PurchaseReceipt.supplier_id == Supplier.id).distinct().order_by(Supplier.name).all()
+        supplier_catalog = []
+        supplier_colors = {supplier.id: index % 10 for index, supplier in enumerate(sorted(suppliers, key=lambda item: item.id))}
+        all_codes = set()
+        total_links = 0
+        for supplier in suppliers:
+            records = (
+                db.query(PurchaseReceiptItem, PurchaseReceipt)
+                .join(PurchaseReceipt, PurchaseReceipt.id == PurchaseReceiptItem.receipt_id)
+                .filter(PurchaseReceipt.supplier_id == supplier.id)
+                .order_by(PurchaseReceipt.received_at.desc(), PurchaseReceiptItem.id.desc())
+                .all()
+            )
+            unique_products = {}
+            for item, receipt in records:
+                if item.product_code in unique_products:
+                    continue
+                unique_products[item.product_code] = {
+                    "code": item.product_code,
+                    "name": item.product_name,
+                    "color": item.color or "",
+                    "latest_price": item.unit_price or 0,
+                    "latest_date": receipt.received_at,
+                }
+            products = list(unique_products.values())
+            if q:
+                supplier_matches = q in supplier.name.lower() or q in supplier.code.lower()
+                matched_products = [product for product in products if q in f"{product['code']} {product['name']} {product['color']}".lower()]
+                if not supplier_matches and not matched_products:
+                    continue
+                if not supplier_matches:
+                    products = matched_products
+            if not products and q:
+                continue
+            products.sort(key=lambda product: (product["name"], product["color"], product["code"]))
+            all_codes.update(product["code"] for product in products)
+            total_links += len(products)
+            supplier_catalog.append({"supplier": supplier, "products": products, "product_count": len(products), "color_index": supplier_colors[supplier.id]})
+        supplier_catalog.sort(key=lambda row: (-row["product_count"], row["supplier"].name))
+        return render_template("supplier_catalog.html", supplier_catalog=supplier_catalog, q=request.args.get("q", "").strip(), supplier_count=len(supplier_catalog), unique_product_count=len(all_codes), total_links=total_links)
+    finally:
+        db.close()
+
+
+@app.route("/admin/suppliers/compare")
+@login_required
+def admin_supplier_compare():
+    db = SessionLocal()
+    try:
+        q = request.args.get("q", "").strip()
+        search_key = product_match_key(q) if q else ""
+        records = db.query(PurchaseReceiptItem, PurchaseReceipt).join(PurchaseReceipt, PurchaseReceipt.id == PurchaseReceiptItem.receipt_id).order_by(PurchaseReceipt.received_at.desc()).all()
+        grouped = {}
+        for item, receipt in records:
+            if search_key:
+                searchable = (item.product_code, item.product_name, item.color)
+                if not any(search_key in product_match_key(value) for value in searchable):
+                    continue
+            key = (receipt.supplier_id, receipt.supplier_name, item.product_code, item.product_name, item.color or "")
+            row = grouped.setdefault(key, {"supplier_id": receipt.supplier_id, "supplier_name": receipt.supplier_name, "code": item.product_code, "name": item.product_name, "color": item.color or "", "prices": [], "latest_price": item.unit_price or 0, "latest_date": receipt.received_at, "times": 0, "quantity": 0})
+            row["prices"].append(item.unit_price or 0)
+            row["times"] += 1
+            row["quantity"] += item.quantity or 0
+        compare_rows = list(grouped.values())
+        for row in compare_rows:
+            positive = [price for price in row["prices"] if price > 0]
+            row["min_price"] = min(positive) if positive else 0
+            row["max_price"] = max(positive) if positive else 0
+            row["avg_price"] = sum(positive) / len(positive) if positive else 0
+        compare_rows.sort(key=lambda row: (row["code"], row["latest_price"] or float("inf"), row["supplier_name"]))
+        cheapest_by_code = {}
+        for row in compare_rows:
+            if row["latest_price"] > 0:
+                cheapest_by_code[row["code"]] = min(cheapest_by_code.get(row["code"], row["latest_price"]), row["latest_price"])
+        for row in compare_rows:
+            row["is_cheapest"] = row["latest_price"] > 0 and row["latest_price"] == cheapest_by_code.get(row["code"])
+            row["age_days"] = (datetime.now() - row["latest_date"]).days if row["latest_date"] else None
+        return render_template("supplier_compare.html", q=q, compare_rows=compare_rows)
+    finally:
+        db.close()
+
+
 @app.route("/admin")
 @login_required
 def admin_dashboard():
@@ -1464,4 +1620,8 @@ def admin_import_price():
 
 if __name__ == "__main__":
     seed_if_empty()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+    )

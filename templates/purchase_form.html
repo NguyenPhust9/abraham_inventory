@@ -55,7 +55,7 @@
             </span>
           </label>
           <label><span>Mã hàng <em>*</em></span><input id="purchaseCode" placeholder="Nhập mã mới nếu chưa có"></label>
-          <label><span>Giá nhập (VNĐ) <em>*</em></span><input id="purchasePrice" type="number" min="0" step="1000" placeholder="0"></label>
+          <label><span>Giá nhập (VNĐ) <em>*</em></span><input id="purchasePrice" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9.]+" placeholder="0" aria-label="Giá nhập bằng đồng Việt Nam"></label>
           <label><span>Số lượng <em>*</em></span><input id="purchaseQuantity" type="number" min="1" value="1"></label>
           <label>Đơn vị tính<input id="purchaseUnit" value="Chiếc" placeholder="Chiếc"></label>
           <button type="button" class="purchase-add-btn" id="addPurchaseItem"><i data-lucide="plus"></i>Thêm vào danh sách</button>
@@ -119,6 +119,21 @@ const productSearchResults = document.getElementById("productSearchResults");
 const productDropdownToggle = document.getElementById("productDropdownToggle");
 
 function money(value) { return new Intl.NumberFormat("vi-VN").format(value) + " đ"; }
+function formatPrice(value) {
+  const digits = String(value).replace(/\D/g, "");
+  return digits ? new Intl.NumberFormat("vi-VN").format(Number(digits)) : "";
+}
+priceInput.addEventListener("input", function () {
+  const digitsBeforeCursor = this.value.slice(0, this.selectionStart).replace(/\D/g, "").length;
+  this.value = formatPrice(this.value);
+  let cursor = 0;
+  let digitCount = 0;
+  while (cursor < this.value.length && digitCount < digitsBeforeCursor) {
+    if (/\d/.test(this.value[cursor])) digitCount++;
+    cursor++;
+  }
+  this.setSelectionRange(cursor, cursor);
+});
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, function (char) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char];
@@ -129,7 +144,7 @@ function chooseCatalogProduct(product) {
   productSelect.value = product.name;
   codeInput.value = product.code || "";
   unitInput.value = product.unit || "Chiếc";
-  priceInput.value = Number(product.price) ? Number(product.price) : "";
+  priceInput.value = Number(product.price) ? formatPrice(Math.round(Number(product.price))) : "";
   productSearchResults.hidden = true;
 }
 function renderProductSearch(showAll) {
@@ -197,13 +212,13 @@ document.getElementById("supplierName").addEventListener("change", function () {
 });
 document.getElementById("addPurchaseItem").addEventListener("click", function () {
   const quantity = Number(quantityInput.value);
-  const unitPrice = Number(priceInput.value);
+  const unitPrice = Number(priceInput.value.replace(/\./g, ""));
   const enteredName = productSelect.value.trim();
   const enteredCode = codeInput.value.trim();
   if (!enteredName) { alert("Vui lòng chọn hoặc nhập tên sản phẩm."); return; }
   if (!enteredCode) { alert("Vui lòng nhập mã hàng."); return; }
   if (!quantity || quantity < 1) { alert("Số lượng phải lớn hơn 0."); return; }
-  if (unitPrice < 0 || Number.isNaN(unitPrice)) { alert("Giá nhập không hợp lệ."); return; }
+  if (!priceInput.value || !Number.isFinite(unitPrice) || unitPrice < 0) { alert("Giá nhập không hợp lệ."); return; }
   purchaseItems.push({
     product_id: selectedCatalogProduct ? selectedCatalogProduct.id : 0,
     code: enteredCode,

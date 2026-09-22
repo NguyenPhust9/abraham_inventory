@@ -34,11 +34,11 @@
 
     <nav class="admin-main-nav" aria-label="Điều hướng quản trị">
       <a class="active" href="#tong-quan"><i data-lucide="house"></i>Tổng quan</a>
-      <a href="#san-pham"><i data-lucide="package"></i>Sản phẩm</a>
+      <span class="disabled" aria-disabled="true" title="Mục này đang tạm khóa"><i data-lucide="lock-keyhole"></i>Sản phẩm</span>
       <a href="{{ url_for('admin_purchase_new') }}"><i data-lucide="truck"></i>Nhập hàng</a>
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="package-open"></i>Xuất hàng</a>
-      <a href="#ton-kho"><i data-lucide="warehouse"></i>Tồn kho</a>
-      <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="users"></i>Nhà cung cấp</a>
+      <span class="disabled" aria-disabled="true" title="Mục này đang tạm khóa"><i data-lucide="lock-keyhole"></i>Tồn kho</span>
+      <a href="{{ url_for('admin_suppliers') }}"><i data-lucide="users"></i>Nhà cung cấp</a>
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="chart-no-axes-combined"></i>Báo cáo</a>
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="settings"></i>Cài đặt</a>
     </nav>
@@ -84,12 +84,12 @@
   <section class="quick-panel">
     <div class="section-heading"><div><span class="section-heading-icon"><i data-lucide="layout-grid"></i></span><h2>Các chức năng chính</h2></div><span class="section-note">Truy cập nhanh</span></div>
     <div class="quick-grid">
-      <a class="quick-card quick-blue" href="#san-pham"><span class="module-icon"><i data-lucide="package"></i></span><strong>Sản phẩm</strong><small>Thêm, sửa và quản lý danh sách sản phẩm</small><b><i data-lucide="arrow-right"></i></b></a>
+      <div class="quick-card quick-blue disabled" aria-disabled="true" title="Mục này đang tạm khóa"><span class="module-icon"><i data-lucide="lock-keyhole"></i></span><strong>Sản phẩm</strong><small>Tạm khóa</small><b><i data-lucide="lock-keyhole"></i></b></div>
       <a class="quick-card quick-green" href="{{ url_for('admin_purchase_new') }}"><span class="module-icon"><i data-lucide="truck"></i></span><strong>Nhập hàng từ NCC</strong><small>Lưu nhà cung cấp, giá nhập và số lượng</small><b><i data-lucide="arrow-right"></i></b></a>
-      <a class="quick-card quick-orange" href="#ton-kho"><span class="module-icon"><i data-lucide="warehouse"></i></span><strong>Kho hàng</strong><small>Theo dõi tồn, hàng đã đặt và có thể bán</small><b><i data-lucide="arrow-right"></i></b></a>
+      <div class="quick-card quick-orange disabled" aria-disabled="true" title="Mục này đang tạm khóa"><span class="module-icon"><i data-lucide="lock-keyhole"></i></span><strong>Kho hàng</strong><small>Tạm khóa</small><b><i data-lucide="lock-keyhole"></i></b></div>
       <a class="quick-card quick-purple" href="{{ url_for('admin_dashboard', price_type='dealer') }}#san-pham"><span class="module-icon"><i data-lucide="badge-dollar-sign"></i></span><strong>Giá xuất xưởng</strong><small>Quản lý bảng giá dành cho đại lý</small><b><i data-lucide="arrow-right"></i></b></a>
-      <a class="quick-card quick-pink disabled" href="#" aria-disabled="true"><span class="module-icon"><i data-lucide="users"></i></span><strong>Nhà cung cấp</strong><small>Module đang được phát triển</small><b><i data-lucide="lock-keyhole"></i></b></a>
-      <a class="quick-card quick-cyan disabled" href="#" aria-disabled="true"><span class="module-icon"><i data-lucide="swatch-book"></i></span><strong>Mẫu mã NCC</strong><small>Module đang được phát triển</small><b><i data-lucide="lock-keyhole"></i></b></a>
+      <a class="quick-card quick-pink" href="{{ url_for('admin_suppliers') }}"><span class="module-icon"><i data-lucide="users"></i></span><strong>Nhà cung cấp</strong><small>Xem NCC và bảng giá nhập lịch sử</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-cyan" href="{{ url_for('admin_supplier_catalog') }}"><span class="module-icon"><i data-lucide="swatch-book"></i></span><strong>Danh mục hàng theo NCC</strong><small>Tổng hợp mỗi NCC từng bán những mã nào</small><b><i data-lucide="arrow-right"></i></b></a>
       <a class="quick-card quick-blue" href="{{ url_for('admin_purchase_history') }}"><span class="module-icon"><i data-lucide="clipboard-list"></i></span><strong>Lịch sử nhập hàng</strong><small>Tra cứu, thống kê và quản lý phiếu nhập</small><b><i data-lucide="arrow-right"></i></b></a>
     </div>
   </section>

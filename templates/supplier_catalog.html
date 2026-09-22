@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Danh mục hàng theo NCC | Abraham Bike{% endblock %}
+{% block head %}<script src="https://unpkg.com/lucide@latest" defer></script>{% endblock %}
+{% block content %}
+<div class="purchase-page supplier-page">
+  <header class="purchase-topbar">
+    <a class="purchase-brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-mark"><i data-lucide="bike"></i></span><span><strong>ABRAHAM BIKE</strong><small>DANH MỤC HÀNG THEO NCC</small></span></a>
+    <nav><a href="{{ url_for('admin_dashboard') }}"><i data-lucide="house"></i>Dashboard</a><a href="{{ url_for('admin_purchase_history') }}"><i data-lucide="history"></i>Lịch sử nhập</a><a class="active" href="{{ url_for('admin_suppliers') }}"><i data-lucide="users"></i>Nhà cung cấp</a></nav>
+  </header>
+  <main class="purchase-content">
+    <div class="purchase-titlebar"><div><p class="eyebrow">TỔNG HỢP NHÀ CUNG CẤP</p><h1>Danh mục hàng theo NCC</h1><p>Mỗi mã hàng chỉ xuất hiện một lần trong từng NCC, dù đã nhập qua nhiều phiếu.</p></div><div class="detail-actions"><a href="{{ url_for('admin_suppliers') }}"><i data-lucide="arrow-left"></i>Tổng quan NCC</a><a class="primary" href="{{ url_for('admin_supplier_compare') }}"><i data-lucide="scale"></i>So sánh giá</a></div></div>
+    <section class="history-stats catalog-stats"><div class="history-stat blue"><span><i data-lucide="users"></i></span><div><small>NCC TRONG KẾT QUẢ</small><strong>{{ supplier_count }} NCC</strong></div></div><div class="history-stat green"><span><i data-lucide="package"></i></span><div><small>MÃ HÀNG KHÔNG TRÙNG</small><strong>{{ unique_product_count }} mã</strong></div></div><div class="history-stat purple"><span><i data-lucide="network"></i></span><div><small>QUAN HỆ NCC – MÃ HÀNG</small><strong>{{ total_links }} liên kết</strong></div></div></section>
+    <section class="purchase-panel catalog-search-panel"><form method="GET"><i data-lucide="search"></i><input name="q" value="{{ q }}" placeholder="Tìm NCC, mã hàng, tên sản phẩm hoặc màu..."><button type="submit">Tìm kiếm</button>{% if q %}<a href="{{ url_for('admin_supplier_catalog') }}"><i data-lucide="rotate-ccw"></i>Xóa lọc</a>{% endif %}</form></section>
+    <div class="supplier-catalog-list">
+      {% for row in supplier_catalog %}
+      <section class="purchase-panel supplier-catalog-card supplier-accent supplier-accent-{{ row.color_index }}">
+        <div class="supplier-catalog-head"><div><span class="module-icon"><i data-lucide="building-2"></i></span><span><a href="{{ url_for('admin_supplier_detail', supplier_id=row.supplier.id) }}">{{ row.supplier.name }}</a><small>{{ row.supplier.code }} · {{ row.product_count }} mã hàng</small></span></div><a href="{{ url_for('admin_supplier_detail', supplier_id=row.supplier.id) }}"><i data-lucide="eye"></i>Xem chi tiết NCC</a></div>
+        <div class="supplier-product-grid">
+          {% for product in row.products %}
+          <article class="supplier-product-item"><div><a href="{{ url_for('admin_supplier_compare', q=product.code) }}">{{ product.code }}</a><strong>{{ product.name }}</strong><small>{{ product.color or 'Không màu' }}</small></div><div><small>Giá gần nhất</small><strong>{{ "{:,.0f}".format(product.latest_price).replace(",", ".") }} đ</strong><time>{{ product.latest_date.strftime('%d/%m/%Y') }}</time></div></article>
+          {% else %}<p class="catalog-empty">NCC này chưa có mã hàng trong lịch sử phiếu nhập.</p>{% endfor %}
+        </div>
+      </section>
+      {% else %}<section class="purchase-panel purchase-empty-cell">Không tìm thấy dữ liệu NCC hoặc mã hàng phù hợp.</section>{% endfor %}
+    </div>
+  </main>
+</div>
+<script>window.addEventListener("DOMContentLoaded",function(){if(window.lucide)window.lucide.createIcons();});</script>
+{% endblock %}
