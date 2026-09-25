@@ -12,7 +12,7 @@ from flask_login import (  # type: ignore
     LoginManager, UserMixin, login_user, logout_user,
     login_required
 )
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, text, func, inspect, or_  # type: ignore
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, text, func, inspect, or_  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
@@ -138,6 +138,7 @@ class PurchaseReceipt(Base):
     supplier_id = Column(Integer, nullable=True)
     supplier_name = Column(String, nullable=False)
     received_at = Column(DateTime, default=datetime.utcnow)
+    expected_arrival_date = Column(Date, nullable=True)
     notes = Column(String, default="")
     total_amount = Column(Float, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -386,6 +387,22 @@ def render_catalog_page(price_type):
     db = SessionLocal()
     try:
         visible = retail_prices_visible(db)
+        incoming_rows = (
+            db.query(PurchaseReceiptItem, PurchaseReceipt.expected_arrival_date)
+            .join(PurchaseReceipt, PurchaseReceipt.id == PurchaseReceiptItem.receipt_id)
+            .filter(PurchaseReceipt.expected_arrival_date.isnot(None))
+            .filter(PurchaseReceipt.expected_arrival_date > datetime.now().date())
+            .order_by(PurchaseReceipt.expected_arrival_date.asc(), PurchaseReceiptItem.id.asc())
+            .limit(30)
+            .all()
+        )
+        incoming_products = [
+            {
+                "name": item.product_name,
+                "date": expected_date.strftime("%d/%m/%Y"),
+            }
+            for item, expected_date in incoming_rows
+        ]
     finally:
         db.close()
     return render_template(
@@ -393,6 +410,7 @@ def render_catalog_page(price_type):
         price_type=price_type,
         price_label="Giá lẻ" if price_type == "retail" else "Giá đại lý",
         retail_visible=visible,
+        incoming_products=incoming_products,
     )
 
 
@@ -498,6 +516,7 @@ def admin_purchase_new():
             supplier_address = request.form.get("supplier_address", "").strip()
             receipt_number = request.form.get("receipt_number", "").strip()
             received_date = request.form.get("received_date", "").strip()
+            expected_arrival_date_value = request.form.get("expected_arrival_date", "").strip()
             notes = request.form.get("notes", "").strip()
 
             try:
@@ -536,11 +555,17 @@ def admin_purchase_new():
             except ValueError:
                 received_at = datetime.utcnow()
 
+            try:
+                expected_arrival_date = datetime.fromisoformat(expected_arrival_date_value).date() if expected_arrival_date_value else None
+            except ValueError:
+                expected_arrival_date = None
+
             receipt = PurchaseReceipt(
                 receipt_number=receipt_number,
                 supplier_id=supplier.id,
                 supplier_name=supplier.name,
                 received_at=received_at,
+                expected_arrival_date=expected_arrival_date,
                 notes=notes,
                 total_amount=0,
             )
@@ -707,10 +732,16 @@ def admin_purchase_edit(receipt_id):
                 received_at = datetime.fromisoformat(request.form.get("received_date", ""))
             except ValueError:
                 received_at = receipt.received_at
+            expected_arrival_date_value = request.form.get("expected_arrival_date", "").strip()
+            try:
+                expected_arrival_date = datetime.fromisoformat(expected_arrival_date_value).date() if expected_arrival_date_value else None
+            except ValueError:
+                expected_arrival_date = receipt.expected_arrival_date
             receipt.receipt_number = receipt_number
             receipt.supplier_id = supplier.id
             receipt.supplier_name = supplier.name
             receipt.received_at = received_at
+            receipt.expected_arrival_date = expected_arrival_date
             receipt.notes = request.form.get("notes", "").strip()
             db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).delete(synchronize_session=False)
 
@@ -862,7 +893,7 @@ def admin_purchase_export():
         for receipt in receipts:
             items = db.query(PurchaseReceiptItem).filter_by(receipt_id=receipt.id).all()
             for item in items:
-                rows.append({"Mã phiếu": receipt.receipt_number, "Ngày nhập": receipt.received_at.strftime("%d/%m/%Y"), "Nhà cung cấp": receipt.supplier_name, "Mã hàng": item.product_code, "Sản phẩm": item.product_name, "Màu": item.color, "Đơn vị": item.unit, "Số lượng": item.quantity, "Giá nhập": item.unit_price, "Thành tiền": item.line_total, "Ghi chú": receipt.notes})
+                rows.append({"Mã phiếu": receipt.receipt_number, "Ngày nhập": receipt.received_at.strftime("%d/%m/%Y"), "Ngày dự kiến": receipt.expected_arrival_date.strftime("%d/%m/%Y") if receipt.expected_arrival_date else "", "Nhà cung cấp": receipt.supplier_name, "Mã hàng": item.product_code, "Sản phẩm": item.product_name, "Màu": item.color, "Đơn vị": item.unit, "Số lượng": item.quantity, "Giá nhập": item.unit_price, "Thành tiền": item.line_total, "Ghi chú": receipt.notes})
         output = BytesIO()
         pd.DataFrame(rows).to_excel(output, index=False, sheet_name="Lich su nhap hang")
         output.seek(0)

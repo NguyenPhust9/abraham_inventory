@@ -478,6 +478,12 @@ def build_inventory_map(
             "InventoryItemName",
             "name",
         )
+
+        # Cac dong an chi/ky hieu thu tien trong CRM khong phai hang ton kho.
+        if "phiếu thu ký hiệu" in product_name.casefold():
+            inventory_map.pop(normalized_code, None)
+            continue
+
         explicit_model = first_text(
             item,
             "model",

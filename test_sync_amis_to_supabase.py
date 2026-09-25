@@ -112,6 +112,19 @@ class SyncAmisToSupabaseTest(unittest.TestCase):
         )
         self.assertNotIn("GHI CHÚ:", second_output.getvalue())
 
+    def test_ignores_receipt_symbol_records(self):
+        inventory_map = sync.build_inventory_map(
+            [
+                {
+                    "product_code": "PT-HCM1",
+                    "product_name": "Phiếu Thu Ký Hiệu: HCM 1",
+                    "main_stock_quantity": 10,
+                }
+            ]
+        )
+
+        self.assertEqual(inventory_map, {})
+
 
 if __name__ == "__main__":
     unittest.main()

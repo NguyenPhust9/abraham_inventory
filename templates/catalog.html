@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=24"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=26"
 >
 {% endblock %}
 
@@ -68,13 +68,12 @@
   </section>
 
 
-  <nav class="price-module-tabs" aria-label="Chọn bảng giá">
-    <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
-    <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ{% if not retail_visible %}<small class="module-pending-tag">Đang cập nhật</small>{% endif %}</a>
-  </nav>
-
   {% if price_type == 'retail' and not retail_visible %}
   <section class="retail-pending-module" role="status">
+    <nav class="price-module-tabs" aria-label="Chọn bảng giá">
+      <a href="{{ url_for('catalog') }}" class="price-module-tab">Giá đại lý</a>
+      <a href="{{ url_for('retail_catalog') }}" class="price-module-tab active" aria-current="page">Giá lẻ</a>
+    </nav>
     <span class="retail-pending-kicker">GIÁ LẺ</span>
     <h1>Đang cập nhật</h1>
     <p>Bảng Giá lẻ sẽ hiển thị khi cửa hàng cập nhật xong.</p>
@@ -102,9 +101,35 @@
             TRA CỨU SẢN PHẨM
           </span>
 
-          <h2>
-            Tìm xe đang có sẵn trong kho
-          </h2>
+          <section class="incoming-strip" aria-label="Hàng sắp về">
+            <div class="incoming-strip-label">
+              <span aria-hidden="true">🚚</span>
+              <strong>Hàng sắp về</strong>
+            </div>
+            <div class="incoming-strip-track">
+              {% for incoming in incoming_products %}
+                <article class="incoming-strip-item">
+                  <strong>{{ incoming.name }}</strong>
+                  <time datetime="{{ incoming.date }}">Dự kiến {{ incoming.date }}</time>
+                </article>
+              {% else %}
+                <div class="incoming-strip-empty">
+                  Hàng sắp về đang cập nhật
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <div class="control-title-row">
+            <h2>
+              Tìm xe đang có sẵn trong kho
+            </h2>
+
+            <nav class="price-module-tabs" aria-label="Chọn bảng giá">
+              <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
+              <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
+            </nav>
+          </div>
         </div>
 
         <span class="control-badge">

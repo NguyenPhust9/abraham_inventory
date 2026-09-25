@@ -2162,12 +2162,90 @@
 }
 
 .price-module-tabs {
-  width: min(1160px, calc(100% - 36px));
-  margin: 20px auto 0;
   display: flex;
   gap: 10px;
   position: relative;
   z-index: 7;
+}
+
+.control-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.incoming-strip {
+  width: min(820px, 100%);
+  margin: 8px 0 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+}
+
+.incoming-strip-label {
+  flex: none;
+  min-width: 126px;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 12px;
+  background: #eaf6ff;
+  color: #116a9f;
+  font-size: 11px;
+}
+
+.incoming-strip-track {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(17, 106, 159, .3) transparent;
+  padding-bottom: 3px;
+}
+
+.incoming-strip-item,
+.incoming-strip-empty {
+  flex: 0 0 auto;
+  min-width: 200px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  scroll-snap-align: start;
+  border: 1px solid #cfe6f5;
+  border-radius: 12px;
+  background: #f7fcff;
+}
+
+.incoming-strip-item strong {
+  max-width: 230px;
+  overflow: hidden;
+  color: #17334f;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incoming-strip-item time {
+  color: #247aa8;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.incoming-strip-empty {
+  min-width: 260px;
+  color: #607d91;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .price-module-tab {
@@ -2219,6 +2297,10 @@
   box-shadow: 0 24px 70px rgba(77, 6, 12, .12);
 }
 
+.retail-pending-module .price-module-tabs {
+  margin-bottom: 28px;
+}
+
 .retail-pending-kicker {
   color: #a80c18;
   font-size: 12px;
@@ -2242,15 +2324,17 @@
 }
 
 @media (max-width: 760px) {
-  .price-module-tabs {
-    width: calc(100% - 24px);
-  }
+  .incoming-strip { width: 100%; flex-direction: column; }
+  .incoming-strip-label { min-width: 0; justify-content: flex-start; }
+  .incoming-strip-item { min-width: 180px; }
+  .control-title-row { align-items: flex-start; flex-direction: column; }
+  .control-title-row .price-module-tabs { width: 100%; }
   .price-module-tab {
     flex: 1;
     padding: 0 10px;
   }
-  .module-pending-tag { margin-left: 5px; font-size: 10px; }
   .retail-pending-module { width: calc(100% - 24px); min-height: 240px; }
+  .retail-pending-module .price-module-tabs { width: 100%; }
 }
 
 .modal-zoom-btn {
