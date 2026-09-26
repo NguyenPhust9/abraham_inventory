@@ -881,6 +881,15 @@
 }
 
 .modal-image{ width:100%; height:auto; max-height:420px; object-fit:contain; display:block; }
+@media (min-width:761px){
+  .modal-image-wrap .modal-image{
+    width:100%;
+    height:100%;
+    max-height:none;
+    object-fit:contain;
+    object-position:center;
+  }
+}
 .modal-no-image{
   position:relative;
   z-index:1;
