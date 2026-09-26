@@ -52,7 +52,7 @@
 }
 
 .catalog-hero::after{
-  content:"TRUNG THU";
+  content:"20 · 10";
   position:absolute;
   right:-22px;
   bottom:-54px;
@@ -813,7 +813,7 @@
 }
 
 .modal-head::after{
-  content:"☾";
+  content:"✿";
   position:absolute;
   right:78px;
   top:-35px;
@@ -1326,106 +1326,6 @@
 }
 
 /* Thỏ chibi ngồi yên, đưa lồng đèn lên xuống */
-.hero-chibi-bunny {
-  position: absolute;
-  z-index: 2;
-  left: 8%;
-  bottom: 5%;
-  width: clamp(90px, 12vw, 160px);
-  height: clamp(90px, 12vw, 160px);
-  pointer-events: none;
-}
-
-.hero-chibi-bunny__character {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  filter: drop-shadow(0 7px 5px rgba(4, 54, 91, .25));
-}
-
-.hero-bunny-ear {
-  transform-box: fill-box;
-  transform-origin: center bottom;
-  animation: hero-bunny-ear 2.6s ease-in-out infinite;
-}
-
-.hero-bunny-arm {
-  transform-box: view-box;
-  transform-origin: 96px 99px;
-  animation: hero-bunny-wave 1.8s ease-in-out infinite;
-}
-
-.hero-bunny-lantern {
-  transform-box: view-box;
-  transform-origin: 130px 94px;
-  animation: hero-lantern-sway 1.8s ease-in-out infinite;
-}
-
-.hero-chibi-bunny__shadow {
-  position: absolute;
-  right: 10%;
-  bottom: 3px;
-  left: 10%;
-  height: 11px;
-  border-radius: 50%;
-  background: rgba(4, 54, 91, .22);
-  filter: blur(3px);
-}
-
-.hero-chibi-bunny__spark {
-  position: absolute;
-  color: #fff6a8;
-  font-family: sans-serif;
-  font-weight: 700;
-  text-shadow: 0 1px 7px rgba(255, 255, 255, .8);
-  animation: hero-rider-spark 1.4s ease-in-out infinite;
-}
-
-.hero-chibi-bunny__spark--one {
-  top: 8%;
-  right: -2%;
-  font-size: 18px;
-}
-
-.hero-chibi-bunny__spark--two {
-  top: 40%;
-  left: -8%;
-  font-size: 25px;
-  animation-delay: .45s;
-}
-
-@keyframes hero-bunny-wave {
-  0%, 100% { transform: rotate(-7deg); }
-  50% { transform: rotate(13deg); }
-}
-
-@keyframes hero-lantern-sway {
-  0%, 100% { transform: rotate(-4deg) translateY(1px); }
-  50% { transform: rotate(7deg) translateY(-3px); }
-}
-
-@keyframes hero-bunny-ear {
-  0%, 100% { transform: rotate(0); }
-  50% { transform: rotate(3deg); }
-}
-
-@keyframes hero-bunny-spark {
-  0%, 100% { opacity: .25; transform: scale(.75) rotate(0); }
-  50% { opacity: 1; transform: scale(1.15) rotate(18deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-bunny-ear,
-  .hero-bunny-arm,
-  .hero-bunny-lantern,
-  .hero-chibi-bunny__spark {
-    animation: none;
-  }
-}
-
-
 /* Nút quản lý nằm trên ảnh */
 .hero-manage-overlay {
   position: absolute;
@@ -1483,7 +1383,7 @@
 }
 
 /* =========================================================
-   MID-AUTUMN INVENTORY THEME
+   VIETNAMESE WOMEN'S DAY INVENTORY THEME
 ========================================================= */
 
 .catalog-page {
@@ -2373,10 +2273,354 @@
   background: rgba(8, 20, 35, .88);
 }
 
+/* Vietnamese Women's Day 20/10 theme */
+.catalog-page {
+  --nd-red: #eb5f8a;
+  --nd-red-2: #d82462;
+  --nd-red-3: #bd174f;
+  --nd-red-4: #6d1737;
+  --nd-gold: #f4a3ba;
+  --nd-gold-bright: #ffd5e0;
+  --nd-gold-soft: #fff0f4;
+  --nd-cream: #fff7f8;
+  --nd-paper: #fffdfd;
+  --nd-ink: #173f66;
+  --nd-muted: #75849b;
+  --nd-line: rgba(216, 36, 98, .14);
+  background:
+    radial-gradient(circle at 92% 4%, rgba(246, 174, 194, .24), transparent 24%),
+    linear-gradient(180deg, #fff7f8 0%, #fffdfd 62%, #fff4f6 100%);
+}
+
+.national-ticker {
+  height: 54px;
+  padding-right: 175px;
+  border: 0;
+  background: linear-gradient(90deg, #a93c5e 0%, #c84f72 48%, #df6f91 100%);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(124, 33, 67, .18);
+}
+
+.national-ticker::before {
+  background: linear-gradient(90deg, #a93c5e, rgba(169, 60, 94, 0));
+}
+
+.national-ticker::after {
+  background: linear-gradient(270deg, #df6f91, rgba(223, 111, 145, 0));
+}
+
+.national-ticker-track span {
+  color: #fff;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  line-height: 54px;
+  letter-spacing: .035em;
+}
+
+.catalog-hero-image { background: #f8dfe7; }
+
+.hero-banner-img {
+  height: clamp(290px, 26.5vw, 500px);
+  object-position: center center;
+}
+
+.hero-manage-overlay {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  min-height: 42px;
+  padding: 0 22px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  background: #df5681;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(184, 35, 91, .22);
+  font-family: "Inter", sans-serif;
+  font-size: 15px;
+}
+
+.hero-manage-overlay:hover {
+  border-color: #fff;
+  background: #c91855;
+  transform: translateY(-50%);
+}
+
+.catalog-controls,
+.reorder-panel {
+  border-color: rgba(216, 36, 98, .12);
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 20px 55px rgba(137, 49, 80, .08);
+}
+
+.control-kicker,
+.catalog-page .price-row .price { color: #d82462; }
+
+.catalog-page .card-top{position:relative}.promotion-ribbon{position:absolute;z-index:4;top:10px;left:10px;display:inline-flex;align-items:center;min-height:27px;padding:0 10px;border-radius:7px;background:linear-gradient(135deg,#d7192d,#f14c5c);box-shadow:0 5px 14px rgba(190,17,37,.25);color:#fff;font-size:10px;font-weight:900;letter-spacing:.08em}.promotion-ribbon.hot{background:linear-gradient(135deg,#ff8a00,#f04414);box-shadow:0 5px 14px rgba(221,91,0,.27)}.catalog-page .price-row .price{display:flex;align-items:flex-end;justify-content:flex-end;gap:7px;flex-wrap:wrap}.catalog-page .price-row .price del{color:#9b8587;font-size:11px;font-weight:500}.promotion-period{margin:-3px 0 10px;padding:0 14px;color:#b61e2e;font-size:10px;font-weight:700;text-align:right}
+
+.control-badge,
+.catalog-page .cat-tag {
+  border-color: rgba(216, 36, 98, .18);
+  background: #fff0f4;
+  color: #d82462;
+}
+
+.catalog-page .pill:hover:not(.active) {
+  border-color: rgba(216, 36, 98, .3);
+  color: #d82462;
+  background: #fff4f7;
+}
+
+.catalog-page .pill.active,
+.copy-all-btn {
+  border-color: #d82462;
+  background: linear-gradient(135deg, #e83c77, #ce1454);
+  box-shadow: 0 8px 18px rgba(206, 20, 84, .2);
+}
+
+.incoming-strip-label,
+.reorder-kicker {
+  color: #d82462;
+}
+
+.reorder-intro {
+  background: linear-gradient(145deg, #fff7f9, #fde6ed);
+}
+
+@media (max-width: 768px) {
+  .national-ticker { height: 40px; }
+  .national-ticker-track span { line-height: 40px; }
+  .hero-banner-img { height: clamp(190px, 48vw, 300px); }
+  .hero-manage-overlay {
+    top: 50%;
+    right: 6px;
+    min-height: 32px;
+    padding: 0 14px;
+    font-size: 11px;
+  }
+
+  .national-ticker { padding-right: 128px; }
+}
+
 .image-zoom-box {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+/* 20/10 product showcase */
+.catalog-page .grid {
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 18px;
+}
+
+.catalog-page .card {
+  min-height: 580px;
+  padding: 14px 14px 58px;
+  gap: 12px;
+  border: 1px solid rgba(231, 88, 132, .34);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fffdfd 0%, #fff8f8 60%, #fff0f3 100%);
+  box-shadow: 0 14px 34px rgba(182, 50, 94, .12);
+}
+
+.catalog-page .card::before {
+  z-index: 0;
+  padding: 1px;
+  background: linear-gradient(145deg, #ffc4d5, #fff, #e94c82);
+  opacity: .85;
+}
+
+.catalog-page .card::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: auto;
+  height: auto;
+  border-radius: inherit;
+  background: url("uploads/product-card-frame-20-10.png") center bottom / 100% 100% no-repeat;
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+}
+
+.catalog-promo-banner {
+  width: 100%;
+  margin: 0 0 14px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 72, 119, .2);
+  border-radius: 20px;
+  background: #ffe9ef;
+  box-shadow: 0 12px 30px rgba(177, 46, 90, .1);
+}
+
+.catalog-promo-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 230px;
+  object-fit: cover;
+  object-position: center;
+}
+
+.catalog-page .card-top,
+.catalog-page .colorlist,
+.catalog-page .price-row {
+  position: relative;
+  z-index: 3;
+}
+
+.catalog-page .card-image-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.27 / 1;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(236, 102, 143, .3);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 72% 18%, rgba(255, 255, 255, .16), transparent 28%),
+    linear-gradient(145deg, #173f66, #092b4d);
+}
+
+.catalog-page .card-image-stage::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: url("uploads/product-image-frame-20-10.png") center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.catalog-page .card-img {
+  position: absolute;
+  z-index: 1;
+  inset: 9% 8% 11%;
+  width: 84%;
+  height: 80%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  object-fit: contain;
+}
+
+.catalog-page .card:hover .card-img {
+  transform: scale(1.025);
+}
+
+.catalog-page .model {
+  color: #39151f;
+  font-size: 17px;
+}
+
+.catalog-page .cat-tag {
+  border-color: #ffb1c8;
+  background: #fff1f5;
+  color: #dc2462;
+  box-shadow: 0 3px 10px rgba(211, 34, 92, .09);
+}
+
+.catalog-page .colorlist {
+  padding: 0 8px;
+}
+
+.catalog-page .colorrow {
+  border-color: rgba(224, 103, 139, .25);
+  background: rgba(255, 252, 250, .88);
+}
+
+.catalog-page .price-row {
+  margin: auto 8px 0;
+  padding: 16px 0 8px;
+  border-top-color: rgba(224, 76, 122, .48);
+}
+
+.catalog-page .price-row span:first-child {
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ef4b82, #d91658);
+  color: #fff;
+  box-shadow: 0 6px 15px rgba(204, 23, 83, .24);
+}
+
+.catalog-page .price-row .price {
+  color: #d91658;
+  font-size: 20px;
+}
+
+@media (max-width: 760px) {
+  .catalog-promo-banner {
+    border-radius: 14px;
+  }
+
+  .catalog-promo-banner img {
+    min-height: 120px;
+  }
+
+  .catalog-page .card {
+    min-height: 520px;
+    padding-bottom: 50px;
+  }
+}
+
+/* Vietnamese Women's Day product modal */
+.product-modal::backdrop {
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(6px);
+}
+
+.modal-box {
+  border-color: rgba(222, 63, 113, .24);
+  background: #fffafb;
+  box-shadow: 0 36px 110px rgba(102, 24, 56, .3);
+}
+
+.modal-head {
+  border-bottom-color: rgba(255, 255, 255, .2);
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 220, 230, .3), transparent 25%),
+    linear-gradient(135deg, #9f2852 0%, #cf3f70 58%, #ef7c9d 100%);
+}
+
+.modal-head::after {
+  content: "✿";
+  right: 82px;
+  top: -24px;
+  color: rgba(255, 236, 242, .2);
+  font-size: 116px;
+}
+
+.modal-kicker {
+  color: #ffe7ef;
+}
+
+.modal-image-wrap {
+  border-color: rgba(226, 74, 121, .24);
+  background:
+    radial-gradient(circle at 78% 18%, rgba(255, 255, 255, .82), transparent 25%),
+    linear-gradient(145deg, #fff7f9, #f9dce6);
+}
+
+.modal-close {
+  border-color: rgba(255, 255, 255, .42);
+  background: rgba(151, 27, 73, .22);
+  color: #fff;
+}
+
+.modal-close:hover {
+  background: rgba(151, 27, 73, .48);
+}
+
+/* Keep the complete seasonal hero artwork visible. */
+.hero-banner-img {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
 }
 
 .image-zoom-toolbar {
@@ -2476,4 +2720,132 @@
   .image-zoom-actions { gap: 4px; }
   .image-zoom-actions button { width: 44px; height: 44px; }
   .image-zoom-actions span { min-width: 40px; }
+}
+
+/* Final 20/10 card composition */
+@media (min-width: 1181px) {
+  .catalog-content-layout.reorder-collapsed .catalog-page .grid,
+  .catalog-content-layout.reorder-collapsed .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .catalog-content-layout:not(.reorder-collapsed) .catalog-page .grid,
+  .catalog-content-layout:not(.reorder-collapsed) .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.catalog-promo-banner {
+  height: 168px;
+  margin-bottom: 16px;
+}
+
+.catalog-promo-banner img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+}
+
+.catalog-page .card {
+  height: auto;
+  min-height: 0;
+  padding: 16px 16px 18px;
+  overflow: hidden;
+}
+
+.catalog-page .card::after {
+  content: none;
+  display: none;
+}
+
+.catalog-page .card-image-stage::after {
+  content: none;
+  display: none;
+}
+
+.catalog-page .card-image-stage .card-img {
+  inset: 2%;
+  width: 96%;
+  height: 96%;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+}
+
+.catalog-page .card-top {
+  flex: 0 0 auto;
+}
+
+.catalog-page .card-image-stage {
+  aspect-ratio: 1.27 / 1;
+  margin: 0 0 12px;
+}
+
+.catalog-page .model {
+  max-width: calc(100% - 105px);
+  line-height: 1.25;
+}
+
+.catalog-page .colorlist {
+  flex: 0 0 auto;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0 8px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #f1a1b8 transparent;
+}
+
+.catalog-page .colorrow {
+  min-height: 48px;
+  padding: 8px 12px;
+}
+
+.catalog-page .price-row {
+  flex: 0 0 auto;
+  min-height: 62px;
+  align-items: center;
+  margin: 0 8px;
+  padding: 12px 0 4px;
+  gap: 10px;
+}
+
+.catalog-page .price-row span:first-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.catalog-page .price-row .price {
+  min-width: 0;
+  font-size: clamp(16px, 1.45vw, 20px);
+  white-space: nowrap;
+}
+
+.catalog-page .price-row span:first-child::before {
+  content: none;
+  margin-right: 0;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .catalog-page .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .catalog-promo-banner {
+    height: 120px;
+  }
+
+  .catalog-page .card {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 18px;
+  }
+
+  .catalog-page .card::after {
+    display: none;
+  }
 }

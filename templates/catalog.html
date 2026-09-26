@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=26"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=43"
 >
 {% endblock %}
 
@@ -17,31 +17,20 @@
 ========================================================= -->
 <div class="national-ticker">
   <div class="national-ticker-track">
-
     <span>
-      ☾ ABRAHAM BIKE
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TRUNG THU ĐOÀN VIÊN
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      ĐÊM HỘI TRĂNG RẰM CÙNG ABRAHAM BIKE
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TRA CỨU TỒN KHO NHANH CHÓNG – CHÍNH XÁC – TIỆN LỢI
-      &nbsp;&nbsp;&nbsp; 🏮
+      TRANG CHỦ &nbsp;&nbsp; • &nbsp;&nbsp; NGÀY PHỤ NỮ VIỆT NAM 20/10
+      &nbsp;&nbsp; • &nbsp;&nbsp; TRA CỨU TỒN KHO NHANH CHÓNG – CHÍNH XÁC – TIỆN LỢI
+      &nbsp;&nbsp; ✿ &nbsp;&nbsp; ABRAHAM BIKE &nbsp;&nbsp; • &nbsp;&nbsp;
     </span>
-
-    <!-- Lặp lại để chạy vô hạn -->
     <span aria-hidden="true">
-      ☾ ABRAHAM BIKE
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TRUNG THU ĐOÀN VIÊN
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      ĐÊM HỘI TRĂNG RẰM CÙNG ABRAHAM BIKE
-      &nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;
-      TRA CỨU TỒN KHO NHANH CHÓNG – CHÍNH XÁC – TIỆN LỢI
-      &nbsp;&nbsp;&nbsp; 🏮
+      TRANG CHỦ &nbsp;&nbsp; • &nbsp;&nbsp; NGÀY PHỤ NỮ VIỆT NAM 20/10
+      &nbsp;&nbsp; • &nbsp;&nbsp; TRA CỨU TỒN KHO NHANH CHÓNG – CHÍNH XÁC – TIỆN LỢI
+      &nbsp;&nbsp; ✿ &nbsp;&nbsp; ABRAHAM BIKE &nbsp;&nbsp; • &nbsp;&nbsp;
     </span>
-
   </div>
+  <a class="hero-manage-overlay" href="{{ url_for('admin_login') }}">
+    Quản lý kho ↗
+  </a>
 </div>
 
 
@@ -53,17 +42,10 @@
   <section class="catalog-hero-image">
 
     <img
-      src="{{ url_for('static', filename='uploads/hero2.png') }}"
-      alt="Abraham Bike - Trung Thu đoàn viên"
+      src="{{ url_for('static', filename='uploads/anh2010.png') }}"
+      alt="Abraham Bike - Chúc mừng Ngày Phụ nữ Việt Nam 20/10"
       class="hero-banner-img"
     >
-
-    <a
-      class="hero-manage-overlay"
-      href="{{ url_for('admin_login') }}"
-    >
-      Quản lý kho ↗
-    </a>
 
   </section>
 
@@ -329,7 +311,7 @@
         class="empty-star"
         aria-hidden="true"
       >
-        ☾
+        ✿
       </div>
 
       <strong>
@@ -462,7 +444,7 @@
       class="footer-star"
       aria-hidden="true"
     >
-      ☾
+      ✿
     </span>
 
     <span>
@@ -479,7 +461,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=22"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=28"></script>
 {% else %}
 <script>
   setInterval(async () => {

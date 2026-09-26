@@ -152,7 +152,7 @@ function playUISound(kind = 'click') {
     click: { frequency: 520, endFrequency: 700, duration: .07, volume: .065 },
     open: { frequency: 620, endFrequency: 920, duration: .16, volume: .085 },
     close: { frequency: 420, endFrequency: 260, duration: .12, volume: .07 },
-    lantern: { frequency: 760, endFrequency: 1120, duration: .13, volume: .07 },
+    celebration: { frequency: 760, endFrequency: 1120, duration: .13, volume: .07 },
   }[kind] || { frequency: 520, endFrequency: 700, duration: .07, volume: .065 };
 
   const now = audioContext.currentTime;
@@ -310,12 +310,22 @@ function groupByModel(items) {
 }
 
 function getGroupPrice(variants) {
-  const withPrice = variants.find(v => {
+  const withPrice = variants.find(v => v.promotion_active && Number(v.price) > 0) || variants.find(v => {
     const price = Number(v.price);
     return !Number.isNaN(price) && price > 0;
   });
 
   return withPrice ? withPrice.price : null;
+}
+
+function getGroupPromotion(variants) {
+  return variants.find(v => v.promotion_active) || null;
+}
+
+function formatPromotionDate(value) {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
 }
 
 function getGroupAvailable(variants) {
@@ -619,7 +629,7 @@ function openProductModal(group) {
   els.modalBody.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', event => {
       event.stopPropagation();
-      playUISound('lantern');
+      playUISound('celebration');
       copyText(btn.dataset.copy || '');
     });
   });
@@ -633,7 +643,7 @@ function openProductModal(group) {
   if (copyImageBtn) {
     copyImageBtn.addEventListener('click', event => {
       event.stopPropagation();
-      playUISound('lantern');
+      playUISound('celebration');
       copyProductImage(group);
     });
   }
@@ -642,7 +652,7 @@ function openProductModal(group) {
   if (copyTextBtn) {
     copyTextBtn.addEventListener('click', event => {
       event.stopPropagation();
-      playUISound('lantern');
+      playUISound('celebration');
       copyProductText(group);
     });
   }
@@ -701,13 +711,17 @@ function render() {
 
     const imgVariant = getGroupImage(g.variants);
     const groupPrice = getGroupPrice(g.variants);
+    const promotion = getGroupPromotion(g.variants);
     const colorRows = renderColorRows(g.variants);
 
     card.innerHTML = `
       <div class="card-top">
+        ${promotion ? `<div class="promotion-ribbon ${promotion.promotion_tag === 'hot' ? 'hot' : 'discount'}">${promotion.promotion_tag === 'hot' ? 'HOT' : 'GIẢM GIÁ'}</div>` : ''}
         ${
           imgVariant && imgVariant.image_url
-            ? `<img class="card-img" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(g.model)}">`
+            ? `<div class="card-image-stage">
+                <img class="card-img" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(g.model)}">
+              </div>`
             : ''
         }
 
@@ -726,8 +740,9 @@ function render() {
 
       <div class="price-row">
         <span>${priceLabel}</span>
-        <span class="price">${escapeHTML(fmtPrice(groupPrice))}</span>
+        <span class="price">${promotion && promotion.original_price ? `<del>${escapeHTML(fmtPrice(promotion.original_price))}</del>` : ''}${escapeHTML(fmtPrice(groupPrice))}</span>
       </div>
+      ${promotion ? `<div class="promotion-period">Áp dụng ${formatPromotionDate(promotion.promotion_start)} – ${formatPromotionDate(promotion.promotion_end)}</div>` : ''}
     `;
 
     card.addEventListener('click', () => {

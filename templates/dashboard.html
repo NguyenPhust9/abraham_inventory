@@ -147,6 +147,52 @@
   </section>
   {% endif %}
 
+  <section class="panel promotion-panel" id="khuyen-mai">
+    <div class="promotion-heading">
+      <div>
+        <h2 class="icon-title"><span class="module-icon"><i data-lucide="badge-percent"></i></span>Khuyến mãi theo mã hàng</h2>
+        <p class="hint">Áp dụng riêng cho Giá đại lý. Giá lẻ luôn giữ nguyên. Tag chỉ hiển thị ngoài trang khách trong khoảng ngày đã đặt.</p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_update_promotion') }}" id="promotionBatchForm">
+      <input type="hidden" name="promotions_json" id="promotionsJson">
+      <datalist id="promotion-code-list">{% for code in product_codes %}<option value="{{ code }}">{% endfor %}</datalist>
+      <div class="promotion-entry-wrap">
+        <table class="promotion-entry-table">
+          <thead><tr><th>STT</th><th>Mã hàng</th><th>Giá khuyến mãi</th><th>Tag hiển thị</th><th>Áp dụng từ</th><th>Áp dụng tới</th><th></th></tr></thead>
+          <tbody id="promotionRows"></tbody>
+        </table>
+      </div>
+      <div class="promotion-form-actions">
+        <button type="button" id="addPromotionRow" class="promotion-add-row"><i data-lucide="plus"></i>Thêm dòng</button>
+        <button type="submit" class="promotion-save"><i data-lucide="save"></i>Lưu tất cả khuyến mãi</button>
+      </div>
+    </form>
+
+    <div class="promotion-table-wrap">
+      <table class="promotion-table">
+        <thead><tr><th>Mã hàng</th><th>Giá khuyến mãi</th><th>Tag</th><th>Áp dụng từ</th><th>Áp dụng tới</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <tbody>
+        {% for p in promotion_products %}
+          {% set is_active = p.promotion_start and p.promotion_end and p.promotion_start <= today <= p.promotion_end %}
+          <tr>
+            <td><span class="code-badge">{{ p.code }}</span><small class="promotion-product-name">{{ p.model }}</small></td>
+            <td class="num">{{ "{:,.0f}".format(p.promotion_price or 0).replace(",", ".") }}đ</td>
+            <td><span class="promotion-admin-tag {{ p.promotion_tag or 'discount' }}">{{ 'HOT' if p.promotion_tag == 'hot' else 'GIẢM GIÁ' }}</span></td>
+            <td>{{ p.promotion_start.strftime('%d/%m/%Y') if p.promotion_start else '—' }}</td>
+            <td>{{ p.promotion_end.strftime('%d/%m/%Y') if p.promotion_end else '—' }}</td>
+            <td><span class="promotion-status {{ 'active' if is_active else '' }}">{{ 'Đang áp dụng' if is_active else ('Sắp diễn ra' if p.promotion_start and today < p.promotion_start else 'Đã kết thúc') }}</span></td>
+            <td><form method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ khuyến mãi của mã {{ p.code }}?');"><input type="hidden" name="code" value="{{ p.code }}"><input type="hidden" name="action" value="clear"><button type="submit" class="promotion-clear">Gỡ</button></form></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="empty-state">Chưa có mã hàng nào được cài khuyến mãi.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <div class="form-grid-wrap">
 
     <section class="panel" id="nhap-du-lieu">
@@ -452,6 +498,107 @@
         searchForm.submit();
       }, 500);
     });
+  }
+
+  const promotionRows = document.getElementById("promotionRows");
+  const promotionBatchForm = document.getElementById("promotionBatchForm");
+  const promotionsJson = document.getElementById("promotionsJson");
+  const addPromotionRowButton = document.getElementById("addPromotionRow");
+  const promotionCodeList = document.getElementById("promotion-code-list");
+  const allPromotionCodes = promotionCodeList
+    ? Array.from(promotionCodeList.options).map(function (option) { return option.value; })
+    : [];
+
+  function validatePromotionCodes(showMessage) {
+    const seen = new Map();
+    let firstDuplicate = null;
+    promotionRows.querySelectorAll(".promotion-code-input").forEach(function (input) {
+      const key = input.value.trim().toLocaleLowerCase("vi");
+      input.classList.remove("duplicate-code");
+      if (!key) return;
+      if (seen.has(key)) {
+        input.classList.add("duplicate-code");
+        seen.get(key).classList.add("duplicate-code");
+        if (!firstDuplicate) firstDuplicate = input;
+      } else {
+        seen.set(key, input);
+      }
+    });
+    if (firstDuplicate && showMessage) {
+      firstDuplicate.focus();
+      alert("Mã hàng này đã có ở dòng khác. Dữ liệu vẫn được giữ nguyên, vui lòng chọn mã khác.");
+    }
+    return !firstDuplicate;
+  }
+
+  function refreshPromotionCodeOptions() {
+    if (!promotionCodeList) return;
+    const used = new Set(Array.from(promotionRows.querySelectorAll(".promotion-code-input"))
+      .map(function (input) { return input.value.trim().toLocaleLowerCase("vi"); })
+      .filter(Boolean));
+    promotionCodeList.innerHTML = allPromotionCodes
+      .filter(function (code) { return !used.has(code.toLocaleLowerCase("vi")); })
+      .map(function (code) { return `<option value="${code.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">`; })
+      .join("");
+  }
+
+  function refreshPromotionRowNumbers() {
+    promotionRows.querySelectorAll("tr").forEach(function (row, index) {
+      row.querySelector(".promotion-row-number").textContent = index + 1;
+      row.querySelector(".promotion-remove-row").disabled = promotionRows.children.length === 1;
+    });
+  }
+
+  function addPromotionRow() {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td class="promotion-row-number"></td>
+      <td><input class="promotion-code-input" list="promotion-code-list" placeholder="Nhập mã hàng" required></td>
+      <td><input class="promotion-price-input" type="text" inputmode="numeric" autocomplete="off" placeholder="1.000.000" required></td>
+      <td><select class="promotion-tag-input"><option value="discount">GIẢM GIÁ</option><option value="hot">HOT</option></select></td>
+      <td><input class="promotion-start-input" type="date" required></td>
+      <td><input class="promotion-end-input" type="date" required></td>
+      <td><button type="button" class="promotion-remove-row" title="Xóa dòng"><i data-lucide="trash-2"></i></button></td>`;
+    promotionRows.appendChild(row);
+
+    row.querySelector(".promotion-code-input").addEventListener("input", function () {
+      validatePromotionCodes(false);
+      refreshPromotionCodeOptions();
+    });
+    row.querySelector(".promotion-price-input").addEventListener("input", function () {
+      const digits = this.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+      this.dataset.value = digits;
+      this.value = digits ? Number(digits).toLocaleString("vi-VN") : "";
+    });
+    row.querySelector(".promotion-remove-row").addEventListener("click", function () {
+      row.remove();
+      refreshPromotionRowNumbers();
+      validatePromotionCodes(false);
+      refreshPromotionCodeOptions();
+    });
+    refreshPromotionRowNumbers();
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  if (promotionRows && promotionBatchForm && promotionsJson && addPromotionRowButton) {
+    addPromotionRowButton.addEventListener("click", addPromotionRow);
+    promotionBatchForm.addEventListener("submit", function (event) {
+      if (!validatePromotionCodes(true)) {
+        event.preventDefault();
+        return;
+      }
+      promotionsJson.value = JSON.stringify(Array.from(promotionRows.querySelectorAll("tr")).map(function (row) {
+        const priceInput = row.querySelector(".promotion-price-input");
+        return {
+          code: row.querySelector(".promotion-code-input").value.trim(),
+          promotion_price: priceInput.dataset.value || priceInput.value.replace(/\D/g, ""),
+          promotion_tag: row.querySelector(".promotion-tag-input").value,
+          promotion_start: row.querySelector(".promotion-start-input").value,
+          promotion_end: row.querySelector(".promotion-end-input").value
+        };
+      }));
+    });
+    addPromotionRow();
   }
 
   function openEditModal(productId) {

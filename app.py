@@ -86,6 +86,10 @@ class Product(Base):
     reserved = Column(Integer, default=0)
     price = Column(Float, nullable=True)
     retail_price = Column(Float, nullable=True)
+    promotion_price = Column(Float, nullable=True)
+    promotion_tag = Column(String, nullable=True)
+    promotion_start = Column(Date, nullable=True)
+    promotion_end = Column(Date, nullable=True)
     image_filename = Column(String, default="")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -107,6 +111,10 @@ class Product(Base):
             "reserved": self.reserved or 0,
             "available": self.available,
             "price": self.price,
+            "promotion_price": self.promotion_price,
+            "promotion_tag": self.promotion_tag,
+            "promotion_start": self.promotion_start.isoformat() if self.promotion_start else None,
+            "promotion_end": self.promotion_end.isoformat() if self.promotion_end else None,
             "image": self.image_filename,
         }
 
@@ -171,6 +179,24 @@ def ensure_retail_price_column():
 
 
 ensure_retail_price_column()
+
+
+def ensure_promotion_columns():
+    """Keep existing databases compatible without requiring a separate migration command."""
+    columns = {column["name"] for column in inspect(engine).get_columns("products")}
+    definitions = {
+        "promotion_price": "FLOAT",
+        "promotion_tag": "VARCHAR",
+        "promotion_start": "DATE",
+        "promotion_end": "DATE",
+    }
+    with engine.begin() as conn:
+        for column_name, column_type in definitions.items():
+            if column_name not in columns:
+                conn.execute(text(f"ALTER TABLE products ADD COLUMN {column_name} {column_type}"))
+
+
+ensure_promotion_columns()
 
 
 # ---------- Upload folder ----------
@@ -458,11 +484,26 @@ def api_products(price_type="dealer"):
         products = db.query(Product).order_by(Product.model, Product.color).all()
 
         out = []
+        today = datetime.now().date()
 
         for p in products:
             d = p.to_dict()
             if price_type == "retail":
                 d["price"] = p.retail_price if visible else None
+
+            base_price = d["price"]
+            promotion_active = bool(
+                price_type == "dealer"
+                and p.promotion_price
+                and p.promotion_price > 0
+                and p.promotion_start
+                and p.promotion_end
+                and p.promotion_start <= today <= p.promotion_end
+            )
+            d["original_price"] = base_price if promotion_active else None
+            d["promotion_active"] = promotion_active
+            if promotion_active:
+                d["price"] = p.promotion_price
 
             d["original_model"] = p.model
             d["model"] = normalize_model_name(p.model)
@@ -1098,6 +1139,10 @@ def admin_dashboard():
         )
 
         all_products = db.query(Product).all()
+        promotion_products = sorted(
+            [p for p in all_products if p.promotion_start or p.promotion_end or p.promotion_price],
+            key=lambda p: (p.promotion_start or datetime.max.date(), p.code),
+        )
 
         categories = sorted({
             p.category for p in all_products
@@ -1140,6 +1185,9 @@ def admin_dashboard():
             price_type=price_type,
             retail_visible=retail_visible,
             retail_priced_count=retail_priced_count,
+            promotion_products=promotion_products,
+            product_codes=sorted(p.code for p in all_products),
+            today=datetime.now().date(),
         )
 
     finally:
@@ -1234,6 +1282,86 @@ def admin_retail_visibility():
     finally:
         db.close()
     return redirect(url_for("admin_dashboard", price_type="retail"))
+
+
+def parse_form_date(value):
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+@app.route("/admin/promotions/update", methods=["POST"])
+@login_required
+def admin_update_promotion():
+    code = request.form.get("code", "").strip()
+    action = request.form.get("action", "save")
+    db = SessionLocal()
+    try:
+        if action == "clear":
+            product = db.query(Product).filter(func.lower(Product.code) == code.lower()).first()
+            if not product:
+                flash(f"Không tìm thấy mã hàng '{code}'.")
+                return redirect(url_for("admin_dashboard") + "#khuyen-mai")
+            product.promotion_price = None
+            product.promotion_tag = None
+            product.promotion_start = None
+            product.promotion_end = None
+            db.commit()
+            flash(f"Đã gỡ khuyến mãi của mã {product.code}.")
+            return redirect(url_for("admin_dashboard") + "#khuyen-mai")
+
+        try:
+            rows = json.loads(request.form.get("promotions_json", "[]"))
+        except (TypeError, ValueError):
+            rows = []
+        if not isinstance(rows, list) or not rows:
+            flash("Vui lòng nhập ít nhất một dòng khuyến mãi.")
+            return redirect(url_for("admin_dashboard") + "#khuyen-mai")
+
+        prepared = []
+        seen_codes = set()
+        errors = []
+        for index, row in enumerate(rows, start=1):
+            row_code = str(row.get("code", "")).strip()
+            promotion_price = safe_float(row.get("promotion_price"))
+            promotion_tag = str(row.get("promotion_tag", "discount")).strip().lower()
+            start_date = parse_form_date(row.get("promotion_start"))
+            end_date = parse_form_date(row.get("promotion_end"))
+            product = db.query(Product).filter(func.lower(Product.code) == row_code.lower()).first()
+
+            if not product:
+                errors.append(f"Dòng {index}: không tìm thấy mã '{row_code}'.")
+            elif row_code.lower() in seen_codes:
+                errors.append(f"Dòng {index}: mã '{row_code}' bị trùng.")
+            elif not promotion_price or promotion_price <= 0:
+                errors.append(f"Dòng {index}: giá khuyến mãi phải lớn hơn 0.")
+            elif promotion_tag not in ("hot", "discount"):
+                errors.append(f"Dòng {index}: tag không hợp lệ.")
+            elif not start_date or not end_date:
+                errors.append(f"Dòng {index}: thiếu ngày bắt đầu hoặc kết thúc.")
+            elif end_date < start_date:
+                errors.append(f"Dòng {index}: ngày kết thúc phải sau ngày bắt đầu.")
+            else:
+                seen_codes.add(row_code.lower())
+                prepared.append((product, promotion_price, promotion_tag, start_date, end_date))
+
+        if errors:
+            flash(" ".join(errors[:5]))
+        else:
+            for product, promotion_price, promotion_tag, start_date, end_date in prepared:
+                product.promotion_price = promotion_price
+                product.promotion_tag = promotion_tag
+                product.promotion_start = start_date
+                product.promotion_end = end_date
+            db.commit()
+            flash(f"Đã cập nhật khuyến mãi cho {len(prepared)} mã hàng.")
+    finally:
+        db.close()
+    return redirect(url_for("admin_dashboard") + "#khuyen-mai")
 
 
 @app.route("/admin/products/add", methods=["POST"])
