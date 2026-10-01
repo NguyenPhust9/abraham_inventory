@@ -34,8 +34,10 @@ let REORDER_ITEMS = [];
 let reorderQuery = '';
 let reorderRefreshInFlight = false;
 let reorderLastLoadedAt = 0;
-const priceType = document.querySelector('.catalog-page')?.dataset.priceType === 'retail' ? 'retail' : 'dealer';
-const priceLabel = priceType === 'retail' ? 'Giá lẻ' : 'Giá đại lý';
+const catalogMode = document.querySelector('.catalog-page')?.dataset.priceType || 'dealer';
+const priceType = catalogMode === 'retail' ? 'retail' : 'dealer';
+const isPromotionCatalog = catalogMode === 'promotion';
+const priceLabel = isPromotionCatalog ? 'Giá khuyến mãi' : (priceType === 'retail' ? 'Giá lẻ' : 'Giá đại lý');
 let activeCat = 'Tất cả';
 let onlyInStock = false;
 let sortStockOrder = '';
@@ -664,6 +666,7 @@ function render() {
   const q = normalizeText(els.search.value);
 
   const filtered = PRODUCTS.filter(p => {
+    const matchesPromotion = !isPromotionCatalog || (p.promotion_active && p.promotion_tag === 'discount');
     const matchesCat = activeCat === 'Tất cả' || p.category === activeCat;
     const matchesQ = matchesSearch(p, q);
     const matchesStock = !onlyInStock || Number(p.available || 0) > 0;
@@ -672,7 +675,7 @@ function render() {
     const matchesMinPrice = minPrice === null || (hasPrice && price >= minPrice);
     const matchesMaxPrice = maxPrice === null || (hasPrice && price <= maxPrice);
 
-    return matchesCat && matchesQ && matchesStock && matchesMinPrice && matchesMaxPrice;
+    return matchesPromotion && matchesCat && matchesQ && matchesStock && matchesMinPrice && matchesMaxPrice;
   });
 
   const groups = groupByModel(filtered);

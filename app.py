@@ -434,7 +434,11 @@ def render_catalog_page(price_type):
     return render_template(
         "catalog.html",
         price_type=price_type,
-        price_label="Giá lẻ" if price_type == "retail" else "Giá đại lý",
+        price_label=(
+            "Chương trình khuyến mãi"
+            if price_type == "promotion"
+            else ("Giá lẻ" if price_type == "retail" else "Giá đại lý")
+        ),
         retail_visible=visible,
         incoming_products=incoming_products,
     )
@@ -448,6 +452,11 @@ def catalog():
 @app.route("/gia-le")
 def retail_catalog():
     return render_catalog_page("retail")
+
+
+@app.route("/ctkm")
+def promotion_catalog():
+    return render_catalog_page("promotion")
 
 
 @app.route("/api/retail-status")
