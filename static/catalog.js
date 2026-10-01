@@ -910,7 +910,7 @@ function renderPromotionSuggestions() {
   const list = document.getElementById('promotionSuggestionList');
   if (!list) return;
 
-  const promotionGroups = groupProducts(PRODUCTS)
+  const promotionGroups = groupByModel(PRODUCTS)
     .map(group => {
       const promotion = getGroupPromotion(group.variants);
       return promotion ? { group, promotion } : null;
