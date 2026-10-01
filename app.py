@@ -14,6 +14,7 @@ from flask_login import (  # type: ignore
 )
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, text, func, inspect, or_  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
+from sqlalchemy.engine import make_url  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
@@ -25,9 +26,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "shop.db")
 
 # Local development secrets are kept outside Git and loaded before DB setup.
-LOCAL_ENV_PATH = os.path.join(BASE_DIR, ".env.local")
-if os.path.exists(LOCAL_ENV_PATH):
-    with open(LOCAL_ENV_PATH, encoding="utf-8") as env_file:
+LOCAL_ENV_PATHS = [
+    os.path.join(BASE_DIR, ".env.pooler"),
+    os.path.join(BASE_DIR, ".env.local"),
+]
+for local_env_path in LOCAL_ENV_PATHS:
+    if not os.path.exists(local_env_path):
+        continue
+    with open(local_env_path, encoding="utf-8") as env_file:
         for env_line in env_file:
             env_line = env_line.strip()
             if not env_line or env_line.startswith("#") or "=" not in env_line:
@@ -60,6 +66,24 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+    # Some Supabase direct database hosts are IPv6-only. Local machines without
+    # IPv6 use the project's IPv4 Session Pooler with the same credentials.
+    pooler_host = os.environ.get("SUPABASE_POOLER_HOST", "").strip()
+    if pooler_host:
+        database_url = make_url(DATABASE_URL)
+        direct_host = database_url.host or ""
+        pooler_user = database_url.username
+        if direct_host.startswith("db.") and direct_host.endswith(".supabase.co"):
+            project_ref = direct_host.split(".")[1]
+            if pooler_user == "postgres":
+                pooler_user = f"postgres.{project_ref}"
+        DATABASE_URL = database_url.set(
+            host=pooler_host,
+            port=int(os.environ.get("SUPABASE_POOLER_PORT", "5432")),
+            username=pooler_user,
+        ).render_as_string(hide_password=False)
+
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,

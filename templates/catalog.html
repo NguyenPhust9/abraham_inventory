@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=46"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=47"
 >
 {% endblock %}
 
@@ -353,6 +353,20 @@
       <div id="reorderList" class="reorder-list" aria-live="polite">
         <div class="reorder-loading">Đang tính mức dự trữ…</div>
       </div>
+    </section>
+
+    <section class="promotion-suggestion-card" aria-labelledby="promotionSuggestionTitle">
+      <div class="promotion-suggestion-intro">
+        <span class="promotion-suggestion-kicker">✦ Gợi ý CTKM</span>
+        <h2 id="promotionSuggestionTitle">Ưu đãi đang áp dụng</h2>
+        <p>Các mẫu xe có giá khuyến mãi nổi bật trong thời gian hiện tại.</p>
+      </div>
+      <div id="promotionSuggestionList" class="promotion-suggestion-list" aria-live="polite">
+        <div class="reorder-loading">Đang tải chương trình khuyến mãi…</div>
+      </div>
+      <a class="promotion-suggestion-link" href="{{ url_for('promotion_catalog') }}">
+        Xem tất cả CTKM <span aria-hidden="true">→</span>
+      </a>
     </section>
 
   </aside>

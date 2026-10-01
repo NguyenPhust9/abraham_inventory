@@ -811,6 +811,7 @@ async function load(includeReorderSuggestions = true) {
 
     buildPills();
     render();
+    renderPromotionSuggestions();
     if (includeReorderSuggestions) loadReorderSuggestions();
   } catch (error) {
     console.error('Không tải được dữ liệu sản phẩm:', error);
@@ -903,6 +904,50 @@ function renderReorderSuggestions() {
     </article>
   `).join('');
 
+}
+
+function renderPromotionSuggestions() {
+  const list = document.getElementById('promotionSuggestionList');
+  if (!list) return;
+
+  const promotionGroups = groupProducts(PRODUCTS)
+    .map(group => {
+      const promotion = getGroupPromotion(group.variants);
+      return promotion ? { group, promotion } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aDiscount = Number(a.promotion.original_price || 0) - Number(a.promotion.price || 0);
+      const bDiscount = Number(b.promotion.original_price || 0) - Number(b.promotion.price || 0);
+      return bDiscount - aDiscount;
+    })
+    .slice(0, 6);
+
+  if (!promotionGroups.length) {
+    list.innerHTML = '<div class="promotion-suggestion-empty">Chưa có chương trình khuyến mãi đang áp dụng.</div>';
+    return;
+  }
+
+  list.innerHTML = promotionGroups.map(({ group, promotion }) => `
+    <a class="promotion-suggestion-item" href="/ctkm" aria-label="Xem khuyến mãi ${escapeHTML(group.model)}">
+      <div class="promotion-suggestion-thumb">
+        ${promotion.image_url
+          ? `<img src="${escapeHTML(promotion.image_url)}" alt="${escapeHTML(group.model)}">`
+          : '<span aria-hidden="true">✦</span>'}
+      </div>
+      <div class="promotion-suggestion-copy">
+        <span class="promotion-suggestion-tag ${promotion.promotion_tag === 'hot' ? 'hot' : 'discount'}">
+          ${promotion.promotion_tag === 'hot' ? 'HOT' : 'GIẢM GIÁ'}
+        </span>
+        <strong>${escapeHTML(group.model)}</strong>
+        <span class="promotion-suggestion-period">${formatPromotionDate(promotion.promotion_start)} – ${formatPromotionDate(promotion.promotion_end)}</span>
+      </div>
+      <div class="promotion-suggestion-price">
+        ${promotion.original_price ? `<del>${escapeHTML(fmtPrice(promotion.original_price))}</del>` : ''}
+        <strong>${escapeHTML(fmtPrice(promotion.price))}</strong>
+      </div>
+    </a>
+  `).join('');
 }
 
 async function loadReorderSuggestions() {
