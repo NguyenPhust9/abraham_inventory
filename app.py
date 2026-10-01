@@ -15,6 +15,7 @@ from flask_login import (  # type: ignore
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, text, func, inspect, or_  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 from sqlalchemy.engine import make_url  # type: ignore
+from sqlalchemy.pool import NullPool  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
@@ -84,11 +85,14 @@ if DATABASE_URL:
             username=pooler_user,
         ).render_as_string(hide_password=False)
 
-    engine = create_engine(
-        DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=300,
-    )
+    engine_options = {"pool_pre_ping": True}
+    if pooler_host:
+        # Transaction Pooler handles pooling for us. NullPool prevents each web
+        # process/serverless instance from reserving its own persistent clients.
+        engine_options["poolclass"] = NullPool
+    else:
+        engine_options["pool_recycle"] = 300
+    engine = create_engine(DATABASE_URL, **engine_options)
 else:
     engine = create_engine(
         f"sqlite:///{DB_PATH}",
