@@ -2,7 +2,12 @@ import os
 import re
 import json
 import unicodedata
+import threading
+import time
 from io import BytesIO
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, quote_plus
+from urllib.request import Request, urlopen
 import cloudinary  # type: ignore
 import cloudinary.uploader  # type: ignore
 from datetime import datetime, timedelta
@@ -163,6 +168,39 @@ class Supplier(Base):
     phone = Column(String, default="")
     email = Column(String, default="")
     address = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Dealer(Base):
+    __tablename__ = "dealers"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    owner = Column(String, default="")
+    original_address = Column(String, default="")
+    address = Column(String, nullable=False)
+    street = Column(String, default="")
+    ward = Column(String, default="")
+    district = Column(String, default="")
+    province = Column(String, default="")
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    coordinate_source = Column(String, default="")
+    confidence = Column(String, default="")
+    review_reason = Column(String, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AddressGeocode(Base):
+    __tablename__ = "address_geocodes"
+
+    id = Column(Integer, primary_key=True)
+    query_key = Column(String, unique=True, nullable=False)
+    query = Column(String, nullable=False)
+    display_name = Column(String, default="")
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -372,6 +410,268 @@ def safe_int(value, default=0):
         return default
 
 
+def clean_import_text(value):
+    """Return a trimmed string without turning empty spreadsheet cells into 'nan'."""
+    if value is None or pd.isna(value):
+        return ""
+    text_value = str(value).strip()
+    return "" if text_value.casefold() in {"nan", "none", "null"} else text_value
+
+
+def normalize_import_header(value):
+    text_value = clean_import_text(value).casefold().replace("đ", "d")
+    text_value = unicodedata.normalize("NFD", text_value)
+    text_value = "".join(char for char in text_value if unicodedata.category(char) != "Mn")
+    return re.sub(r"[^a-z0-9]+", " ", text_value).strip()
+
+
+def find_import_column(columns, *aliases):
+    normalized = {normalize_import_header(column): column for column in columns}
+    for alias in aliases:
+        match = normalized.get(normalize_import_header(alias))
+        if match is not None:
+            return match
+    return None
+
+
+GEOCODE_LOCK = threading.Lock()
+LAST_GEOCODE_REQUEST_AT = 0.0
+
+
+def normalize_address_query(value):
+    return re.sub(r"\s+", " ", clean_import_text(value)).strip().casefold()
+
+
+def address_match_tokens(value):
+    normalized = normalize_import_header(value)
+    removable_phrases = (
+        "viet nam",
+        "thanh pho ho chi minh",
+        "tp ho chi minh",
+        "tphcm",
+        "ho chi minh",
+    )
+    for phrase in removable_phrases:
+        normalized = normalized.replace(phrase, " ")
+    tokens = normalized.split()
+    ignored = {"duong", "d", "street"}
+    return [token for token in tokens if token not in ignored]
+
+
+def addresses_refer_same_place(first, second):
+    def street_cores(value):
+        segments = [address_match_tokens(part) for part in clean_import_text(value).split(",")]
+        cores = []
+        for index, tokens in enumerate(segments):
+            if not tokens or not re.fullmatch(r"\d+[a-z]?(?:[/\-]\d+[a-z]?)?", tokens[0]):
+                continue
+            core = list(tokens)
+            if len(core) == 1 and index + 1 < len(segments):
+                core.extend(segments[index + 1])
+            if len(core) >= 3:
+                cores.append(core)
+        return cores
+
+    first_cores = street_cores(first)
+    second_cores = street_cores(second)
+    for first_core in first_cores:
+        for second_core in second_cores:
+            shorter, longer = sorted((first_core, second_core), key=len)
+            if shorter == longer[:len(shorter)]:
+                return True
+    return False
+
+
+def parse_coordinates(value):
+    match = re.fullmatch(
+        r"\s*(-?\d{1,2}(?:\.\d+)?)\s*[,;]\s*(-?\d{1,3}(?:\.\d+)?)\s*",
+        clean_import_text(value),
+    )
+    if not match:
+        return None
+    latitude, longitude = float(match.group(1)), float(match.group(2))
+    if -90 <= latitude <= 90 and -180 <= longitude <= 180:
+        return latitude, longitude
+    return None
+
+
+def dealer_address_candidates(address, db):
+    """Use imported old/new dealer addresses to translate legacy admin names."""
+    candidates = []
+    area_fallbacks = []
+    normalized = normalize_import_header(address)
+
+    # Keep familiar pre-merger province names searchable. Nominatim now indexes
+    # Long Phu under Can Tho; querying the old "Soc Trang" name can otherwise
+    # resolve to an unrelated business in Tra Vinh that contains those words.
+    legacy_area_replacements = {
+        "soc trang": "Thành phố Cần Thơ",
+        "tinh soc trang": "Thành phố Cần Thơ",
+    }
+    address_parts = [part.strip() for part in address.split(",") if part.strip()]
+    modern_parts = [
+        legacy_area_replacements.get(normalize_import_header(part), part)
+        for part in address_parts
+    ]
+    if modern_parts != address_parts:
+        candidates.append(", ".join(modern_parts))
+
+    official_overrides = (
+        (
+            ("xa dinh hoa", "huyen lai vung", "tinh dong thap"),
+            ("Xã Định Hòa", "Huyện Lai Vung", "Xã Phong Hòa", "Tỉnh Đồng Tháp"),
+        ),
+    )
+    for required_parts, (old_ward, old_district, new_ward, new_province) in official_overrides:
+        if all(part in normalized for part in required_parts):
+            modernized = re.sub(re.escape(old_ward), new_ward, address, flags=re.IGNORECASE)
+            modernized = re.sub(rf"\s*,?\s*{re.escape(old_district)}", "", modernized, flags=re.IGNORECASE)
+            candidates.append(modernized)
+            area_fallbacks.append(f"{new_ward}, {new_province}")
+            break
+
+    ward_match = re.search(r"(?:^|\s)(?:phuong|p)\s*(\d+)(?:\s|$)", normalized)
+    district_match = re.search(r"(?:^|\s)(?:quan|q)\s*(\d+)(?:\s|$)", normalized)
+
+    if ward_match and district_match:
+        ward_number = ward_match.group(1)
+        district_number = district_match.group(1)
+        district_name = f"Quận {district_number}"
+        old_ward_patterns = [f"%Phường {ward_number}%", f"%P{ward_number}%", f"%P. {ward_number}%"]
+        mapping_rows = db.query(Dealer.ward, Dealer.province).filter(
+            Dealer.district.ilike(f"%{district_name}%"),
+            or_(*(Dealer.original_address.ilike(pattern) for pattern in old_ward_patterns)),
+            Dealer.ward != "",
+        ).all()
+
+        mapping_counts = {}
+        for new_ward, new_province in mapping_rows:
+            key = (clean_import_text(new_ward), clean_import_text(new_province))
+            if key[0]:
+                mapping_counts[key] = mapping_counts.get(key, 0) + 1
+
+        if mapping_counts:
+            (new_ward, new_province), _ = max(mapping_counts.items(), key=lambda item: item[1])
+            legacy_admin = re.compile(
+                rf"(?:phường|p\.?)[ ]*{ward_number}[ ]*,?[ ]*(?:quận|q\.?)[ ]*{district_number}",
+                re.IGNORECASE,
+            )
+            modernized = legacy_admin.sub(new_ward, address)
+            if new_province and normalize_import_header(new_province) not in normalize_import_header(modernized):
+                modernized = f"{modernized}, {new_province}"
+            candidates.append(modernized)
+
+    # Nominatim resolves Vietnamese numbered addresses more reliably with a road prefix.
+    expanded = []
+    for candidate in candidates + [address]:
+        parts = [part.strip() for part in candidate.split(",") if part.strip()]
+        if parts and re.match(r"^\d+[A-Za-z]?(?:[/\-]\d+[A-Za-z]?)?\s+", parts[0]):
+            first_part = parts[0]
+            remainder = re.sub(r"^\d+[A-Za-z]?(?:[/\-]\d+[A-Za-z]?)?\s+", "", first_part).strip()
+            is_area_address = normalize_import_header(remainder).startswith(("khu ", "ap ", "to ", "cum "))
+            if not is_area_address and not re.search(r"\b(đường|duong|đ\.|d\.)\s+", first_part, re.IGNORECASE):
+                first_part = re.sub(
+                    r"^(\d+[A-Za-z]?(?:[/\-]\d+[A-Za-z]?)?)\s+",
+                    r"\1 Đường ",
+                    first_part,
+                    count=1,
+                )
+                parts[0] = first_part
+                expanded.append(", ".join(parts))
+
+    ordered = []
+    seen = set()
+    for candidate in expanded + candidates + [address] + area_fallbacks:
+        key = normalize_address_query(candidate)
+        if key and key not in seen:
+            ordered.append(candidate)
+            seen.add(key)
+    return ordered[:3]
+
+
+def geocode_address(address, db):
+    """Resolve one address and persist the result to avoid repeated public API calls."""
+    coordinates = parse_coordinates(address)
+    if coordinates:
+        return coordinates[0], coordinates[1], f"Tọa độ {coordinates[0]:.6f}, {coordinates[1]:.6f}"
+
+    query_key = normalize_address_query(address)
+    cached = db.query(AddressGeocode).filter(AddressGeocode.query_key == query_key).first()
+    if (
+        cached
+        and "soc trang" in normalize_import_header(address)
+        and "tra vinh" in normalize_import_header(cached.display_name)
+    ):
+        db.delete(cached)
+        db.commit()
+        cached = None
+    if cached:
+        return cached.latitude, cached.longitude, cached.display_name or cached.query
+
+    payload = []
+    global LAST_GEOCODE_REQUEST_AT
+    for candidate in dealer_address_candidates(address, db):
+        with GEOCODE_LOCK:
+            elapsed = time.monotonic() - LAST_GEOCODE_REQUEST_AT
+            if elapsed < 1.05:
+                time.sleep(1.05 - elapsed)
+
+            params = urlencode({
+                "q": candidate,
+                "format": "jsonv2",
+                "limit": 1,
+                "countrycodes": "vn",
+                "addressdetails": 1,
+                "accept-language": "vi",
+            })
+            endpoint = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search")
+            user_agent = os.environ.get(
+                "NOMINATIM_USER_AGENT",
+                "AbrahamBikeDealerFinder/1.0 (https://github.com/NguyenPhust9/abraham_inventory)",
+            )
+            request_data = Request(
+                f"{endpoint}?{params}",
+                headers={"User-Agent": user_agent, "Accept": "application/json"},
+            )
+            try:
+                with urlopen(request_data, timeout=12) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            finally:
+                LAST_GEOCODE_REQUEST_AT = time.monotonic()
+        if payload:
+            break
+
+    if not payload:
+        return None
+
+    latitude = float(payload[0]["lat"])
+    longitude = float(payload[0]["lon"])
+    display_name = clean_import_text(payload[0].get("display_name"))
+    db.add(AddressGeocode(
+        query_key=query_key,
+        query=address,
+        display_name=display_name,
+        latitude=latitude,
+        longitude=longitude,
+    ))
+    db.commit()
+    return latitude, longitude, display_name
+
+
+def distance_km(latitude_1, longitude_1, latitude_2, longitude_2):
+    radius_km = 6371.0088
+    lat_1 = math.radians(latitude_1)
+    lat_2 = math.radians(latitude_2)
+    delta_lat = math.radians(latitude_2 - latitude_1)
+    delta_lon = math.radians(longitude_2 - longitude_1)
+    value = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat_1) * math.cos(lat_2) * math.sin(delta_lon / 2) ** 2
+    )
+    value = min(1.0, max(0.0, value))
+    return radius_km * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
+
+
 
 def safe_float(value):
     try:
@@ -485,6 +785,137 @@ def retail_catalog():
 @app.route("/ctkm")
 def promotion_catalog():
     return render_catalog_page("promotion")
+
+
+@app.route("/tim-dai-ly")
+def dealer_locator():
+    search_mode = request.args.get("mode", "address")
+    if search_mode not in ("address", "area"):
+        search_mode = "address"
+    address = request.args.get("address", "").strip()
+    selected_province = request.args.get("province", "").strip()
+    selected_ward = request.args.get("ward", "").strip()
+    results = []
+    resolved_address = ""
+    search_point = None
+    error = ""
+
+    db = SessionLocal()
+    try:
+        provinces = [row[0] for row in db.query(Dealer.province).filter(
+            Dealer.province != ""
+        ).distinct().order_by(Dealer.province).all()]
+        wards = []
+        if selected_province:
+            wards = [row[0] for row in db.query(Dealer.ward).filter(
+                Dealer.province == selected_province,
+                Dealer.ward != "",
+            ).distinct().order_by(Dealer.ward).all()]
+
+        if search_mode == "area":
+            if selected_province:
+                area_query = db.query(Dealer).filter(Dealer.province == selected_province)
+                if selected_ward:
+                    area_query = area_query.filter(Dealer.ward == selected_ward)
+                area_dealers = area_query.order_by(Dealer.name, Dealer.code).limit(100).all()
+                for dealer in area_dealers:
+                    results.append({
+                        "code": dealer.code,
+                        "name": dealer.name,
+                        "address": dealer.address,
+                        "province": dealer.province,
+                        "latitude": dealer.latitude,
+                        "longitude": dealer.longitude,
+                        "distance_km": None,
+                        "directions_url": (
+                            "https://www.google.com/maps/search/?api=1"
+                            f"&query={dealer.latitude:.7f},{dealer.longitude:.7f}"
+                            if dealer.latitude is not None and dealer.longitude is not None
+                            else "https://www.google.com/maps/search/?api=1&query=" + quote_plus(dealer.address)
+                        ),
+                    })
+                resolved_address = selected_ward or selected_province
+                if not results:
+                    error = "Chưa có đại lý trong khu vực đã chọn."
+            elif request.args.get("mode") == "area":
+                error = "Vui lòng chọn Tỉnh/Thành để lọc đại lý."
+        elif len(address) > 300:
+            error = "Địa chỉ quá dài. Vui lòng nhập tối đa 300 ký tự."
+        elif address:
+            try:
+                location = geocode_address(address, db)
+            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                location = None
+                error = "Dịch vụ bản đồ đang bận. Vui lòng thử lại sau ít phút."
+
+            if location:
+                latitude, longitude, resolved_address = location
+                search_point = {"latitude": latitude, "longitude": longitude}
+                dealers = db.query(Dealer).filter(
+                    Dealer.latitude.isnot(None),
+                    Dealer.longitude.isnot(None),
+                ).all()
+
+                corrected_dealers = []
+                if addresses_refer_same_place(address, resolved_address):
+                    for dealer in dealers:
+                        if addresses_refer_same_place(address, dealer.address):
+                            old_distance = distance_km(
+                                latitude,
+                                longitude,
+                                dealer.latitude,
+                                dealer.longitude,
+                            )
+                            source_key = normalize_import_header(dealer.coordinate_source)
+                            if "tam phuong" in source_key or "tam xa" in source_key or old_distance > 0.15:
+                                dealer.latitude = latitude
+                                dealer.longitude = longitude
+                                dealer.coordinate_source = "Geocode địa chỉ đầy đủ"
+                                dealer.confidence = "Cao"
+                                dealer.review_reason = ""
+                                dealer.updated_at = datetime.utcnow()
+                                corrected_dealers.append(dealer.code)
+                    if corrected_dealers:
+                        db.commit()
+
+                ranked = []
+                for dealer in dealers:
+                    distance = distance_km(latitude, longitude, dealer.latitude, dealer.longitude)
+                    ranked.append({
+                        "code": dealer.code,
+                        "name": dealer.name,
+                        "address": dealer.address,
+                        "province": dealer.province,
+                        "latitude": dealer.latitude,
+                        "longitude": dealer.longitude,
+                        "distance_km": distance,
+                        "directions_url": (
+                            "https://www.google.com/maps/dir/?api=1"
+                            f"&origin={latitude:.7f},{longitude:.7f}"
+                            f"&destination={dealer.latitude:.7f},{dealer.longitude:.7f}"
+                        ),
+                    })
+                results = sorted(ranked, key=lambda item: item["distance_km"])[:5]
+                if not results:
+                    error = "Chưa có đại lý nào có tọa độ để so sánh."
+            elif not error:
+                error = "Không tìm thấy địa chỉ này. Hãy nhập đầy đủ số nhà, đường, phường/xã và tỉnh/thành."
+    finally:
+        db.close()
+
+    return render_template(
+        "dealer_locator_new.html",
+        search_mode=search_mode,
+        address=address,
+        provinces=provinces,
+        wards=wards,
+        selected_province=selected_province,
+        selected_ward=selected_ward,
+        resolved_address=resolved_address,
+        search_point=search_point,
+        results=results,
+        error=error,
+    )
 
 
 @app.route("/api/retail-status")
@@ -1231,6 +1662,61 @@ def admin_dashboard():
         db.close()
 
 
+@app.route("/admin/dealers")
+@login_required
+def admin_dealers():
+    q = request.args.get("q", "").strip()
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except ValueError:
+        page = 1
+
+    per_page = 25
+    db = SessionLocal()
+    try:
+        query = db.query(Dealer)
+        if q:
+            like = f"%{q}%"
+            query = query.filter(or_(
+                Dealer.code.ilike(like),
+                Dealer.name.ilike(like),
+                Dealer.address.ilike(like),
+                Dealer.province.ilike(like),
+                Dealer.owner.ilike(like),
+            ))
+
+        filtered_total = query.count()
+        total_dealers = db.query(Dealer).count()
+        located_count = db.query(Dealer).filter(
+            Dealer.latitude.isnot(None),
+            Dealer.longitude.isnot(None),
+        ).count()
+        review_count = db.query(Dealer).filter(Dealer.review_reason != "").count()
+        total_pages = max(1, (filtered_total + per_page - 1) // per_page)
+        if page > total_pages:
+            page = total_pages
+
+        dealers = (
+            query.order_by(Dealer.name, Dealer.code)
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+        return render_template(
+            "dealers.html",
+            dealers=dealers,
+            total_dealers=total_dealers,
+            located_count=located_count,
+            review_count=review_count,
+            filtered_total=filtered_total,
+            q=q,
+            page=page,
+            total_pages=total_pages,
+        )
+    finally:
+        db.close()
+
+
 @app.route("/api/reorder-suggestions")
 def api_reorder_suggestions():
     """Suggest replenishment when stock is below two months of average sales."""
@@ -1714,6 +2200,131 @@ def admin_import():
         db.close()
 
     return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/dealers/import", methods=["POST"])
+@login_required
+def admin_import_dealers():
+    file = request.files.get("file")
+    if not file or not file.filename:
+        flash("Chưa chọn file địa chỉ đại lý.")
+        return redirect(url_for("admin_dealers"))
+
+    filename = secure_filename(file.filename).lower()
+    if not filename.endswith((".xlsx", ".xls", ".csv")):
+        flash("File đại lý phải có định dạng Excel hoặc CSV.")
+        return redirect(url_for("admin_dealers"))
+
+    try:
+        if filename.endswith(".csv"):
+            df = pd.read_csv(file, dtype=object)
+        else:
+            workbook = pd.ExcelFile(file)
+            preferred_sheet = "KhachHang_ChuanHoa"
+            sheet_name = preferred_sheet if preferred_sheet in workbook.sheet_names else workbook.sheet_names[0]
+            df = pd.read_excel(workbook, sheet_name=sheet_name, dtype=object)
+    except Exception as error:
+        flash(f"Không đọc được file địa chỉ đại lý: {error}")
+        return redirect(url_for("admin_dealers"))
+
+    code_col = find_import_column(df.columns, "Mã KH", "Mã khách hàng", "Mã đại lý", "Account Code", "Customer Code")
+    name_col = find_import_column(df.columns, "Tên khách hàng", "Tên đại lý", "Tên tài khoản", "Account Name", "Customer Name")
+    address_col = find_import_column(df.columns, "Địa chỉ đầy đủ (mới)", "Địa chỉ đầy đủ", "Địa chỉ")
+    old_address_col = find_import_column(df.columns, "Địa chỉ đầy đủ (cũ)")
+    original_address_col = find_import_column(df.columns, "Địa chỉ gốc (nguyên văn)", "Địa chỉ gốc")
+
+    missing = []
+    if not code_col:
+        missing.append("Mã KH")
+    if not name_col:
+        missing.append("Tên khách hàng")
+    if not any((address_col, old_address_col, original_address_col)):
+        missing.append("Địa chỉ")
+    if missing:
+        flash("File thiếu cột bắt buộc: " + ", ".join(missing) + ".")
+        return redirect(url_for("admin_dealers"))
+
+    owner_col = find_import_column(df.columns, "Chủ sở hữu (NVKD)", "Chủ sở hữu", "NVKD")
+    street_col = find_import_column(df.columns, "Số nhà, đường, ấp/khu phố", "Số nhà đường")
+    ward_col = find_import_column(df.columns, "Xã/Phường (mới)", "Xã/Phường", "Phường/Xã")
+    district_col = find_import_column(df.columns, "Quận/Huyện (cũ)", "Quận/Huyện", "Huyện/Quận")
+    province_col = find_import_column(df.columns, "Tỉnh/TP (mới)", "Tỉnh/TP", "Tỉnh thành")
+    latitude_col = find_import_column(df.columns, "Vĩ độ", "Latitude", "Lat")
+    longitude_col = find_import_column(df.columns, "Kinh độ", "Longitude", "Lng", "Lon")
+    source_col = find_import_column(df.columns, "Nguồn tọa độ", "Coordinate Source")
+    confidence_col = find_import_column(df.columns, "Độ tin cậy", "Confidence")
+    review_col = find_import_column(df.columns, "Lý do cần rà soát", "Ghi chú rà soát")
+
+    def row_text(row, column):
+        return clean_import_text(row.get(column)) if column else ""
+
+    db = SessionLocal()
+    added = updated = skipped = 0
+    try:
+        existing_by_code = {code: dealer_id for dealer_id, code in db.query(Dealer.id, Dealer.code).all()}
+        inserts = []
+        updates = []
+        seen_codes = set()
+
+        for row in df.to_dict(orient="records"):
+            code = row_text(row, code_col)
+            name = row_text(row, name_col)
+            address = row_text(row, address_col) or row_text(row, old_address_col) or row_text(row, original_address_col)
+            if not code or not name or not address or code in seen_codes:
+                skipped += 1
+                continue
+            seen_codes.add(code)
+
+            latitude = safe_float(row.get(latitude_col)) if latitude_col else None
+            longitude = safe_float(row.get(longitude_col)) if longitude_col else None
+            if latitude is not None and not -90 <= latitude <= 90:
+                latitude = None
+            if longitude is not None and not -180 <= longitude <= 180:
+                longitude = None
+
+            data = {
+                "code": code,
+                "name": name,
+                "owner": row_text(row, owner_col),
+                "original_address": row_text(row, original_address_col),
+                "address": address,
+                "street": row_text(row, street_col),
+                "ward": row_text(row, ward_col),
+                "district": row_text(row, district_col),
+                "province": row_text(row, province_col),
+                "latitude": latitude,
+                "longitude": longitude,
+                "coordinate_source": row_text(row, source_col),
+                "confidence": row_text(row, confidence_col),
+                "review_reason": row_text(row, review_col),
+                "updated_at": datetime.utcnow(),
+            }
+            existing_id = existing_by_code.get(code)
+            if existing_id:
+                data["id"] = existing_id
+                updates.append(data)
+                updated += 1
+            else:
+                inserts.append(data)
+                added += 1
+
+        if inserts:
+            db.bulk_insert_mappings(Dealer, inserts)
+        if updates:
+            db.bulk_update_mappings(Dealer, updates)
+        db.commit()
+
+        message = f"Nhập địa chỉ đại lý xong: thêm mới {added}, cập nhật {updated}."
+        if skipped:
+            message += f" Bỏ qua {skipped} dòng thiếu mã/tên/địa chỉ hoặc trùng mã trong file."
+        flash(message)
+    except Exception as error:
+        db.rollback()
+        flash(f"Lỗi khi nhập địa chỉ đại lý: {error}")
+    finally:
+        db.close()
+
+    return redirect(url_for("admin_dealers"))
 
 
 @app.route("/admin/import-price", methods=["POST"])

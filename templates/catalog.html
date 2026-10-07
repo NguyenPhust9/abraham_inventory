@@ -55,7 +55,8 @@
     <nav class="price-module-tabs" aria-label="Chọn bảng giá">
       <a href="{{ url_for('catalog') }}" class="price-module-tab">Giá đại lý</a>
       <a href="{{ url_for('retail_catalog') }}" class="price-module-tab active" aria-current="page">Giá lẻ</a>
-      <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab promotion-tab"><span aria-hidden="true">✦</span> CTKM</a>
+              <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab promotion-tab"><span aria-hidden="true">✦</span> CTKM</a>
+              <a href="{{ url_for('dealer_locator') }}" class="price-module-tab"><span aria-hidden="true">⌖</span> Tìm đại lý</a>
     </nav>
     <span class="retail-pending-kicker">GIÁ LẺ</span>
     <h1>Đang cập nhật</h1>
@@ -112,6 +113,7 @@
               <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
               <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
               <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab promotion-tab {{ 'active' if price_type == 'promotion' else '' }}" {% if price_type == 'promotion' %}aria-current="page"{% endif %}><span aria-hidden="true">✦</span> CTKM</a>
+              <a href="{{ url_for('dealer_locator') }}" class="price-module-tab"><span aria-hidden="true">⌖</span> Tìm đại lý</a>
             </nav>
           </div>
         </div>

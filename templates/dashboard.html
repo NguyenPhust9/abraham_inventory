@@ -40,6 +40,7 @@
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="package-open"></i>Xuất hàng</a>
       <span class="disabled" aria-disabled="true" title="Mục này đang tạm khóa"><i data-lucide="lock-keyhole"></i>Tồn kho</span>
       <a href="{{ url_for('admin_suppliers') }}"><i data-lucide="users"></i>Nhà cung cấp</a>
+      <a href="{{ url_for('admin_dealers') }}"><i data-lucide="map-pinned"></i>Đại lý</a>
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="chart-no-axes-combined"></i>Báo cáo</a>
       <a class="disabled" href="#" aria-disabled="true" title="Chức năng đang được phát triển"><i data-lucide="settings"></i>Cài đặt</a>
     </nav>
@@ -92,6 +93,7 @@
       <a class="quick-card quick-pink" href="{{ url_for('admin_suppliers') }}"><span class="module-icon"><i data-lucide="users"></i></span><strong>Nhà cung cấp</strong><small>Xem NCC và bảng giá nhập lịch sử</small><b><i data-lucide="arrow-right"></i></b></a>
       <a class="quick-card quick-cyan" href="{{ url_for('admin_supplier_catalog') }}"><span class="module-icon"><i data-lucide="swatch-book"></i></span><strong>Danh mục hàng theo NCC</strong><small>Tổng hợp mỗi NCC từng bán những mã nào</small><b><i data-lucide="arrow-right"></i></b></a>
       <a class="quick-card quick-blue" href="{{ url_for('admin_purchase_history') }}"><span class="module-icon"><i data-lucide="clipboard-list"></i></span><strong>Lịch sử nhập hàng</strong><small>Tra cứu, thống kê và quản lý phiếu nhập</small><b><i data-lucide="arrow-right"></i></b></a>
+      <a class="quick-card quick-green" href="{{ url_for('admin_dealers') }}"><span class="module-icon"><i data-lucide="map-pinned"></i></span><strong>Địa chỉ đại lý</strong><small>Import và quản lý dữ liệu vị trí đại lý</small><b><i data-lucide="arrow-right"></i></b></a>
     </div>
   </section>
 

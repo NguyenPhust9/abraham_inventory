@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Địa chỉ đại lý | Abraham Bike{% endblock %}
+{% block content %}
+<div class="purchase-page dealer-page">
+  <header class="purchase-topbar">
+    <a class="purchase-brand" href="{{ url_for('admin_dashboard') }}">
+      <span class="brand-mark"><i data-lucide="bike"></i></span>
+      <span><strong>ABRAHAM BIKE</strong><small>QUẢN LÝ ĐẠI LÝ</small></span>
+    </a>
+    <nav>
+      <a href="{{ url_for('admin_dashboard') }}"><i data-lucide="house"></i>Dashboard</a>
+      <a href="{{ url_for('admin_purchase_new') }}"><i data-lucide="truck"></i>Nhập hàng</a>
+      <a href="{{ url_for('admin_suppliers') }}"><i data-lucide="users"></i>Nhà cung cấp</a>
+      <a class="active" href="{{ url_for('admin_dealers') }}"><i data-lucide="map-pinned"></i>Đại lý</a>
+      <a href="{{ url_for('admin_logout') }}"><i data-lucide="log-out"></i>Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main class="purchase-content">
+    <div class="purchase-titlebar">
+      <div>
+        <p class="eyebrow">QUẢN LÝ DỮ LIỆU VỊ TRÍ</p>
+        <h1>Địa chỉ đại lý</h1>
+        <p>Nhập và quản lý dữ liệu dùng cho chức năng tìm đại lý gần nhất.</p>
+      </div>
+      <div class="purchase-breadcrumb"><i data-lucide="house"></i>Admin <span>/</span> <strong>Đại lý</strong></div>
+    </div>
+
+    <section class="history-stats dealer-stats">
+      <div class="history-stat blue"><span><i data-lucide="store"></i></span><div><small>TỔNG ĐẠI LÝ</small><strong>{{ "{:,.0f}".format(total_dealers).replace(",", ".") }}</strong></div></div>
+      <div class="history-stat green"><span><i data-lucide="map-pin-check"></i></span><div><small>ĐÃ CÓ TỌA ĐỘ</small><strong>{{ "{:,.0f}".format(located_count).replace(",", ".") }}</strong></div></div>
+      <div class="history-stat orange"><span><i data-lucide="map-pin-off"></i></span><div><small>CHƯA CÓ TỌA ĐỘ</small><strong>{{ "{:,.0f}".format(total_dealers - located_count).replace(",", ".") }}</strong></div></div>
+      <div class="history-stat purple"><span><i data-lucide="scan-search"></i></span><div><small>CẦN RÀ SOÁT</small><strong>{{ "{:,.0f}".format(review_count).replace(",", ".") }}</strong></div></div>
+    </section>
+
+    <section class="purchase-panel dealer-import-card">
+      <div class="purchase-panel-title"><i data-lucide="file-up"></i>Import địa chỉ đại lý</div>
+      <div class="dealer-import-body">
+        <div>
+          <strong>Nhập Excel hoặc CSV</strong>
+          <p>Trùng Mã KH sẽ cập nhật. File CRM chuẩn hóa tự đọc sheet <b>KhachHang_ChuanHoa</b> và nhận luôn Vĩ độ/Kinh độ.</p>
+        </div>
+        <form method="POST" action="{{ url_for('admin_import_dealers') }}" enctype="multipart/form-data" class="dealer-import-form">
+          <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+          <button type="submit"><i data-lucide="upload"></i>Nhập dữ liệu</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="purchase-panel dealer-list-panel">
+      <div class="purchase-panel-title dealer-list-title">
+        <span><i data-lucide="list"></i>Danh sách đại lý <small>{{ filtered_total }} kết quả</small></span>
+        <form method="GET" action="{{ url_for('admin_dealers') }}" class="dealer-search">
+          <i data-lucide="search"></i>
+          <input name="q" value="{{ q }}" placeholder="Tìm mã, tên, địa chỉ, tỉnh/TP...">
+          <button type="submit">Tìm kiếm</button>
+          {% if q %}<a href="{{ url_for('admin_dealers') }}">Xóa lọc</a>{% endif %}
+        </form>
+      </div>
+      <div class="dealer-table-wrap">
+        <table class="dealer-table">
+          <thead><tr><th>STT</th><th>Mã KH</th><th>Tên đại lý</th><th>Địa chỉ</th><th>Tỉnh/TP</th><th>NVKD</th><th>Tọa độ</th><th>Độ tin cậy</th></tr></thead>
+          <tbody>
+          {% for dealer in dealers %}
+            <tr>
+              <td>{{ (page - 1) * 25 + loop.index }}</td>
+              <td><span class="code-badge">{{ dealer.code }}</span></td>
+              <td><strong>{{ dealer.name }}</strong></td>
+              <td title="{{ dealer.original_address or dealer.address }}">{{ dealer.address }}</td>
+              <td>{{ dealer.province or '—' }}</td>
+              <td>{{ dealer.owner or '—' }}</td>
+              <td>{{ ('%.6f, %.6f'|format(dealer.latitude, dealer.longitude)) if dealer.latitude is not none and dealer.longitude is not none else 'Chưa có' }}</td>
+              <td>{{ dealer.confidence or '—' }}{% if dealer.review_reason %}<small title="{{ dealer.review_reason }}">Cần rà soát</small>{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="purchase-empty-cell">Chưa có dữ liệu đại lý phù hợp.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="receipt-pagination">
+        {% if page > 1 %}<a href="{{ url_for('admin_dealers', page=page-1, q=q) }}"><i data-lucide="chevron-left"></i>Trang trước</a>{% else %}<span class="disabled">Trang trước</span>{% endif %}
+        <span>Trang {{ page }} / {{ total_pages }}</span>
+        {% if page < total_pages %}<a href="{{ url_for('admin_dealers', page=page+1, q=q) }}">Trang sau<i data-lucide="chevron-right"></i></a>{% else %}<span class="disabled">Trang sau</span>{% endif %}
+      </div>
+    </section>
+  </main>
+</div>
+<script>window.addEventListener('DOMContentLoaded',function(){if(window.lucide)window.lucide.createIcons();});</script>
+{% endblock %}

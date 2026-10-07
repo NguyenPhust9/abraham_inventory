@@ -13,3 +13,4 @@ Thumbs.db
 .env*
 server.stdout.log
 server.stderr.log
+*.log
