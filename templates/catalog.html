@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=47"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=49"
 >
 {% endblock %}
 
@@ -364,9 +364,6 @@
       <div id="promotionSuggestionList" class="promotion-suggestion-list" aria-live="polite">
         <div class="reorder-loading">Đang tải chương trình khuyến mãi…</div>
       </div>
-      <a class="promotion-suggestion-link" href="{{ url_for('promotion_catalog') }}">
-        Xem tất cả CTKM <span aria-hidden="true">→</span>
-      </a>
     </section>
 
   </aside>
@@ -477,7 +474,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=29"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=30"></script>
 {% else %}
 <script>
   setInterval(async () => {

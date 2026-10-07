@@ -920,8 +920,7 @@ function renderPromotionSuggestions() {
       const aDiscount = Number(a.promotion.original_price || 0) - Number(a.promotion.price || 0);
       const bDiscount = Number(b.promotion.original_price || 0) - Number(b.promotion.price || 0);
       return bDiscount - aDiscount;
-    })
-    .slice(0, 6);
+    });
 
   if (!promotionGroups.length) {
     list.innerHTML = '<div class="promotion-suggestion-empty">Chưa có chương trình khuyến mãi đang áp dụng.</div>';
