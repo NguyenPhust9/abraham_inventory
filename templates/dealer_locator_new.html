@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Tìm đại lý gần nhất | Abraham Bike{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynhYHhyYZMZ3fD1TIarhD7B3p7NU=" crossorigin="">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 {% block content %}
 <div class="locator-page">
@@ -34,7 +34,7 @@
       <div id="dealerLocationMap" class="locator-map" aria-label="Bản đồ chọn vị trí"></div>
       <form method="GET" action="{{ url_for('dealer_locator') }}" class="locator-map-confirm">
         <input type="hidden" name="mode" value="address"><input type="hidden" name="address" value="{{ address }}"><input type="hidden" id="pickedLatitude" name="latitude"><input type="hidden" id="pickedLongitude" name="longitude">
-        <span id="pickedCoordinates">Chưa chọn vị trí</span><button id="confirmMapLocation" type="submit" disabled><i data-lucide="map-pin-check"></i>Tìm đại lý từ vị trí này</button>
+        <span id="pickedCoordinates">Chưa chọn vị trí</span><div><button id="useMapCenter" type="button" class="locator-map-center-button"><i data-lucide="crosshair"></i>Đặt ghim tại tâm bản đồ</button><button id="confirmMapLocation" type="submit" disabled><i data-lucide="map-pin-check"></i>Tìm đại lý từ vị trí này</button></div>
       </form>
     </section>
     {% endif %}
@@ -45,14 +45,17 @@
   </main>
 </div>
 {% if error and search_mode == 'address' and address %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script>
 window.addEventListener('DOMContentLoaded',function(){
   if(!window.L)return;
-  var map=L.map('dealerLocationMap').setView([16.05,108.2],6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map);
-  var marker=null,latInput=document.getElementById('pickedLatitude'),lngInput=document.getElementById('pickedLongitude'),label=document.getElementById('pickedCoordinates'),button=document.getElementById('confirmMapLocation');
-  map.on('click',function(event){var lat=event.latlng.lat.toFixed(7),lng=event.latlng.lng.toFixed(7);if(marker){marker.setLatLng(event.latlng);}else{marker=L.marker(event.latlng).addTo(map);}latInput.value=lat;lngInput.value=lng;label.textContent='Tọa độ đã chọn: '+lat+', '+lng;button.disabled=false;});
+  var map=L.map('dealerLocationMap',{zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([16.05,108.2],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,updateWhenIdle:true,keepBuffer:1,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map);
+  var marker=null,latInput=document.getElementById('pickedLatitude'),lngInput=document.getElementById('pickedLongitude'),label=document.getElementById('pickedCoordinates'),button=document.getElementById('confirmMapLocation'),centerButton=document.getElementById('useMapCenter');
+  function setPoint(point){var lat=point.lat.toFixed(7),lng=point.lng.toFixed(7);if(marker){marker.setLatLng(point);}else{marker=L.circleMarker(point,{radius:9,color:'#fff',weight:3,fillColor:'#e91e63',fillOpacity:1}).addTo(map);}latInput.value=lat;lngInput.value=lng;label.textContent='Tọa độ đã chọn: '+lat+', '+lng;button.disabled=false;}
+  map.on('click',function(event){setPoint(event.latlng);});
+  centerButton.addEventListener('click',function(){setPoint(map.getCenter());});
+  setTimeout(function(){map.invalidateSize();},100);
 });
 </script>
 {% endif %}
