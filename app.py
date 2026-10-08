@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Date
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 from sqlalchemy.engine import make_url  # type: ignore
 from sqlalchemy.pool import NullPool  # type: ignore
+from sqlalchemy.dialects.postgresql import insert as pg_insert  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
@@ -1009,10 +1010,9 @@ def dealer_locator():
                         "longitude": dealer.longitude,
                         "distance_km": None,
                         "directions_url": (
-                            "https://www.google.com/maps/search/?api=1"
-                            f"&query={dealer.latitude:.7f},{dealer.longitude:.7f}"
-                            if dealer.latitude is not None and dealer.longitude is not None
-                            else "https://www.google.com/maps/search/?api=1&query=" + quote_plus(dealer.address)
+                            "https://www.google.com/maps/dir/?api=1"
+                            f"&origin={quote_plus(selected_ward or selected_province)}"
+                            f"&destination={quote_plus(dealer.address)}"
                         ),
                     })
                 resolved_address = selected_ward or selected_province
@@ -1056,10 +1056,9 @@ def dealer_locator():
                         "distance_km": None,
                         "match_label": match_label,
                         "directions_url": (
-                            "https://www.google.com/maps/search/?api=1"
-                            f"&query={dealer.latitude:.7f},{dealer.longitude:.7f}"
-                            if dealer.latitude is not None and dealer.longitude is not None
-                            else "https://www.google.com/maps/search/?api=1&query=" + quote_plus(dealer.address)
+                            "https://www.google.com/maps/dir/?api=1"
+                            f"&origin={quote_plus(address)}"
+                            f"&destination={quote_plus(dealer.address)}"
                         ),
                     })
                 if results:
@@ -2535,10 +2534,28 @@ def admin_import_dealers():
                 inserts.append(data)
                 added += 1
 
-        if inserts:
-            db.bulk_insert_mappings(Dealer, inserts)
-        if updates:
-            db.bulk_update_mappings(Dealer, updates)
+        if db.bind.dialect.name == "postgresql":
+            rows = inserts + [
+                {key: value for key, value in item.items() if key != "id"}
+                for item in updates
+            ]
+            update_columns = (
+                "name", "owner", "original_address", "address", "street", "ward",
+                "district", "province", "latitude", "longitude", "coordinate_source",
+                "confidence", "review_reason", "updated_at",
+            )
+            for start in range(0, len(rows), 250):
+                statement = pg_insert(Dealer).values(rows[start:start + 250])
+                statement = statement.on_conflict_do_update(
+                    index_elements=[Dealer.code],
+                    set_={column: getattr(statement.excluded, column) for column in update_columns},
+                )
+                db.execute(statement)
+        else:
+            if inserts:
+                db.bulk_insert_mappings(Dealer, inserts)
+            if updates:
+                db.bulk_update_mappings(Dealer, updates)
         db.commit()
 
         message = f"Nhập địa chỉ đại lý xong: thêm mới {added}, cập nhật {updated}."
