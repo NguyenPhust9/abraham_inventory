@@ -727,6 +727,54 @@ def distance_km(latitude_1, longitude_1, latitude_2, longitude_2):
     return radius_km * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
+def dealer_area_map_center(address, db):
+    """Center the manual picker using area names already present in dealer data."""
+    query_key = normalize_import_header(address)
+    if not query_key:
+        return None
+
+    hcm_aliases = ("tp hcm", "tphcm", "ho chi minh", "thanh pho ho chi minh")
+    query_mentions_hcm = any(alias in query_key for alias in hcm_aliases)
+    matches = []
+    best_score = 0
+    dealers = db.query(Dealer).filter(
+        Dealer.latitude.isnot(None),
+        Dealer.longitude.isnot(None),
+    ).all()
+    for dealer in dealers:
+        score = 0
+        province_key = normalize_import_header(dealer.province)
+        district_key = normalize_import_header(dealer.district)
+        ward_key = normalize_import_header(dealer.ward)
+        if province_key and province_key in query_key:
+            score += 2
+        elif query_mentions_hcm and any(alias in province_key for alias in hcm_aliases):
+            score += 2
+        if district_key and district_key in query_key:
+            score += 3
+        if ward_key and ward_key in query_key:
+            score += 4
+        if score > best_score:
+            best_score = score
+            matches = [dealer]
+        elif score and score == best_score:
+            matches.append(dealer)
+
+    if not matches:
+        return None
+    latitudes = sorted(dealer.latitude for dealer in matches)
+    longitudes = sorted(dealer.longitude for dealer in matches)
+    middle = len(matches) // 2
+    if len(matches) % 2:
+        latitude = latitudes[middle]
+        longitude = longitudes[middle]
+    else:
+        latitude = (latitudes[middle - 1] + latitudes[middle]) / 2
+        longitude = (longitudes[middle - 1] + longitudes[middle]) / 2
+    zoom = 15 if best_score >= 7 else (13 if best_score >= 5 else 11)
+    return {"latitude": latitude, "longitude": longitude, "zoom": zoom}
+
+
 
 def safe_float(value):
     try:
@@ -856,6 +904,7 @@ def dealer_locator():
     resolved_address = ""
     search_point = None
     error = ""
+    map_picker_center = {"latitude": 16.05, "longitude": 108.2, "zoom": 6}
 
     db = SessionLocal()
     try:
@@ -972,6 +1021,10 @@ def dealer_locator():
                     error = error or "Chưa có đại lý nào có tọa độ để so sánh."
             elif not error:
                 error = "Không tìm thấy địa chỉ này. Hãy nhập đầy đủ số nhà, đường, phường/xã và tỉnh/thành."
+            if error:
+                area_center = dealer_area_map_center(address, db)
+                if area_center:
+                    map_picker_center = area_center
     finally:
         db.close()
 
@@ -987,6 +1040,7 @@ def dealer_locator():
         search_point=search_point,
         results=results,
         error=error,
+        map_picker_center=map_picker_center,
     )
 
 

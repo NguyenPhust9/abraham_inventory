@@ -49,7 +49,7 @@
 <script>
 window.addEventListener('DOMContentLoaded',function(){
   if(!window.L)return;
-  var map=L.map('dealerLocationMap',{zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([16.05,108.2],6);
+  var map=L.map('dealerLocationMap',{zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false}).setView([{{ map_picker_center.latitude }},{{ map_picker_center.longitude }}],{{ map_picker_center.zoom }});
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,updateWhenIdle:true,keepBuffer:1,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map);
   var marker=null,latInput=document.getElementById('pickedLatitude'),lngInput=document.getElementById('pickedLongitude'),label=document.getElementById('pickedCoordinates'),button=document.getElementById('confirmMapLocation'),centerButton=document.getElementById('useMapCenter');
   function setPoint(point){var lat=point.lat.toFixed(7),lng=point.lng.toFixed(7);if(marker){marker.setLatLng(point);}else{marker=L.circleMarker(point,{radius:9,color:'#fff',weight:3,fillColor:'#e91e63',fillOpacity:1}).addTo(map);}latInput.value=lat;lngInput.value=lng;label.textContent='Tọa độ đã chọn: '+lat+', '+lng;button.disabled=false;}
