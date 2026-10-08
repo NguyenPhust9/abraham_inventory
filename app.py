@@ -627,11 +627,117 @@ def dealer_address_candidates(address, db):
     return ordered[:5]
 
 
+def google_geocode_address(address, db, api_key):
+    """Resolve a Vietnamese address with Google and cache it separately."""
+    query_key = "google:" + normalize_address_query(address)
+    cached = db.query(AddressGeocode).filter(AddressGeocode.query_key == query_key).first()
+    if cached:
+        return cached.latitude, cached.longitude, cached.display_name or cached.query
+
+    params = urlencode({
+        "address": address,
+        "components": "country:VN",
+        "language": "vi",
+        "region": "vn",
+        "key": api_key,
+    })
+    endpoint = os.environ.get(
+        "GOOGLE_GEOCODING_URL",
+        "https://maps.googleapis.com/maps/api/geocode/json",
+    )
+    request_data = Request(
+        f"{endpoint}?{params}",
+        headers={"Accept": "application/json"},
+    )
+    with urlopen(request_data, timeout=15) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if payload.get("status") != "OK" or not payload.get("results"):
+        return None
+
+    result = payload["results"][0]
+    location = result["geometry"]["location"]
+    latitude = float(location["lat"])
+    longitude = float(location["lng"])
+    display_name = clean_import_text(result.get("formatted_address"))
+    db.add(AddressGeocode(
+        query_key=query_key,
+        query=address,
+        display_name=display_name,
+        latitude=latitude,
+        longitude=longitude,
+    ))
+    db.commit()
+    return latitude, longitude, display_name
+
+
+def google_driving_distances(origin_latitude, origin_longitude, dealers, api_key):
+    """Return Google driving distances for dealer rows already in our data."""
+    if not dealers:
+        return {}
+    endpoint = os.environ.get(
+        "GOOGLE_ROUTES_MATRIX_URL",
+        "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix",
+    )
+    destinations = [{
+        "waypoint": {
+            "location": {
+                "latLng": {
+                    "latitude": dealer["latitude"],
+                    "longitude": dealer["longitude"],
+                }
+            }
+        }
+    } for dealer in dealers]
+    body = json.dumps({
+        "origins": [{
+            "waypoint": {
+                "location": {
+                    "latLng": {
+                        "latitude": origin_latitude,
+                        "longitude": origin_longitude,
+                    }
+                }
+            }
+        }],
+        "destinations": destinations,
+        "travelMode": "DRIVE",
+        "routingPreference": "TRAFFIC_AWARE",
+    }).encode("utf-8")
+    request_data = Request(
+        endpoint,
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
+        },
+    )
+    with urlopen(request_data, timeout=25) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    distances = {}
+    for element in payload:
+        destination_index = element.get("destinationIndex")
+        distance_meters = element.get("distanceMeters")
+        if destination_index is None or distance_meters is None:
+            continue
+        if element.get("condition") not in (None, "ROUTE_EXISTS"):
+            continue
+        distances[int(destination_index)] = float(distance_meters) / 1000
+    return distances
+
+
 def geocode_address(address, db):
     """Resolve one address and persist the result to avoid repeated public API calls."""
     coordinates = parse_coordinates(address)
     if coordinates:
         return coordinates[0], coordinates[1], f"Tọa độ {coordinates[0]:.6f}, {coordinates[1]:.6f}"
+
+    google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+    if google_maps_api_key:
+        return google_geocode_address(address, db, google_maps_api_key)
 
     # An address copied from the dealer data should resolve from that same data,
     # even when the external map does not recognize an old administrative name.
@@ -950,9 +1056,41 @@ def dealer_locator():
                             f"&destination={dealer.latitude:.7f},{dealer.longitude:.7f}"
                         ),
                     })
-                results = sorted(ranked, key=lambda item: item["distance_km"])[:5]
+                ranked = sorted(ranked, key=lambda item: item["distance_km"])
+                google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+                if google_maps_api_key:
+                    # Use straight-line distance only to keep the billable route
+                    # matrix small. Final ordering uses Google driving distance.
+                    route_candidates = ranked[:25]
+                    try:
+                        route_distances = google_driving_distances(
+                            latitude,
+                            longitude,
+                            route_candidates,
+                            google_maps_api_key,
+                        )
+                    except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                        route_distances = {}
+                    for index, dealer_result in enumerate(route_candidates):
+                        if index in route_distances:
+                            dealer_result["distance_km"] = route_distances[index]
+                            dealer_result["distance_label"] = "quãng đường lái xe"
+                    results = sorted(
+                        [
+                            dealer_result
+                            for dealer_result in route_candidates
+                            if dealer_result.get("distance_label")
+                        ],
+                        key=lambda item: item["distance_km"],
+                    )[:5]
+                    if not results:
+                        error = "Google Maps chưa tính được quãng đường đến các đại lý trong dữ liệu."
+                else:
+                    for dealer_result in ranked[:5]:
+                        dealer_result["distance_label"] = "đường chim bay"
+                    results = ranked[:5]
                 if not results:
-                    error = "Chưa có đại lý nào có tọa độ để so sánh."
+                    error = error or "Chưa có đại lý nào có tọa độ để so sánh."
             elif not error:
                 error = "Không tìm thấy địa chỉ này. Hãy nhập đầy đủ số nhà, đường, phường/xã và tỉnh/thành."
     finally:
