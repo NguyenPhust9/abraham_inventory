@@ -38,7 +38,7 @@
       <div class="dealer-import-body">
         <div>
           <strong>Nhập Excel hoặc CSV</strong>
-          <p>Trùng Mã KH sẽ cập nhật. File CRM chuẩn hóa tự đọc sheet <b>KhachHang_ChuanHoa</b> và nhận luôn Vĩ độ/Kinh độ.</p>
+          <p>Trùng Mã KH sẽ cập nhật. File nhận hai cột <b>Địa chỉ đầy đủ (cũ)</b>, <b>Địa chỉ đầy đủ (mới)</b> và tự đọc sheet <b>KhachHang_ChuanHoa</b>.</p>
         </div>
         <form method="POST" action="{{ url_for('admin_import_dealers') }}" enctype="multipart/form-data" class="dealer-import-form">
           <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
@@ -59,21 +59,22 @@
       </div>
       <div class="dealer-table-wrap">
         <table class="dealer-table">
-          <thead><tr><th>STT</th><th>Mã KH</th><th>Tên đại lý</th><th>Địa chỉ</th><th>Tỉnh/TP</th><th>NVKD</th><th>Tọa độ</th><th>Độ tin cậy</th></tr></thead>
+          <thead><tr><th>STT</th><th>Mã KH</th><th>Tên đại lý</th><th>Địa chỉ đầy đủ (cũ)</th><th>Địa chỉ đầy đủ (mới)</th><th>Tỉnh/TP</th><th>NVKD</th><th>Tọa độ</th><th>Độ tin cậy</th></tr></thead>
           <tbody>
           {% for dealer in dealers %}
             <tr>
               <td>{{ (page - 1) * 25 + loop.index }}</td>
               <td><span class="code-badge">{{ dealer.code }}</span></td>
               <td><strong>{{ dealer.name }}</strong></td>
-              <td title="{{ dealer.original_address or dealer.address }}">{{ dealer.address }}</td>
+              <td>{{ dealer.original_address or '—' }}</td>
+              <td>{{ dealer.address or '—' }}</td>
               <td>{{ dealer.province or '—' }}</td>
               <td>{{ dealer.owner or '—' }}</td>
               <td>{{ ('%.6f, %.6f'|format(dealer.latitude, dealer.longitude)) if dealer.latitude is not none and dealer.longitude is not none else 'Chưa có' }}</td>
               <td>{{ dealer.confidence or '—' }}{% if dealer.review_reason %}<small title="{{ dealer.review_reason }}">Cần rà soát</small>{% endif %}</td>
             </tr>
           {% else %}
-            <tr><td colspan="8" class="purchase-empty-cell">Chưa có dữ liệu đại lý phù hợp.</td></tr>
+            <tr><td colspan="9" class="purchase-empty-cell">Chưa có dữ liệu đại lý phù hợp.</td></tr>
           {% endfor %}
           </tbody>
         </table>

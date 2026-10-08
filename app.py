@@ -1904,6 +1904,7 @@ def admin_dealers():
             query = query.filter(or_(
                 Dealer.code.ilike(like),
                 Dealer.name.ilike(like),
+                Dealer.original_address.ilike(like),
                 Dealer.address.ilike(like),
                 Dealer.province.ilike(like),
                 Dealer.owner.ilike(like),
@@ -2493,7 +2494,9 @@ def admin_import_dealers():
         for row in df.to_dict(orient="records"):
             code = row_text(row, code_col)
             name = row_text(row, name_col)
-            address = row_text(row, address_col) or row_text(row, old_address_col) or row_text(row, original_address_col)
+            new_address = row_text(row, address_col)
+            old_address = row_text(row, old_address_col) or row_text(row, original_address_col)
+            address = new_address or old_address
             if not code or not name or not address or code in seen_codes:
                 skipped += 1
                 continue
@@ -2510,7 +2513,7 @@ def admin_import_dealers():
                 "code": code,
                 "name": name,
                 "owner": row_text(row, owner_col),
-                "original_address": row_text(row, original_address_col),
+                "original_address": old_address,
                 "address": address,
                 "street": row_text(row, street_col),
                 "ward": row_text(row, ward_col),
