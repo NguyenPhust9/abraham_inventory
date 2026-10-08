@@ -33,8 +33,8 @@
       <div class="locator-map-picker-heading"><div><span>CHỌN VỊ TRÍ THỦ CÔNG</span><h2>Đặt ghim tại vị trí của bạn</h2></div><p>Bấm vào đúng vị trí trên bản đồ, sau đó chọn <strong>Tìm đại lý từ vị trí này</strong>.</p></div>
       <div id="dealerLocationMap" class="locator-map" aria-label="Bản đồ chọn vị trí"></div>
       <form method="GET" action="{{ url_for('dealer_locator') }}" class="locator-map-confirm">
-        <input type="hidden" name="mode" value="address"><input type="hidden" name="address" value="{{ address }}"><input type="hidden" id="pickedLatitude" name="latitude"><input type="hidden" id="pickedLongitude" name="longitude">
-        <span id="pickedCoordinates">Chưa chọn vị trí</span><div><button id="useMapCenter" type="button" class="locator-map-center-button"><i data-lucide="crosshair"></i>Đặt ghim tại tâm bản đồ</button><button id="confirmMapLocation" type="submit" disabled><i data-lucide="map-pin-check"></i>Tìm đại lý từ vị trí này</button></div>
+        <input type="hidden" name="mode" value="address"><input type="hidden" name="address" value="{{ address }}"><input type="hidden" id="pickedLatitude" name="latitude" value="{{ map_picker_center.latitude }}"><input type="hidden" id="pickedLongitude" name="longitude" value="{{ map_picker_center.longitude }}">
+        <span id="pickedCoordinates">Tọa độ đang chọn: {{ '%.7f'|format(map_picker_center.latitude) }}, {{ '%.7f'|format(map_picker_center.longitude) }}</span><div><button id="useMapCenter" type="button" class="locator-map-center-button"><i data-lucide="crosshair"></i>Đặt ghim tại tâm bản đồ</button><button id="confirmMapLocation" type="submit"><i data-lucide="map-pin-check"></i>Tìm đại lý từ vị trí này</button></div>
       </form>
     </section>
     {% endif %}
@@ -53,6 +53,7 @@ window.addEventListener('DOMContentLoaded',function(){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,updateWhenIdle:true,keepBuffer:1,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map);
   var marker=null,latInput=document.getElementById('pickedLatitude'),lngInput=document.getElementById('pickedLongitude'),label=document.getElementById('pickedCoordinates'),button=document.getElementById('confirmMapLocation'),centerButton=document.getElementById('useMapCenter');
   function setPoint(point){var lat=point.lat.toFixed(7),lng=point.lng.toFixed(7);if(marker){marker.setLatLng(point);}else{marker=L.circleMarker(point,{radius:9,color:'#fff',weight:3,fillColor:'#e91e63',fillOpacity:1}).addTo(map);}latInput.value=lat;lngInput.value=lng;label.textContent='Tọa độ đã chọn: '+lat+', '+lng;button.disabled=false;}
+  setPoint(map.getCenter());
   map.on('click',function(event){setPoint(event.latlng);});
   centerButton.addEventListener('click',function(){setPoint(map.getCenter());});
   setTimeout(function(){map.invalidateSize();},100);
