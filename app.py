@@ -495,6 +495,20 @@ def parse_coordinates(value):
     return None
 
 
+def comparable_dealer_address(value):
+    """Normalize common administrative spelling variants for local DB lookup."""
+    normalized = normalize_import_header(value)
+    replacements = (
+        (r"\bthi tran\b", "tt"),
+        (r"\bhuyen\b", ""),
+        (r"\btinh\b", ""),
+        (r"\bviet nam\b", ""),
+    )
+    for pattern, replacement in replacements:
+        normalized = re.sub(pattern, replacement, normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
 def dealer_address_candidates(address, db):
     """Use imported old/new dealer addresses to translate legacy admin names."""
     candidates = []
@@ -594,6 +608,23 @@ def geocode_address(address, db):
     coordinates = parse_coordinates(address)
     if coordinates:
         return coordinates[0], coordinates[1], f"Tọa độ {coordinates[0]:.6f}, {coordinates[1]:.6f}"
+
+    # An address copied from the dealer data should resolve from that same data,
+    # even when the external map does not recognize an old administrative name.
+    query_address_key = comparable_dealer_address(address)
+    if query_address_key:
+        dealers_with_coordinates = db.query(Dealer).filter(
+            Dealer.latitude.isnot(None),
+            Dealer.longitude.isnot(None),
+        ).all()
+        for dealer in dealers_with_coordinates:
+            stored_addresses = (dealer.address, dealer.original_address)
+            if any(
+                query_address_key == comparable_dealer_address(stored_address)
+                for stored_address in stored_addresses
+                if stored_address
+            ):
+                return dealer.latitude, dealer.longitude, dealer.address
 
     query_key = normalize_address_query(address)
     cached = db.query(AddressGeocode).filter(AddressGeocode.query_key == query_key).first()
