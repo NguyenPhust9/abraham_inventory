@@ -608,7 +608,7 @@ def dealer_address_candidates(address, db):
         simplified_parts = [road_name]
         for part in parts[1:]:
             simplified = re.sub(
-                r"^(?:Thị trấn|Huyện|Tỉnh)\s+",
+                r"^(?:Thị trấn|Thành phố|Phường|Quận|Huyện|Tỉnh|Xã)\s+",
                 "",
                 part,
                 flags=re.IGNORECASE,
@@ -616,6 +616,14 @@ def dealer_address_candidates(address, db):
             if simplified:
                 simplified_parts.append(simplified)
         road_fallbacks.append(", ".join(simplified_parts))
+        area_parts = [
+            part for part in simplified_parts[1:]
+            if normalize_import_header(part) != "viet nam"
+        ]
+        if area_parts:
+            road_fallbacks.append(f"{road_name}, {area_parts[-1]}, Việt Nam")
+        if len(area_parts) >= 2:
+            road_fallbacks.append(f"{road_name}, {area_parts[-2]}, Việt Nam")
 
     ordered = []
     seen = set()
@@ -624,7 +632,7 @@ def dealer_address_candidates(address, db):
         if key and key not in seen:
             ordered.append(candidate)
             seen.add(key)
-    return ordered[:5]
+    return ordered[:7]
 
 
 def geocode_address(address, db):
