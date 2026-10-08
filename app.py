@@ -509,6 +509,47 @@ def comparable_dealer_address(value):
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+def comparable_dealer_street_area(value):
+    """Match the same road and administrative area without the house number."""
+    normalized = comparable_dealer_address(value)
+    return re.sub(r"^\d+[a-z]?(?:[/\-]\d+[a-z]?)?\s+", "", normalized).strip()
+
+
+def requested_dealer_province(address, db):
+    """Return the province from dealer data explicitly mentioned in a query."""
+    query_key = normalize_import_header(address)
+    provinces = [row[0] for row in db.query(Dealer.province).filter(
+        Dealer.province != ""
+    ).distinct().all()]
+    matches = []
+    for province in provinces:
+        province_key = normalize_import_header(province)
+        if province_key and province_key in query_key:
+            matches.append(province_key)
+    return max(matches, key=len) if matches else ""
+
+
+def find_dealers_in_local_address_data(address, db):
+    """Find exact or same-road dealer addresses without an external geocoder."""
+    exact_key = comparable_dealer_address(address)
+    street_area_key = comparable_dealer_street_area(address)
+    exact_matches = []
+    street_matches = []
+    dealers = db.query(Dealer).order_by(Dealer.name, Dealer.code).all()
+    for dealer in dealers:
+        stored_addresses = tuple(
+            stored for stored in (dealer.address, dealer.original_address) if stored
+        )
+        if any(exact_key == comparable_dealer_address(stored) for stored in stored_addresses):
+            exact_matches.append((dealer, "Đúng địa chỉ trong dữ liệu"))
+        elif street_area_key and any(
+            street_area_key == comparable_dealer_street_area(stored)
+            for stored in stored_addresses
+        ):
+            street_matches.append((dealer, "Cùng tuyến đường và khu vực"))
+    return exact_matches or street_matches
+
+
 def dealer_address_candidates(address, db):
     """Use imported old/new dealer addresses to translate legacy admin names."""
     candidates = []
@@ -672,6 +713,7 @@ def geocode_address(address, db):
         return cached.latitude, cached.longitude, cached.display_name or cached.query
 
     payload = []
+    required_province_key = requested_dealer_province(address, db)
     global LAST_GEOCODE_REQUEST_AT
     for candidate in dealer_address_candidates(address, db):
         with GEOCODE_LOCK:
@@ -682,7 +724,7 @@ def geocode_address(address, db):
             params = urlencode({
                 "q": candidate,
                 "format": "jsonv2",
-                "limit": 1,
+                "limit": 5,
                 "countrycodes": "vn",
                 "addressdetails": 1,
                 "accept-language": "vi",
@@ -701,10 +743,35 @@ def geocode_address(address, db):
                     payload = json.loads(response.read().decode("utf-8"))
             finally:
                 LAST_GEOCODE_REQUEST_AT = time.monotonic()
+        if payload and required_province_key:
+            payload = [
+                item for item in payload
+                if required_province_key in normalize_import_header(
+                    item.get("display_name", "")
+                )
+            ]
         if payload:
             break
 
     if not payload:
+        street_area_key = comparable_dealer_street_area(address)
+        if street_area_key:
+            dealers = db.query(Dealer).filter(
+                Dealer.latitude.isnot(None),
+                Dealer.longitude.isnot(None),
+            ).all()
+            for dealer in dealers:
+                stored_addresses = (dealer.address, dealer.original_address)
+                if any(
+                    street_area_key == comparable_dealer_street_area(stored_address)
+                    for stored_address in stored_addresses
+                    if stored_address
+                ):
+                    return (
+                        dealer.latitude,
+                        dealer.longitude,
+                        f"Khu vực gần {dealer.address}",
+                    )
         return None
 
     latitude = float(payload[0]["lat"])
@@ -971,11 +1038,34 @@ def dealer_locator():
             error = "Địa chỉ quá dài. Vui lòng nhập tối đa 300 ký tự."
             location = None
         elif address:
-            try:
-                location = geocode_address(address, db)
-            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            direct_coordinates = parse_coordinates(address)
+            if direct_coordinates:
+                latitude, longitude = direct_coordinates
+                location = (latitude, longitude, f"Tọa độ {latitude:.6f}, {longitude:.6f}")
+            else:
                 location = None
-                error = "Dịch vụ bản đồ đang bận. Vui lòng thử lại sau ít phút."
+                local_matches = find_dealers_in_local_address_data(address, db)
+                for dealer, match_label in local_matches[:5]:
+                    results.append({
+                        "code": dealer.code,
+                        "name": dealer.name,
+                        "address": dealer.address,
+                        "province": dealer.province,
+                        "latitude": dealer.latitude,
+                        "longitude": dealer.longitude,
+                        "distance_km": None,
+                        "match_label": match_label,
+                        "directions_url": (
+                            "https://www.google.com/maps/search/?api=1"
+                            f"&query={dealer.latitude:.7f},{dealer.longitude:.7f}"
+                            if dealer.latitude is not None and dealer.longitude is not None
+                            else "https://www.google.com/maps/search/?api=1&query=" + quote_plus(dealer.address)
+                        ),
+                    })
+                if results:
+                    resolved_address = "Kết quả đối chiếu từ dữ liệu địa chỉ đại lý"
+                else:
+                    error = "Không có địa chỉ cùng tuyến đường và khu vực trong dữ liệu. Bạn có thể chọn vị trí trên bản đồ."
 
             if location:
                 latitude, longitude, resolved_address = location
@@ -1027,7 +1117,7 @@ def dealer_locator():
                 results = sorted(ranked, key=lambda item: item["distance_km"])[:5]
                 if not results:
                     error = error or "Chưa có đại lý nào có tọa độ để so sánh."
-            elif not error:
+            elif not error and not results:
                 error = "Không tìm thấy địa chỉ này. Hãy nhập đầy đủ số nhà, đường, phường/xã và tỉnh/thành."
             if error:
                 area_center = dealer_area_map_center(address, db)
