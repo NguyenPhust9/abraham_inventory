@@ -516,6 +516,49 @@ def comparable_dealer_street_area(value):
     return re.sub(r"^\d+[a-z]?(?:[/\-]\d+[a-z]?)?\s+", "", normalized).strip()
 
 
+def dealer_address_levels(value):
+    """Extract comparable road and administrative levels from one address."""
+    levels = {"street": set(), "ward": set(), "district": set(), "province": set()}
+    parts = [normalize_import_header(part) for part in clean_import_text(value).split(",")]
+    parts = [part for part in parts if part and part != "viet nam"]
+    if not parts:
+        return levels
+
+    if not re.match(r"^(?:phuong|xa|thi tran|p|quan|huyen|thi xa|tinh|thanh pho|tp)\s+", parts[0]):
+        street = re.sub(r"^\d+[a-z]?(?:[/\-]\d+[a-z]?)?\s+", "", parts[0]).strip()
+        street = re.sub(r"^(?:duong|d)\s+", "", street).strip()
+        if street:
+            levels["street"].add(street)
+
+    for index, part in enumerate(parts):
+        if re.match(r"^(?:phuong|xa|thi tran|p)\s+", part):
+            levels["ward"].add(re.sub(r"^(?:phuong|xa|thi tran|p)\s+", "", part).strip())
+        elif re.match(r"^(?:quan|huyen|thi xa)\s+", part):
+            levels["district"].add(re.sub(r"^(?:quan|huyen|thi xa)\s+", "", part).strip())
+        elif re.match(r"^(?:tinh|thanh pho|tp)\s+", part):
+            value_key = re.sub(r"^(?:tinh|thanh pho|tp)\s+", "", part).strip()
+            if index == len(parts) - 1:
+                levels["province"].add(value_key)
+            else:
+                levels["district"].add(value_key)
+
+    last_part = re.sub(r"^(?:tinh|thanh pho|tp)\s+", "", parts[-1]).strip()
+    if last_part:
+        levels["province"].add(last_part)
+    return levels
+
+
+def merge_dealer_address_levels(*values):
+    merged = {"street": set(), "ward": set(), "district": set(), "province": set()}
+    for value in values:
+        if not value:
+            continue
+        extracted = dealer_address_levels(value)
+        for level in merged:
+            merged[level].update(extracted[level])
+    return merged
+
+
 def requested_dealer_province(address, db):
     """Return the province from dealer data explicitly mentioned in a query."""
     query_key = normalize_import_header(address)
@@ -531,11 +574,11 @@ def requested_dealer_province(address, db):
 
 
 def find_dealers_in_local_address_data(address, db):
-    """Find exact or same-road dealer addresses without an external geocoder."""
+    """Find dealers by progressively widening address scope in local data."""
     exact_key = comparable_dealer_address(address)
-    street_area_key = comparable_dealer_street_area(address)
+    query_levels = merge_dealer_address_levels(address)
     exact_matches = []
-    street_matches = []
+    matches_by_level = {"street": [], "ward": [], "district": [], "province": []}
     dealers = db.query(Dealer).order_by(Dealer.name, Dealer.code).all()
     for dealer in dealers:
         stored_addresses = tuple(
@@ -543,12 +586,41 @@ def find_dealers_in_local_address_data(address, db):
         )
         if any(exact_key == comparable_dealer_address(stored) for stored in stored_addresses):
             exact_matches.append((dealer, "Đúng địa chỉ trong dữ liệu"))
-        elif street_area_key and any(
-            street_area_key == comparable_dealer_street_area(stored)
-            for stored in stored_addresses
-        ):
-            street_matches.append((dealer, "Cùng tuyến đường và khu vực"))
-    return exact_matches or street_matches
+            continue
+
+        dealer_levels = merge_dealer_address_levels(
+            dealer.address,
+            dealer.original_address,
+        )
+        structured_levels = (
+            ("ward", dealer.ward, r"^(?:phuong|xa|thi tran|p)\s+"),
+            ("district", dealer.district, r"^(?:quan|huyen|thi xa|thanh pho|tp)\s+"),
+            ("province", dealer.province, r"^(?:tinh|thanh pho|tp)\s+"),
+        )
+        for level, value, prefix_pattern in structured_levels:
+            value_key = re.sub(prefix_pattern, "", normalize_import_header(value)).strip()
+            if value_key:
+                dealer_levels[level].add(value_key)
+        province_matches = bool(query_levels["province"] & dealer_levels["province"])
+        district_matches = bool(query_levels["district"] & dealer_levels["district"])
+        ward_matches = bool(query_levels["ward"] & dealer_levels["ward"])
+        street_matches = bool(query_levels["street"] & dealer_levels["street"])
+
+        if street_matches and (ward_matches or district_matches or province_matches):
+            matches_by_level["street"].append((dealer, "Cùng tuyến đường"))
+        elif ward_matches and (district_matches or province_matches or not query_levels["province"]):
+            matches_by_level["ward"].append((dealer, "Cùng phường/xã"))
+        elif district_matches and (province_matches or not query_levels["province"]):
+            matches_by_level["district"].append((dealer, "Cùng quận/huyện"))
+        elif province_matches:
+            matches_by_level["province"].append((dealer, "Cùng tỉnh/thành"))
+
+    if exact_matches:
+        return exact_matches
+    for level in ("street", "ward", "district", "province"):
+        if matches_by_level[level]:
+            return matches_by_level[level]
+    return []
 
 
 def dealer_address_candidates(address, db):
@@ -1064,7 +1136,7 @@ def dealer_locator():
                 if results:
                     resolved_address = "Kết quả đối chiếu từ dữ liệu địa chỉ đại lý"
                 else:
-                    error = "Không có địa chỉ cùng tuyến đường và khu vực trong dữ liệu. Bạn có thể chọn vị trí trên bản đồ."
+                    error = "Không xác định được đường, phường/xã, quận/huyện hoặc tỉnh/thành trong dữ liệu. Bạn có thể chọn vị trí trên bản đồ."
 
             if location:
                 latitude, longitude, resolved_address = location
