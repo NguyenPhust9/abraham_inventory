@@ -593,14 +593,38 @@ def dealer_address_candidates(address, db):
                 parts[0] = first_part
                 expanded.append(", ".join(parts))
 
+    road_fallbacks = []
+    for candidate in candidates + [address]:
+        parts = [part.strip() for part in candidate.split(",") if part.strip()]
+        if not parts:
+            continue
+        road_name = re.sub(
+            r"^\d+[A-Za-z]?(?:[/\-]\d+[A-Za-z]?)?\s+",
+            "",
+            parts[0],
+        ).strip()
+        if road_name == parts[0]:
+            continue
+        simplified_parts = [road_name]
+        for part in parts[1:]:
+            simplified = re.sub(
+                r"^(?:Thị trấn|Huyện|Tỉnh)\s+",
+                "",
+                part,
+                flags=re.IGNORECASE,
+            ).strip()
+            if simplified:
+                simplified_parts.append(simplified)
+        road_fallbacks.append(", ".join(simplified_parts))
+
     ordered = []
     seen = set()
-    for candidate in expanded + candidates + [address] + area_fallbacks:
+    for candidate in expanded + candidates + [address] + road_fallbacks + area_fallbacks:
         key = normalize_address_query(candidate)
         if key and key not in seen:
             ordered.append(candidate)
             seen.add(key)
-    return ordered[:3]
+    return ordered[:5]
 
 
 def geocode_address(address, db):
