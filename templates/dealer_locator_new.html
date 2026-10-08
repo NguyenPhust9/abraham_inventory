@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Tìm đại lý gần nhất | Abraham Bike{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynhYHhyYZMZ3fD1TIarhD7B3p7NU=" crossorigin="">
+{% endblock %}
 {% block content %}
 <div class="locator-page">
   <header class="locator-header">
@@ -24,12 +27,34 @@
     </section></div>
   </section>
   <main class="locator-main locator-content">
-    {% if error %}<section class="locator-message" role="alert"><i data-lucide="circle-alert"></i><div><strong>Chưa thể tìm đại lý</strong><p>{{ error }}</p></div></section>{% endif %}
+    {% if error %}<section class="locator-message" role="alert"><i data-lucide="circle-alert"></i><div><strong>Chưa thể tự xác định địa chỉ</strong><p>{{ error }}</p></div></section>{% endif %}
+    {% if error and search_mode == 'address' and address %}
+    <section class="locator-map-picker">
+      <div class="locator-map-picker-heading"><div><span>CHỌN VỊ TRÍ THỦ CÔNG</span><h2>Đặt ghim tại vị trí của bạn</h2></div><p>Bấm vào đúng vị trí trên bản đồ, sau đó chọn <strong>Tìm đại lý từ vị trí này</strong>.</p></div>
+      <div id="dealerLocationMap" class="locator-map" aria-label="Bản đồ chọn vị trí"></div>
+      <form method="GET" action="{{ url_for('dealer_locator') }}" class="locator-map-confirm">
+        <input type="hidden" name="mode" value="address"><input type="hidden" name="address" value="{{ address }}"><input type="hidden" id="pickedLatitude" name="latitude"><input type="hidden" id="pickedLongitude" name="longitude">
+        <span id="pickedCoordinates">Chưa chọn vị trí</span><button id="confirmMapLocation" type="submit" disabled><i data-lucide="map-pin-check"></i>Tìm đại lý từ vị trí này</button>
+      </form>
+    </section>
+    {% endif %}
     {% if results %}<section class="locator-results"><div class="locator-result-heading"><div><span>{{ 'KẾT QUẢ THEO KHU VỰC' if search_mode == 'area' else 'KẾT QUẢ GẦN NHẤT' }}</span><h2>{{ 'Đại lý trong khu vực đã chọn' if search_mode == 'area' else 'Đại lý phù hợp quanh vị trí của bạn' }}</h2></div><p><i data-lucide="locate-fixed"></i>{{ resolved_address }}</p></div><div class="locator-result-grid">
-      {% for dealer in results %}<article class="locator-card {{ 'nearest' if loop.first and search_mode == 'address' else '' }}"><div class="locator-rank"><span>{{ loop.index }}</span>{% if loop.first and search_mode == 'address' %}<b>GẦN NHẤT</b>{% endif %}</div><div class="locator-card-copy"><small>{{ dealer.code }}{% if dealer.province %} · {{ dealer.province }}{% endif %}</small><h3>{{ dealer.name }}</h3><p><i data-lucide="map-pin"></i>{{ dealer.address }}</p></div><div class="locator-distance">{% if search_mode == 'address' %}<strong>{{ '%.1f'|format(dealer.distance_km) }} km</strong><small>{{ dealer.distance_label or 'đường chim bay' }}</small>{% endif %}<a href="{{ dealer.directions_url }}" target="_blank" rel="noopener noreferrer"><i data-lucide="route"></i>Chỉ đường</a></div></article>{% endfor %}
-      </div>{% if search_mode == 'address' and results and results[0].distance_label == 'đường chim bay' %}<p class="locator-distance-note"><i data-lucide="info"></i>Khoảng cách dùng để xếp hạng là đường chim bay; quãng đường thực tế có thể khác.</p>{% endif %}</section>{% endif %}
+      {% for dealer in results %}<article class="locator-card {{ 'nearest' if loop.first and search_mode == 'address' else '' }}"><div class="locator-rank"><span>{{ loop.index }}</span>{% if loop.first and search_mode == 'address' %}<b>GẦN NHẤT</b>{% endif %}</div><div class="locator-card-copy"><small>{{ dealer.code }}{% if dealer.province %} · {{ dealer.province }}{% endif %}</small><h3>{{ dealer.name }}</h3><p><i data-lucide="map-pin"></i>{{ dealer.address }}</p></div><div class="locator-distance">{% if search_mode == 'address' %}<strong>{{ '%.1f'|format(dealer.distance_km) }} km</strong><small>đường chim bay</small>{% endif %}<a href="{{ dealer.directions_url }}" target="_blank" rel="noopener noreferrer"><i data-lucide="route"></i>Chỉ đường</a></div></article>{% endfor %}
+      </div>{% if search_mode == 'address' %}<p class="locator-distance-note"><i data-lucide="info"></i>Khoảng cách dùng để xếp hạng là đường chim bay; quãng đường thực tế có thể khác.</p>{% endif %}</section>{% endif %}
     <footer class="locator-footer">Dữ liệu tìm kiếm địa chỉ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></footer>
   </main>
 </div>
+{% if error and search_mode == 'address' and address %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+window.addEventListener('DOMContentLoaded',function(){
+  if(!window.L)return;
+  var map=L.map('dealerLocationMap').setView([16.05,108.2],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map);
+  var marker=null,latInput=document.getElementById('pickedLatitude'),lngInput=document.getElementById('pickedLongitude'),label=document.getElementById('pickedCoordinates'),button=document.getElementById('confirmMapLocation');
+  map.on('click',function(event){var lat=event.latlng.lat.toFixed(7),lng=event.latlng.lng.toFixed(7);if(marker){marker.setLatLng(event.latlng);}else{marker=L.marker(event.latlng).addTo(map);}latInput.value=lat;lngInput.value=lng;label.textContent='Tọa độ đã chọn: '+lat+', '+lng;button.disabled=false;});
+});
+</script>
+{% endif %}
 <script>window.addEventListener('DOMContentLoaded',function(){if(window.lucide)window.lucide.createIcons();});</script>
 {% endblock %}
