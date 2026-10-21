@@ -3666,3 +3666,51 @@ body:has(.catalog-page) {
     display: none;
   }
 }
+
+/* =========================================================
+   RESPONSIVE CONSISTENCY
+   Keep cards and controls at a stable visual scale on wide screens,
+   and make each ticker copy cover the full visible runway.
+========================================================= */
+.national-ticker-track span {
+  min-width: calc(100vw - 175px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 36px;
+}
+
+@media (min-width: 1600px) {
+  .catalog-content-layout {
+    width: min(1760px, calc(100% - clamp(64px, 6vw, 120px)));
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 20vw, 390px);
+  }
+
+  .catalog-content-layout:not(.reorder-collapsed) .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .catalog-content-layout.reorder-collapsed .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .catalog-page .card {
+    font-size: clamp(14px, .78vw, 16px);
+  }
+
+  .catalog-page .model {
+    font-size: clamp(16px, .9vw, 18px);
+  }
+
+  .catalog-controls {
+    padding: clamp(22px, 1.45vw, 28px);
+  }
+}
+
+@media (max-width: 768px) {
+  .national-ticker-track span {
+    min-width: calc(100vw - 128px);
+    padding-inline: 18px;
+    justify-content: flex-start;
+  }
+}
