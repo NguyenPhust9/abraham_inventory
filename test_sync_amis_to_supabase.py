@@ -34,7 +34,26 @@ class SyncAmisToSupabaseTest(unittest.TestCase):
                         reserved INTEGER DEFAULT 0,
                         price FLOAT,
                         image_filename VARCHAR DEFAULT '',
+                        amis_async_id VARCHAR,
                         updated_at DATETIME
+                    )
+                    """
+                )
+            )
+
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE product_lots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        stock_id INTEGER NOT NULL,
+                        batch_number VARCHAR NOT NULL,
+                        expiry_date DATETIME,
+                        quantity INTEGER NOT NULL DEFAULT 0,
+                        amis_product_async_id VARCHAR,
+                        updated_at DATETIME,
+                        UNIQUE (product_id, stock_id, batch_number)
                     )
                     """
                 )
@@ -124,6 +143,58 @@ class SyncAmisToSupabaseTest(unittest.TestCase):
         )
 
         self.assertEqual(inventory_map, {})
+
+    def test_builds_and_replaces_product_lots(self):
+        batch_map = sync.build_batch_map(
+            [
+                {
+                    "ProductCode": "AURA-20 - Cam",
+                    "AsyncID": "product-uuid",
+                    "StockID": 19,
+                    "BatchNumber": "15092026",
+                    "ExpiryDate": "2027-01-15T00:00:00+07:00",
+                    "StockQuantitySummary": 3,
+                },
+                {
+                    "ProductCode": "AURA-20 - Cam",
+                    "AsyncID": "product-uuid",
+                    "StockID": 19,
+                    "BatchNumber": "15092026",
+                    "StockQuantitySummary": 2,
+                },
+                {
+                    "ProductCode": "AURA-20 - Cam",
+                    "StockID": 19,
+                    "BatchNumber": None,
+                    "StockQuantitySummary": 8,
+                },
+            ]
+        )
+
+        self.assertEqual(len(batch_map), 1)
+        self.assertEqual(next(iter(batch_map.values()))["quantity"], 5)
+
+        sync.update_product_lots(batch_map, 19)
+
+        engine = create_engine(self.database_url)
+        with engine.connect() as connection:
+            lot = connection.execute(
+                text(
+                    """
+                    SELECT batch_number, quantity, amis_product_async_id
+                    FROM product_lots
+                    """
+                )
+            ).mappings().one()
+            product_async_id = connection.execute(
+                text("SELECT amis_async_id FROM products")
+            ).scalar_one()
+        engine.dispose()
+
+        self.assertEqual(lot["batch_number"], "15092026")
+        self.assertEqual(lot["quantity"], 5)
+        self.assertEqual(lot["amis_product_async_id"], "product-uuid")
+        self.assertEqual(product_async_id, "product-uuid")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@ import json
 import os
 import re
 import sys
+import uuid
+from datetime import datetime
 from typing import Any
 
 import requests
@@ -19,6 +21,27 @@ CLIENT_ID = os.getenv("AMIS_CLIENT_ID")
 CLIENT_SECRET = os.getenv("AMIS_CLIENT_SECRET")
 STOCK_CODE = os.getenv("AMIS_STOCK_CODE", "HCM 3").strip()
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# API noi bo ma man hinh "Tra cuu ton kho theo lo" cua AMIS su dung.
+# Token nay la token phien dang nhap, khong dung chung voi AMIS_CLIENT_SECRET.
+AMIS_APP_API_BASE = os.getenv(
+    "AMIS_APP_API_BASE",
+    "https://amisapp.misa.vn/crm/g1/api/business",
+).rstrip("/")
+AMIS_APP_TOKEN = os.getenv("AMIS_APP_TOKEN", "").strip()
+AMIS_COMPANY_CODE = os.getenv("AMIS_COMPANY_CODE", "").strip()
+AMIS_BATCH_STOCK_ID = os.getenv("AMIS_BATCH_STOCK_ID", "").strip()
+AMIS_BATCH_ONLY = os.getenv("AMIS_BATCH_ONLY", "").strip().casefold() in {
+    "1", "true", "yes", "on",
+}
+
+BATCH_COLUMNS = (
+    "U2VxSUQsU3RvY2tJRFRleHQsUHJvZHVjdENvZGUsUHJvZHVjdE5hbWUs"
+    "UHJvZHVjdENhdGVnb3J5SURUZXh0LENvbnZlcnNpb25Vbml0SURUZXh0"
+    "LEJhdGNoTnVtYmVyLEV4cGlyeURhdGUsU3RvY2tRdWFudGl0eVN1bW1h"
+    "cnksRXhpc3RBbW91bnQsRm9ybUxheW91dElELEZvcm1MYXlvdXRJRFRl"
+    "eHQsT3duZXJJRCxPd25lcklEVGV4dA=="
+)
 
 
 def stop(message: str) -> None:
@@ -134,6 +157,18 @@ def to_integer(value: Any) -> int:
         return int(round(float(value or 0)))
     except (TypeError, ValueError):
         return 0
+
+
+def parse_datetime(value: Any) -> datetime | None:
+    text_value = str(value or "").strip()
+
+    if not text_value:
+        return None
+
+    try:
+        return datetime.fromisoformat(text_value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 def find_access_token(value: Any) -> str | None:
     """Tìm access token trong nhiều cấu trúc phản hồi AMIS khác nhau."""
@@ -438,6 +473,152 @@ def get_inventory(
     return all_inventory
 
 
+def get_batch_inventory() -> list[dict[str, Any]]:
+    """Lay toan bo ton kho theo lo tu API dang duoc giao dien AMIS su dung."""
+    headers = {
+        "Authorization": f"Bearer {AMIS_APP_TOKEN}",
+        "companycode": AMIS_COMPANY_CODE,
+        "X-MISA-Language": "vi-VN",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    all_rows: list[dict[str, Any]] = []
+    page = 1
+    page_size = 100
+
+    while True:
+        filters = [
+            {
+                "Operator": 0, "Value": False, "Property": "IsSetProduct",
+                "InputType": 17, "Group": "", "Addition": 1,
+                "IsFromFormula": False, "FromFilterCustom": True,
+            },
+            {
+                "Operator": 0, "Value": False, "Property": "InActive",
+                "InputType": 17, "Group": "", "Addition": 1,
+                "IsFromFormula": False, "FromFilterCustom": True,
+            },
+            {
+                "Operator": 11, "Value": int(AMIS_BATCH_STOCK_ID),
+                "Property": "StockID", "InputType": 1, "Group": "",
+                "Addition": 1, "IsFromFormula": False,
+                "FromFilterCustom": True,
+            },
+            {
+                "Operator": 2, "Value": 0,
+                "Property": "StockQuantitySummary", "InputType": 12,
+                "Group": "", "Addition": 1, "IsFromFormula": False,
+                "FromFilterCustom": True,
+            },
+            {
+                "Operator": 0, "Value": False,
+                "Property": "IsCheckShowOrderDetail", "InputType": 17,
+                "Group": "", "Addition": 1, "IsFromFormula": False,
+                "FromFilterCustom": True,
+            },
+        ]
+        payload = {
+            "Columns": BATCH_COLUMNS,
+            "Sorts": [{"SortBy": "ExpiryDate", "SortDirection": 0}],
+            "Start": (page - 1) * page_size,
+            "Page": page,
+            "PageSize": page_size,
+            "Filters": filters,
+            "Formula": "",
+            "LayoutCode": "Product",
+            "DefaultTotal": False,
+            "IsMappingData": False,
+            "IsApproved": False,
+            "CustomPagingData": {
+                "IsGetStockIfNotHaveProductCode": True,
+                "IsSetProduct": False,
+                "QuantityFromOrderStatus": "5",
+                "IncludeDistributorOrder": False,
+                "DeductMinimumStock": False,
+                "numberUnit": 0,
+            },
+            "IsUsedELTS": True,
+            "ListGmailPage": [],
+            "ListFacebookPage": {},
+            "IsGetCache": True,
+            "IsCheckInactive": False,
+            "IsConverted": False,
+            "SessionID": str(uuid.uuid4()),
+            "LayoutCodeCheckPermission": "Product",
+            "AISearchKeyword": "",
+            "SkipNormalSearch": False,
+        }
+        response = requests.post(
+            f"{AMIS_APP_API_BASE}/Stock/productLedgerBatch/Paging",
+            params={"saveWarehouse": "true"},
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+        print(f"Trang lo {page}: HTTP {response.status_code}")
+        result = parse_json_response(response)
+
+        if not response.ok or result.get("Success") is False:
+            stop(
+                "Khong lay duoc ton kho theo lo. "
+                "AMIS_APP_TOKEN co the da het han."
+            )
+
+        rows = extract_list(decode_data(result))
+        all_rows.extend(rows)
+        total = to_integer(result.get("Total"))
+
+        if not rows or (total and len(all_rows) >= total):
+            break
+
+        page += 1
+
+        if page > 200:
+            stop("Vuot qua 200 trang ton kho theo lo.")
+
+    return all_rows
+
+
+def build_batch_map(
+    rows: list[dict[str, Any]],
+) -> dict[tuple[str, int, str], dict[str, Any]]:
+    """Gop ton theo khoa (ma hang, kho, so lo)."""
+    batch_map: dict[tuple[str, int, str], dict[str, Any]] = {}
+
+    for row in rows:
+        product_code = first_text(row, "ProductCode", "product_code")
+        normalized_code = normalize_code(product_code)
+        batch_number = first_text(row, "BatchNumber", "batch_number")
+        stock_id = to_integer(row.get("StockID") or row.get("stock_id"))
+
+        if not normalized_code or not batch_number or not stock_id:
+            continue
+
+        key = (normalized_code, stock_id, batch_number.casefold())
+        quantity = to_integer(
+            row.get("StockQuantitySummary")
+            or row.get("stock_quantity_summary")
+        )
+        existing = batch_map.get(key)
+
+        if existing:
+            existing["quantity"] += quantity
+            continue
+
+        batch_map[key] = {
+            "product_code": product_code,
+            "product_async_id": first_text(row, "AsyncID", "async_id"),
+            "stock_id": stock_id,
+            "batch_number": batch_number,
+            "expiry_date": parse_datetime(
+                row.get("ExpiryDate") or row.get("expiry_date")
+            ),
+            "quantity": quantity,
+        }
+
+    return batch_map
+
+
 def build_inventory_map(
     inventory: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
@@ -675,15 +856,138 @@ def update_supabase(
             print("-", code)
 
 
+def update_product_lots(
+    batch_map: dict[tuple[str, int, str], dict[str, Any]],
+    stock_id: int,
+) -> None:
+    """Thay toan bo snapshot lo cua mot kho trong mot transaction."""
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    inserted_count = 0
+    missing_products: list[str] = []
+
+    with engine.begin() as connection:
+        products = connection.execute(
+            text("SELECT id, code FROM products ORDER BY id")
+        ).mappings().all()
+        products_by_code = {
+            normalize_code(product["code"]): product
+            for product in products
+            if normalize_code(product["code"])
+        }
+
+        # API tra ve snapshot day du cua kho. Xoa snapshot cu trong cung
+        # transaction de cac lo da het ton khong bi giu lai.
+        connection.execute(
+            text("DELETE FROM product_lots WHERE stock_id = :stock_id"),
+            {"stock_id": stock_id},
+        )
+
+        for (normalized_code, _, _), batch in batch_map.items():
+            product = products_by_code.get(normalized_code)
+
+            if not product:
+                missing_products.append(batch["product_code"])
+                continue
+
+            if batch["product_async_id"]:
+                connection.execute(
+                    text(
+                        """
+                        UPDATE products
+                        SET amis_async_id = :amis_async_id
+                        WHERE id = :product_id
+                        """
+                    ),
+                    {
+                        "amis_async_id": batch["product_async_id"],
+                        "product_id": product["id"],
+                    },
+                )
+
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO product_lots (
+                        product_id,
+                        stock_id,
+                        batch_number,
+                        expiry_date,
+                        quantity,
+                        amis_product_async_id,
+                        updated_at
+                    )
+                    VALUES (
+                        :product_id,
+                        :stock_id,
+                        :batch_number,
+                        :expiry_date,
+                        :quantity,
+                        :amis_product_async_id,
+                        CURRENT_TIMESTAMP
+                    )
+                    """
+                ),
+                {
+                    "product_id": product["id"],
+                    "stock_id": batch["stock_id"],
+                    "batch_number": batch["batch_number"],
+                    "expiry_date": batch["expiry_date"],
+                    "quantity": batch["quantity"],
+                    "amis_product_async_id": batch["product_async_id"] or None,
+                },
+            )
+            inserted_count += 1
+
+    engine.dispose()
+
+    print("\n========================================")
+    print("DONG BO TON KHO THEO LO THANH CONG")
+    print("So lo da luu:", inserted_count)
+    print("Ma hang chua co trong products:", len(missing_products))
+    print("========================================")
+
+    for code in missing_products[:20]:
+        print("-", code)
+
+
+def sync_batch_inventory() -> None:
+    missing = []
+
+    if not AMIS_APP_TOKEN:
+        missing.append("AMIS_APP_TOKEN")
+    if not AMIS_COMPANY_CODE:
+        missing.append("AMIS_COMPANY_CODE")
+    if not AMIS_BATCH_STOCK_ID:
+        missing.append("AMIS_BATCH_STOCK_ID")
+
+    if missing:
+        stop("Thieu cau hinh: " + ", ".join(missing))
+
+    try:
+        numeric_stock_id = int(AMIS_BATCH_STOCK_ID)
+    except ValueError:
+        stop("AMIS_BATCH_STOCK_ID phai la so nguyen, vi du 19.")
+
+    rows = get_batch_inventory()
+    batch_map = build_batch_map(rows)
+    print("Tong dong API theo lo:", len(rows))
+    print("Tong lo hop le:", len(batch_map))
+    update_product_lots(batch_map, numeric_stock_id)
+
+
 def main() -> None:
+    if not DATABASE_URL:
+        stop("Thieu DATABASE_URL trong .env")
+
+    if AMIS_BATCH_ONLY:
+        sync_batch_inventory()
+        return
+
     if not CLIENT_ID:
         stop("Thieu AMIS_CLIENT_ID trong .env")
 
     if not CLIENT_SECRET:
         stop("Thieu AMIS_CLIENT_SECRET trong .env")
-
-    if not DATABASE_URL:
-        stop("Thieu DATABASE_URL trong .env")
 
     access_token = get_access_token()
     headers = get_headers(access_token)
@@ -717,6 +1021,24 @@ def main() -> None:
     )
 
     update_supabase(inventory_map)
+
+    batch_settings = (
+        AMIS_APP_TOKEN,
+        AMIS_COMPANY_CODE,
+        AMIS_BATCH_STOCK_ID,
+    )
+    if all(batch_settings):
+        sync_batch_inventory()
+    elif any(batch_settings):
+        stop(
+            "Cau hinh dong bo lo chua du. Can AMIS_APP_TOKEN, "
+            "AMIS_COMPANY_CODE va AMIS_BATCH_STOCK_ID."
+        )
+    else:
+        print(
+            "\nBo qua dong bo theo lo vi chua cau hinh "
+            "AMIS_APP_TOKEN."
+        )
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ from flask_login import (  # type: ignore
     LoginManager, UserMixin, login_user, logout_user,
     login_required
 )
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, text, func, inspect, or_  # type: ignore
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey, UniqueConstraint, text, func, inspect, or_  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
 from sqlalchemy.engine import make_url  # type: ignore
 from sqlalchemy.pool import NullPool  # type: ignore
@@ -125,6 +125,7 @@ class Product(Base):
     promotion_start = Column(Date, nullable=True)
     promotion_end = Column(Date, nullable=True)
     image_filename = Column(String, default="")
+    amis_async_id = Column(String, unique=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     @property
@@ -151,6 +152,27 @@ class Product(Base):
             "promotion_end": self.promotion_end.isoformat() if self.promotion_end else None,
             "image": self.image_filename,
         }
+
+
+class ProductLot(Base):
+    __tablename__ = "product_lots"
+    __table_args__ = (
+        UniqueConstraint(
+            "product_id",
+            "stock_id",
+            "batch_number",
+            name="uq_product_lots_product_stock_batch",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    stock_id = Column(Integer, nullable=False)
+    batch_number = Column(String, nullable=False)
+    expiry_date = Column(DateTime, nullable=True)
+    quantity = Column(Integer, nullable=False, default=0)
+    amis_product_async_id = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class AppSetting(Base):
@@ -264,6 +286,18 @@ def ensure_promotion_columns():
 
 
 ensure_promotion_columns()
+
+
+def ensure_amis_async_id_column():
+    """Add the stable AMIS product identifier to existing databases."""
+    columns = {column["name"] for column in inspect(engine).get_columns("products")}
+
+    if "amis_async_id" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE products ADD COLUMN amis_async_id VARCHAR"))
+
+
+ensure_amis_async_id_column()
 
 
 # ---------- Upload folder ----------

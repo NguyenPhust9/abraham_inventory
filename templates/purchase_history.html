@@ -45,7 +45,7 @@ window.addEventListener("DOMContentLoaded",function(){
   const canvas=document.getElementById("supplierChart");
   const values={{ chart_values|tojson }};
   if(canvas&&window.Chart&&values.some(value=>value>0)){
-    new Chart(canvas,{type:"doughnut",data:{labels:{{ chart_labels|tojson }},datasets:[{data:values,backgroundColor:["#1687f8","#12b981","#ff9d3d","#8b5cf6","#ef4f78","#b8c6d9"],borderWidth:3,borderColor:"#fff",hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,usePointStyle:true,padding:14,font:{size:10}}},tooltip:{callbacks:{label:function(context){return context.label+": "+new Intl.NumberFormat("vi-VN").format(context.raw)+" đ";}}}}}});
+    new Chart(canvas,{type:"doughnut",data:{labels:{{ chart_labels|tojson }},datasets:[{data:values,backgroundColor:["#FF7900","#FFA12B","#8b5cf6","#10b981","#38bdf8","#a855f7"],borderWidth:3,borderColor:"#191426",hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{position:"bottom",labels:{color:"#EAE4F8",boxWidth:10,boxHeight:10,usePointStyle:true,padding:14,font:{size:10}}},tooltip:{callbacks:{label:function(context){return context.label+": "+new Intl.NumberFormat("vi-VN").format(context.raw)+" đ";}}}}}});
   }
 });
 </script>
