@@ -5,7 +5,7 @@
 {% block head %}
 <link
   rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=55"
+  href="{{ url_for('static', filename='catalog_29.css') }}?v=58"
 >
 {% endblock %}
 
@@ -182,6 +182,12 @@
 
       <!-- Extra Filters -->
       <div class="extra-filters">
+        <label class="lot-toggle" for="lotDetails">
+          <input type="checkbox" id="lotDetails" role="switch">
+          <span class="lot-toggle-track" aria-hidden="true"></span>
+          <span>Chi tiết lô / ngày nhập kho</span>
+        </label>
+        <button type="button" id="inventoryWarningButton" class="inventory-warning-button" hidden aria-haspopup="dialog" aria-controls="inventoryWarningDialog">⚠ Cảnh báo quá 90 ngày</button>
 
         <!-- Chỉ hiện sản phẩm còn hàng -->
         <label class="check-inline">
@@ -429,6 +435,20 @@
 
   </dialog>
 
+  <dialog id="inventoryWarningDialog" class="inventory-warning-dialog" aria-labelledby="inventoryWarningTitle">
+    <div class="inventory-warning-head">
+      <h2 id="inventoryWarningTitle">Cảnh báo tồn kho quá 90 ngày</h2>
+      <button type="button" id="inventoryWarningClose" aria-label="Đóng cảnh báo">×</button>
+    </div>
+    <p id="inventoryWarningSummary"></p>
+    <div class="inventory-warning-table-wrap">
+      <table class="inventory-warning-table">
+        <thead><tr><th>Mẫu xe</th><th>Mã hàng</th><th>Màu</th><th>Số lô</th><th>Ngày nhập kho</th><th>Lưu kho</th><th>Còn hàng</th></tr></thead>
+        <tbody id="inventoryWarningRows"></tbody>
+      </table>
+    </div>
+  </dialog>
+
   <dialog id="imageZoomDialog" class="image-zoom-dialog" aria-label="Ảnh sản phẩm phóng to">
     <div class="image-zoom-box">
       <div class="image-zoom-toolbar">
@@ -476,7 +496,7 @@
      CATALOG JS
 ========================================================= -->
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=33"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=36"></script>
 {% else %}
 <script>
   setInterval(async () => {

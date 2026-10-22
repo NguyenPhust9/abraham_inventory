@@ -40,6 +40,8 @@ const isPromotionCatalog = catalogMode === 'promotion';
 const priceLabel = isPromotionCatalog ? 'Giá khuyến mãi' : (priceType === 'retail' ? 'Giá lẻ' : 'Giá đại lý');
 let activeCat = 'Tất cả';
 let onlyInStock = false;
+let showLotDetails = false;
+let visibleInventory = [];
 let sortStockOrder = '';
 let minPrice = null;
 let maxPrice = null;
@@ -52,6 +54,7 @@ const els = {
   summaryText: document.getElementById('summaryText'),
   summaryStock: document.getElementById('summaryStock'),
   onlyStock: document.getElementById('onlyStock'),
+  lotDetails: document.getElementById('lotDetails'),
   sortStock: document.getElementById('sortStock'),
   minPrice: document.getElementById('minPrice'),
   maxPrice: document.getElementById('maxPrice'),
@@ -359,19 +362,91 @@ function sortVariants(variants) {
   });
 }
 
+function displayVariants(variants) {
+  if (showLotDetails) return variants;
+  const merged = new Map();
+  for (const variant of variants) {
+    const key = JSON.stringify([variant.code, normalizeText(variant.color)]);
+    if (!merged.has(key)) {
+      merged.set(key, { ...variant, batch_number: null, received_date: null,
+        stock: 0, reserved: 0, available: 0 });
+    }
+    const total = merged.get(key);
+    for (const field of ['stock', 'reserved', 'available']) {
+      total[field] += Number(variant[field] || 0);
+    }
+  }
+  return Array.from(merged.values());
+}
+
 function renderColorRows(variants) {
-  return sortVariants(variants).map(v => {
+  return sortVariants(displayVariants(variants)).map(v => {
     const badge = stockBadge(v.available);
     const colorName = v.color || 'Chưa có màu';
 
     return `
-      <div class="colorrow">
+      <div class="colorrow ${showLotDetails ? 'with-lot-details' : 'merged-colors'}">
         <div class="swatch" style="${swatchStyle(colorName)}"></div>
         <div class="cname">${escapeHTML(colorName)}${v.batch_number ? `<small class="lot-description">Lô: ${escapeHTML(v.batch_number)}</small>` : ''}</div>
-        <div class="stockbadge ${badge.cls}">${escapeHTML(badge.label)}</div>
+        ${showLotDetails ? `<div class="received-date"><span>${escapeHTML(formatInventoryDate(v.received_date))}</span></div>` : ''}
+        ${showLotDetails ? inventoryAgeBadge(v.received_date, true) : ''}
+        <div class="stockbadge ${badge.cls}" title="${escapeHTML(badge.label)}">${showLotDetails ? Math.max(0, Number(v.available || 0)).toLocaleString('vi-VN') : escapeHTML(badge.label)}</div>
       </div>
     `;
   }).join('');
+}
+
+function formatInventoryDate(value) {
+  if (!value) return '';
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value);
+}
+
+function inventoryAge(value, now = new Date()) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/);
+  if (!match) return null;
+  const [, year, month, day] = match.map(Number);
+  const received = new Date(Date.UTC(year, month - 1, day));
+  if (received.getUTCFullYear() !== year || received.getUTCMonth() !== month - 1 || received.getUTCDate() !== day) return null;
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(now);
+  const parts = Object.fromEntries(today.map(part => [part.type, part.value]));
+  const age = Math.floor((Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) - received.getTime()) / 86400000);
+  return age >= 0 ? age : null;
+}
+
+function inventoryAgeBadge(value, compact = false) {
+  const age = inventoryAge(value);
+  return age === null ? '<span class="inventory-age unknown">—</span>'
+    : `<span class="inventory-age ${age > 90 ? 'overdue' : ''}" title="Lưu kho ${age} ngày">${age}${compact ? '' : ' ngày'}</span>`;
+}
+
+function inventoryWarnings(items) {
+  return items.filter(item => Number(item.available || 0) > 0 && inventoryAge(item.received_date) > 90)
+    .sort((a, b) => inventoryAge(b.received_date) - inventoryAge(a.received_date));
+}
+
+function updateInventoryWarnings() {
+  const button = document.getElementById('inventoryWarningButton');
+  const dialog = document.getElementById('inventoryWarningDialog');
+  if (!button || !dialog) return;
+  button.hidden = !showLotDetails;
+  if (!showLotDetails) {
+    if (dialog.open) dialog.close();
+    return;
+  }
+  const warnings = inventoryWarnings(visibleInventory);
+  button.textContent = `⚠ Cảnh báo quá 90 ngày (${warnings.length})`;
+  const quantity = warnings.reduce((sum, item) => sum + Number(item.available || 0), 0);
+  document.getElementById('inventoryWarningSummary').textContent =
+    `${warnings.length} dòng tồn kho · ${quantity.toLocaleString('vi-VN')} chiếc còn hàng quá 90 ngày, theo bộ lọc hiện tại.`;
+  document.getElementById('inventoryWarningRows').innerHTML = warnings.length ? warnings.map(item => `
+    <tr><td data-label="Mẫu xe">${escapeHTML(item.model)}</td><td data-label="Mã hàng">${escapeHTML(item.code)}</td>
+    <td data-label="Màu">${escapeHTML(item.color)}</td><td data-label="Số lô">${escapeHTML(item.batch_number || '—')}</td>
+    <td data-label="Ngày nhập">${escapeHTML(formatInventoryDate(item.received_date))}</td>
+    <td data-label="Lưu kho">${inventoryAgeBadge(item.received_date)}</td><td data-label="Còn hàng">${Number(item.available || 0).toLocaleString('vi-VN')}</td></tr>
+  `).join('') : '<tr><td colspan="7" class="inventory-warning-empty">Không có lô còn hàng quá 90 ngày trong bộ lọc hiện tại.</td></tr>';
 }
 
 function matchesSearch(product, keyword) {
@@ -526,7 +601,7 @@ function toPngBlob(blob) {
 
 function openProductModal(group) {
   playUISound('open');
-  const variants = sortVariants(group.variants);
+  const variants = sortVariants(displayVariants(group.variants));
   const imgVariant = getGroupImage(variants);
   const groupPrice = getGroupPrice(variants);
 
@@ -554,10 +629,12 @@ function openProductModal(group) {
           <div class="variant-color">${escapeHTML(colorName)}</div>
           <div class="variant-code">Mã hàng: ${escapeHTML(v.code)}</div>
           ${v.batch_number ? `<div class="variant-code">Số lô: ${escapeHTML(v.batch_number)}</div>` : ''}
+          ${showLotDetails ? `<div class="variant-code">Ngày nhập kho: ${escapeHTML(formatInventoryDate(v.received_date))}</div>` : ''}
+          ${showLotDetails ? inventoryAgeBadge(v.received_date) : ''}
         </div>
 
         <div class="stockbadge ${badge.cls} modal-stock">
-          ${escapeHTML(badge.label)}
+          ${showLotDetails ? Math.max(0, Number(v.available || 0)).toLocaleString('vi-VN') : escapeHTML(badge.label)}
         </div>
 
         <button type="button" class="copy-btn" data-copy="${escapeHTML(v.code)}">
@@ -679,6 +756,8 @@ function render() {
     return matchesPromotion && matchesCat && matchesQ && matchesStock && matchesMinPrice && matchesMaxPrice;
   });
 
+  visibleInventory = filtered;
+  updateInventoryWarnings();
   const groups = groupByModel(filtered);
 
   if (sortStockOrder === 'asc' || sortStockOrder === 'desc') {
@@ -706,8 +785,9 @@ function render() {
     return sum + Number(p.available || 0);
   }, 0);
 
-  const rowLabel = filtered.some(p => p.row_id) ? 'dòng tồn kho' : 'biến thể màu';
-  els.summaryText.textContent = `${groups.length} mẫu xe · ${filtered.length} ${rowLabel}`;
+  const rowCount = groups.reduce((sum, group) => sum + displayVariants(group.variants).length, 0);
+  const rowLabel = showLotDetails && filtered.some(p => p.row_id) ? 'dòng tồn kho' : 'biến thể màu';
+  els.summaryText.textContent = `${groups.length} mẫu xe · ${rowCount} ${rowLabel}`;
   els.summaryStock.textContent = `${totalAvail.toLocaleString('vi-VN')} chiếc sẵn sàng`;
 
   for (const g of groups) {
@@ -834,6 +914,26 @@ if (els.onlyStock) {
     render();
   });
 }
+
+if (els.lotDetails) {
+  els.lotDetails.checked = showLotDetails;
+  els.lotDetails.addEventListener('change', () => {
+    showLotDetails = els.lotDetails.checked;
+    render();
+  });
+}
+
+document.getElementById('inventoryWarningButton')?.addEventListener('click', () => {
+  if (!showLotDetails) return;
+  updateInventoryWarnings();
+  document.getElementById('inventoryWarningDialog').showModal();
+});
+document.getElementById('inventoryWarningClose')?.addEventListener('click', () => {
+  document.getElementById('inventoryWarningDialog').close();
+});
+document.getElementById('inventoryWarningDialog')?.addEventListener('click', event => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
 
 if (els.sortStock) {
   els.sortStock.addEventListener('change', () => {

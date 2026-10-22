@@ -36,6 +36,7 @@ DB_PATH = os.path.join(BASE_DIR, "shop.db")
 LOCAL_ENV_PATHS = [
     os.path.join(BASE_DIR, ".env.pooler"),
     os.path.join(BASE_DIR, ".env.local"),
+    os.path.join(BASE_DIR, ".env"),
 ]
 for local_env_path in LOCAL_ENV_PATHS:
     if not os.path.exists(local_env_path):
