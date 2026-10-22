@@ -1,0 +1,50 @@
+HUONG DAN CHUYEN MAY DONG BO TON KHO THEO LO
+
+1. Cap nhat code tu GitHub (nhanh main). Neu may cu co thay doi chua luu,
+   giu lai cac thay doi do truoc khi pull; khong ghi de thu muc cu.
+
+2. Trong thu muc du an, tao/cap nhat moi truong Python:
+   py -m venv venv
+   .\venv\Scripts\python.exe -m pip install -r requirements.txt
+
+3. Chep RIENG ba file tu may da cau hinh sang cung thu muc du an tren may moi:
+   .env
+   .env.amis-session.json
+   .env.amis-batch-request.json
+
+   Cac file nay KHONG duoc dua len GitHub. Khong dan token vao chat.
+   .env can DATABASE_URL tro dung database website dang su dung.
+   AppID/ma bao mat khong thay the duoc file phien AMIS.
+   File batch-request chua mau truy van va bo loc kho HCM 3 (StockID 19).
+   Khong can chep HAR, venv hay du lieu anh/di tuyen.
+   Neu phien het hieu luc, dang nhap AMIS va dung export_amis_session.js de
+   xuat amis_session.json, sau do nhap tren CHINH may chay dong bo:
+   .\venv\Scripts\python.exe -X utf8 amis_app_session.py --import-session C:\duong-dan\amis_session.json
+
+4. Chay thu trong PowerShell:
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run_scheduled_sync.ps1
+
+   Xem hai file log:
+   sync.batch.latest.out.log
+   sync.batch.latest.err.log
+   Khi thanh cong, log co dong 'Da dong bo ... dong lo, ... ma hang'.
+
+5. Chi de MOT may/tac vu dong bo hoat dong. Tat tac vu cu truoc khi bat tac vu moi.
+   Trong Windows Task Scheduler, sua action cua tac vu 5 phut:
+   Program: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+   Arguments: -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\DUONG_DAN_DU_AN\run_scheduled_sync.ps1"
+   Start in: C:\DUONG_DAN_DU_AN
+   Trigger: lap moi 5 phut, vo thoi han.
+   Settings: 'Do not start a new instance' de tranh chay chong.
+   Thay DUONG_DAN_DU_AN bang thu muc THAT tren may moi.
+   Neu dung 'Run only when user is logged on', may phai bat, co mang va dang nhap Windows.
+
+6. Website can chay ban code moi de hien thi Ngay nhap kho va tung dong lo.
+   Ngay nhap kho = ExpiryDate (Han su dung cua CRM), theo quy uoc da thong nhat.
+   Khong co ngay thi de trong; cung ma nhung khac lo/ngay van hien rieng.
+   Gia, anh, ten va mau sac noi theo san pham goc.
+
+Token duoc tu gia han va luu trong .env.amis-session.json.
+Khong dung chung hai ban token tren hai worker; refresh token co the bi xoay.
+Neu AMIS thu hoi phien/refresh token, can dang nhap va nhap phien moi.
+Tac vu moi tu choi chay neu thieu cau hinh lo/phien, tranh quay lai nguon cu.

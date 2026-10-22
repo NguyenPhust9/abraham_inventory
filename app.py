@@ -182,6 +182,20 @@ class AppSetting(Base):
     value = Column(String, nullable=False)
 
 
+class InventoryBatch(Base):
+    __tablename__ = "inventory_batches"
+    stock_id = Column(Integer, primary_key=True)
+    source_key = Column(String, primary_key=True)
+    product_id = Column(Integer, nullable=False, index=True)
+    batch_number = Column(String, nullable=True)
+    expiry_date = Column(String, nullable=True)
+    received_date = Column(String, nullable=True)
+    quantity = Column(Integer, nullable=False)
+    reserved = Column(Integer, nullable=False)
+    source_json = Column(String, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+
+
 class Supplier(Base):
     __tablename__ = "suppliers"
 
@@ -1283,6 +1297,16 @@ def api_products(price_type="dealer"):
         out = []
         today = datetime.now().date()
 
+        source = db.query(AppSetting).filter_by(key="inventory_source").first()
+        batches_by_product = {}
+        batch_mode = source is not None and source.value == "batch"
+        if batch_mode:
+            stock = db.query(AppSetting).filter_by(key="inventory_stock_id").first()
+            if stock:
+                for lot in db.query(InventoryBatch).filter_by(stock_id=int(stock.value)).order_by(
+                        InventoryBatch.product_id, InventoryBatch.batch_number, InventoryBatch.expiry_date).all():
+                    batches_by_product.setdefault(lot.product_id, []).append(lot)
+
         for p in products:
             d = p.to_dict()
             if price_type == "retail":
@@ -1307,7 +1331,17 @@ def api_products(price_type="dealer"):
 
             d["image_url"] = p.image_filename if p.image_filename else None
 
-            out.append(d)
+            if batch_mode:
+                for lot in batches_by_product.get(p.id, []):
+                    row = dict(d)
+                    row.update(row_id=f"{p.id}:{lot.source_key}", batch_number=lot.batch_number,
+                               expiry_date=lot.expiry_date, received_date=lot.received_date,
+                               stock=lot.quantity, reserved=lot.reserved,
+                               available=max(lot.quantity - lot.reserved, 0))
+                    out.append(row)
+            else:
+                d.update(received_date=None, batch_number=None, expiry_date=None)
+                out.append(d)
 
         response = jsonify(out)
         response.headers["X-Retail-Prices-Visible"] = "1" if visible else "0"

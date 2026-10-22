@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import requests
+from amis_app_session import AmisAppSession
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
@@ -475,6 +476,11 @@ def get_inventory(
 
 def get_batch_inventory() -> list[dict[str, Any]]:
     """Lay toan bo ton kho theo lo tu API dang duoc giao dien AMIS su dung."""
+    app_session = AmisAppSession(
+        token=AMIS_APP_TOKEN,
+        company_code=AMIS_COMPANY_CODE,
+        refresh_token=os.getenv("AMIS_APP_REFRESH_TOKEN", "").strip(),
+    )
     headers = {
         "Authorization": f"Bearer {AMIS_APP_TOKEN}",
         "companycode": AMIS_COMPANY_CODE,
@@ -548,7 +554,7 @@ def get_batch_inventory() -> list[dict[str, Any]]:
             "AISearchKeyword": "",
             "SkipNormalSearch": False,
         }
-        response = requests.post(
+        response = app_session.request("POST",
             f"{AMIS_APP_API_BASE}/Stock/productLedgerBatch/Paging",
             params={"saveWarehouse": "true"},
             headers=headers,
@@ -951,11 +957,15 @@ def update_product_lots(
 
 
 def sync_batch_inventory() -> None:
+    app_session = AmisAppSession(
+        token=AMIS_APP_TOKEN, company_code=AMIS_COMPANY_CODE,
+        refresh_token=os.getenv("AMIS_APP_REFRESH_TOKEN", "").strip(),
+    )
     missing = []
 
-    if not AMIS_APP_TOKEN:
+    if not app_session.state.get("token"):
         missing.append("AMIS_APP_TOKEN")
-    if not AMIS_COMPANY_CODE:
+    if not app_session.state.get("companycode"):
         missing.append("AMIS_COMPANY_CODE")
     if not AMIS_BATCH_STOCK_ID:
         missing.append("AMIS_BATCH_STOCK_ID")
@@ -976,6 +986,10 @@ def sync_batch_inventory() -> None:
 
 
 def main() -> None:
+    from batch_inventory import CONFIG_PATH, sync_configured_snapshot
+    if CONFIG_PATH.exists():
+        sync_configured_snapshot()
+        return
     if not DATABASE_URL:
         stop("Thieu DATABASE_URL trong .env")
 
@@ -1022,9 +1036,10 @@ def main() -> None:
 
     update_supabase(inventory_map)
 
+    app_session = AmisAppSession(token=AMIS_APP_TOKEN, company_code=AMIS_COMPANY_CODE)
     batch_settings = (
-        AMIS_APP_TOKEN,
-        AMIS_COMPANY_CODE,
+        app_session.state.get("token"),
+        app_session.state.get("companycode"),
         AMIS_BATCH_STOCK_ID,
     )
     if all(batch_settings):

@@ -11,6 +11,15 @@ Thumbs.db
 
 .vercel
 .env*
+!.env.example
 server.stdout.log
 server.stderr.log
 *.log
+amis_routing_request.*
+data/amis_routing*.json
+data/routing_images/
+data/amis_visits/
+*.har
+amis_session.json
+data/amis_batch_preview.json
+data/inventory_backups/

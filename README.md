@@ -1,5 +1,9 @@
 # Kho Xe Đạp — Web quản lý tồn kho
 
+Hướng dẫn máy đồng bộ tồn kho theo lô: [SYNC_BATCH_SETUP.txt](SYNC_BATCH_SETUP.txt).
+Ba file cấu hình riêng `.env`, `.env.amis-session.json`, `.env.amis-batch-request.json`
+không nằm trên GitHub; cần chuyển riêng sang máy chạy đồng bộ.
+
 Ứng dụng web Python (Flask) gồm:
 - **Giá đại lý** (`/`) và **Giá lẻ** (`/gia-le`): hai trang tra cứu cùng danh sách xe, màu và tồn kho; mỗi trang hiển thị giá riêng — **không cần đăng nhập**.
 - **Trang quản lý** (`/admin`): thêm / sửa / xóa sản phẩm, nhập dữ liệu hàng loạt từ file Excel/CSV — **cần đăng nhập**.
