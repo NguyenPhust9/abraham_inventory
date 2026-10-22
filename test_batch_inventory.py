@@ -65,6 +65,35 @@ class BatchInventoryTest(unittest.TestCase):
             self.assertEqual(len(retail), 3)
             self.assertEqual({r["price"] for r in retail}, {150})
 
+    def test_unpictured_products_hidden_until_image_added(self):
+        apply_snapshot(self.engine, 19, self.rows)
+        with self.web.app.test_client() as client:
+            for image in (None, "", "   "):
+                with self.engine.begin() as conn:
+                    conn.execute(text("UPDATE products SET image_filename=:image WHERE id=1"), {"image": image})
+                self.assertEqual(client.get("/api/products/dealer").get_json(), [])
+                with self.engine.connect() as conn:
+                    self.assertEqual(conn.execute(text("SELECT COUNT(*) FROM inventory_batches")).scalar_one(), 3)
+            with self.engine.begin() as conn:
+                conn.execute(text("UPDATE products SET image_filename='restored.jpg' WHERE id=1"))
+            self.assertEqual(len(client.get("/api/products/dealer").get_json()), 3)
+
+    def test_one_image_keeps_all_codes_in_group(self):
+        with self.engine.begin() as conn:
+            for number in range(2, 6):
+                conn.execute(text("INSERT INTO products (id,code,model,color,category,stock,reserved,image_filename) "
+                                  "VALUES (:id,:code,'AURA (variant)','Other','Xe',4,0,'')"),
+                             {"id": number, "code": f"AURA-{number}"})
+            conn.execute(text("INSERT INTO products (id,code,model,category,stock,reserved,image_filename) "
+                              "VALUES (6,'NO-IMAGE','OTHER','Xe',20,0,'')"))
+            conn.execute(text("INSERT INTO products (id,code,model,category,stock,reserved,image_filename) "
+                              "VALUES (7,'OTHER-CATEGORY','AURA','Other category',20,0,'')"))
+        with self.web.app.test_client() as client:
+            data = client.get("/api/products/dealer").get_json()
+            self.assertEqual({item['id'] for item in data}, {1, 2, 3, 4, 5})
+            self.assertEqual({item['image_url'] for item in data}, {'test.jpg'})
+            self.assertEqual(sum(item['stock'] for item in data), 115)
+
     def test_invalid_snapshot_preserves_old_inventory(self):
         apply_snapshot(self.engine, 19, self.rows)
         with self.assertRaises(ValueError):

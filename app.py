@@ -1294,6 +1294,20 @@ def api_products(price_type="dealer"):
             response.headers["X-Retail-Prices-Visible"] = "0"
             return response
         products = db.query(Product).order_by(Product.model, Product.color).all()
+        # Match the catalog's model/category grouping. One pictured variant
+        # keeps every code and inventory lot in that group visible.
+        def catalog_group_key(product):
+            return (
+                normalize_model_name(product.model).lower(),
+                " ".join(str(product.category or "").lower().split()),
+            )
+
+        group_images = {}
+        for product in products:
+            image = str(product.image_filename or "").strip()
+            if image:
+                group_images.setdefault(catalog_group_key(product), image)
+        products = [product for product in products if catalog_group_key(product) in group_images]
 
         out = []
         today = datetime.now().date()
@@ -1330,7 +1344,7 @@ def api_products(price_type="dealer"):
             d["original_model"] = p.model
             d["model"] = normalize_model_name(p.model)
 
-            d["image_url"] = p.image_filename if p.image_filename else None
+            d["image_url"] = str(p.image_filename or "").strip() or group_images[catalog_group_key(p)]
 
             if batch_mode:
                 for lot in batches_by_product.get(p.id, []):
@@ -2115,6 +2129,8 @@ def api_reorder_suggestions():
         suggestions = []
         matched_models = 0
         for key, product in grouped.items():
+            if not str(product["image_url"] or "").strip():
+                continue
             average_monthly = monthly_sales.get(key)
             if average_monthly is None:
                 continue
