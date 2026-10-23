@@ -3717,9 +3717,13 @@ body:has(.catalog-page) {
 
 /* One row per inventory ledger; a missing CRM date intentionally stays blank. */
 .catalog-page .colorrow {
-  grid-template-columns: 16px minmax(0, 1fr) 86px auto;
-  gap: 7px;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) 86px auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
+.catalog-page .colorrow > * { min-width: 0; }
 .lot-description { display: block; font-size: 10px; font-weight: 400; overflow-wrap: anywhere; }
 .received-date { display: flex; flex-direction: column; font-size: 11px; font-variant-numeric: tabular-nums; }
 .received-date small { font-size: 9px; opacity: .75; white-space: nowrap; }
@@ -3845,6 +3849,52 @@ body:has(.catalog-page) {
 .catalog-page .with-lot-details > .inventory-age { grid-column: 3; grid-row: 1 / span 2; }
 .catalog-page .with-lot-details > .stockbadge { grid-column: 4; grid-row: 1 / span 2; }
 .catalog-page .with-lot-details > .swatch { grid-column: 1; grid-row: 1 / span 2; }
+
+/* Prevent the price label from covering the amount on narrow cards. */
+.catalog-page .price-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 7px;
+}
+
+.catalog-page .price-row .price {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  white-space: normal;
+}
+
+@media (max-width: 1450px) and (min-width: 1101px) {
+  .catalog-page .catalog-content-layout:not(.reorder-collapsed) .price-row {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-page .catalog-content-layout:not(.reorder-collapsed) .price-row span:first-child {
+    justify-self: start;
+  }
+
+  .catalog-page .catalog-content-layout:not(.reorder-collapsed) .price-row .price {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 520px) {
+  .catalog-page .card { padding-inline: 10px; }
+  .catalog-page .colorlist { padding-inline: 2px; }
+  .catalog-page .colorrow { padding-inline: 9px; }
+
+  .catalog-page .price-row {
+    grid-template-columns: 1fr;
+    margin-inline: 2px;
+  }
+
+  .catalog-page .price-row span:first-child { justify-self: start; }
+  .catalog-page .price-row .price { justify-content: flex-start; text-align: left; }
+}
 
 @media (max-width: 760px) {
  .inventory-warning-dialog .inventory-warning-table { display: block; min-width: 0; width: 100%; }
