@@ -721,6 +721,7 @@ def build_inventory_map(
 
 def update_supabase(
     inventory_map: dict[str, dict[str, Any]],
+    stock_id: str | None = None,
 ) -> None:
     engine = create_engine(
         DATABASE_URL,
@@ -836,6 +837,32 @@ def update_supabase(
             )
 
             inserted_count += 1
+
+        # The catalog uses this flag to decide whether to expand one product
+        # into batch rows. A regular inventory snapshot must explicitly switch
+        # that mode off, otherwise stale batch data keeps being displayed even
+        # though the product totals above were refreshed successfully.
+        settings = {
+            "inventory_source": "product_ledger",
+            "inventory_synced_at": datetime.utcnow().isoformat(),
+        }
+        if stock_id:
+            settings["inventory_stock_id"] = str(stock_id)
+        connection.execute(text("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key VARCHAR PRIMARY KEY,
+                value VARCHAR NOT NULL
+            )
+        """))
+        for key, value in settings.items():
+            connection.execute(
+                text("DELETE FROM app_settings WHERE key = :key"),
+                {"key": key},
+            )
+            connection.execute(
+                text("INSERT INTO app_settings (key, value) VALUES (:key, :value)"),
+                {"key": key, "value": value},
+            )
 
     engine.dispose()
 
@@ -986,16 +1013,8 @@ def sync_batch_inventory() -> None:
 
 
 def main() -> None:
-    from batch_inventory import CONFIG_PATH, sync_configured_snapshot
-    if CONFIG_PATH.exists():
-        sync_configured_snapshot()
-        return
     if not DATABASE_URL:
         stop("Thieu DATABASE_URL trong .env")
-
-    if AMIS_BATCH_ONLY:
-        sync_batch_inventory()
-        return
 
     if not CLIENT_ID:
         stop("Thieu AMIS_CLIENT_ID trong .env")
@@ -1034,26 +1053,7 @@ def main() -> None:
         len(inventory_map),
     )
 
-    update_supabase(inventory_map)
-
-    app_session = AmisAppSession(token=AMIS_APP_TOKEN, company_code=AMIS_COMPANY_CODE)
-    batch_settings = (
-        app_session.state.get("token"),
-        app_session.state.get("companycode"),
-        AMIS_BATCH_STOCK_ID,
-    )
-    if all(batch_settings):
-        sync_batch_inventory()
-    elif any(batch_settings):
-        stop(
-            "Cau hinh dong bo lo chua du. Can AMIS_APP_TOKEN, "
-            "AMIS_COMPANY_CODE va AMIS_BATCH_STOCK_ID."
-        )
-    else:
-        print(
-            "\nBo qua dong bo theo lo vi chua cau hinh "
-            "AMIS_APP_TOKEN."
-        )
+    update_supabase(inventory_map, stock_id)
 
 
 if __name__ == "__main__":
