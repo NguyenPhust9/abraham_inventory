@@ -23,3 +23,7 @@ data/amis_visits/
 amis_session.json
 data/amis_batch_preview.json
 data/inventory_backups/
+
+# Local Windows Task Scheduler configuration
+task_backups/
+repair_inventory_schedule.ps1

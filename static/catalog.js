@@ -823,11 +823,13 @@ function render() {
         ${colorRows}
       </div>
 
+      <div class="card-footer">
       <div class="price-row">
         <span>${priceLabel}</span>
         <span class="price">${promotion && promotion.original_price ? `<del>${escapeHTML(fmtPrice(promotion.original_price))}</del>` : ''}${escapeHTML(fmtPrice(groupPrice))}</span>
       </div>
-      ${promotion ? `<div class="promotion-period">Áp dụng ${formatPromotionDate(promotion.promotion_start)} – ${formatPromotionDate(promotion.promotion_end)}</div>` : ''}
+      ${promotion ? `<div class="promotion-period">Áp dụng ${formatPromotionDate(promotion.promotion_start)} – ${formatPromotionDate(promotion.promotion_end)}</div>` : '<div class="promotion-period" aria-hidden="true"></div>'}
+      </div>
     `;
 
     card.addEventListener('click', () => {

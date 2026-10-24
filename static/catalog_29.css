@@ -3911,3 +3911,126 @@ body:has(.catalog-page) {
  .inventory-warning-dialog .inventory-warning-head h2 { font-size: 18px; line-height: 1.35; }
  .inventory-warning-dialog #inventoryWarningSummary { font-size: 13px; line-height: 1.5; }
 }
+
+/* Align titles, color lists and price footers across each product row. */
+.catalog-page .model {
+  min-height: 2.5em;
+}
+
+.catalog-page .card-footer {
+  margin-top: auto;
+  flex: 0 0 auto;
+}
+
+.catalog-page .card-footer .price-row {
+  margin-top: 0;
+}
+
+.catalog-page .card-footer .price {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  min-height: 43px;
+  gap: 4px;
+}
+
+.catalog-page .card-footer .promotion-period {
+  min-height: 2.8em;
+  margin: 6px 8px 0;
+  padding: 0;
+}
+
+@media (max-width: 520px) {
+  .catalog-page .card-footer .price { align-items: flex-start; }
+}
+
+@media (min-width: 1101px) and (max-width: 1450px) {
+  .catalog-page .catalog-content-layout:not(.reorder-collapsed) .card-footer .price {
+    align-items: flex-start;
+  }
+}
+
+/* Render the looping banner as artwork without player chrome. */
+.catalog-page .hero-banner-video {
+  display: block;
+  width: 100%;
+  height: clamp(360px, 48vw, 720px);
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.catalog-page .catalog-hero-image { position: relative; }
+.hero-sound-toggle {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, .45);
+  border-radius: 999px;
+  background: rgba(35, 20, 30, .65);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.hero-sound-toggle:hover { background: rgba(35, 20, 30, .85); }
+.hero-sound-toggle:focus-visible { outline: 2px solid #ff7900; outline-offset: 3px; }
+
+/* Mobile product cards: readable colors and a single price line. */
+.catalog-page .colorrow.merged-colors {
+  grid-template-columns: 23px minmax(0, 1fr) auto;
+  column-gap: 10px;
+}
+@media (max-width: 760px) {
+  .catalog-page .model { min-height: 0; }
+  .catalog-page .card-footer .price-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    margin-inline: 2px;
+    min-height: 54px;
+  }
+  .catalog-page .card-footer .price-row > span:first-child {
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  .catalog-page .card-footer .price-row .price {
+    align-items: flex-end;
+    justify-content: center;
+    text-align: right;
+    white-space: nowrap;
+    font-size: clamp(15px, 4.1vw, 19px);
+    min-height: 36px;
+  }
+  .catalog-page .card-footer .promotion-period:empty { display: none; }
+  .catalog-page .card-footer .promotion-period { min-height: 0; }
+  .catalog-page .colorrow.with-lot-details {
+    grid-template-columns: 23px minmax(0, 1fr) auto auto;
+    column-gap: 10px;
+  }
+  .catalog-page .hero-banner-video {
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+  }
+  .hero-sound-toggle { right: 10px; bottom: 10px; font-size: 11px; padding: 7px 10px; }
+}
+
+.hero-banner-mobile-preview { display: none; }
+@media (max-width: 760px) {
+  .catalog-page .hero-banner-video,
+  .catalog-page .hero-sound-toggle { display: none; }
+  .catalog-page .hero-banner-mobile-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 0;
+  }
+}
