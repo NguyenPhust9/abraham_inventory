@@ -155,7 +155,22 @@
         <h2 class="icon-title"><span class="module-icon"><i data-lucide="badge-percent"></i></span>Khuyến mãi theo mã hàng</h2>
         <p class="hint">Áp dụng riêng cho Giá đại lý. Giá lẻ luôn giữ nguyên. Tag chỉ hiển thị ngoài trang khách trong khoảng ngày đã đặt.</p>
       </div>
+      {% if promotion_products %}
+      <form method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ toàn bộ khuyến mãi của {{ promotion_products|length }} mã hàng? Thao tác này không thể hoàn tác.');">
+        <input type="hidden" name="action" value="clear_all">
+        <button type="submit" class="promotion-clear-all"><i data-lucide="trash-2"></i>Gỡ tất cả ({{ promotion_products|length }})</button>
+      </form>
+      {% endif %}
     </div>
+
+    <form method="POST" action="{{ url_for('admin_import_promotions') }}" enctype="multipart/form-data" class="promotion-import-form">
+      <label>
+        <span>Import Excel khuyến mãi</span>
+        <small>Cột: Mã hàng, Giá khuyến mãi, Tag, Áp dụng từ, Áp dụng tới</small>
+      </label>
+      <input type="file" name="file" accept=".xlsx,.xls" required>
+      <button type="submit"><i data-lucide="file-up"></i>Import Excel</button>
+    </form>
 
     <form method="POST" action="{{ url_for('admin_update_promotion') }}" id="promotionBatchForm">
       <input type="hidden" name="promotions_json" id="promotionsJson">
