@@ -10,7 +10,7 @@ from urllib.parse import urlencode, quote_plus
 from urllib.request import Request, urlopen
 import cloudinary  # type: ignore
 import cloudinary.uploader  # type: ignore
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_file  # type: ignore
 from flask_login import (  # type: ignore
@@ -2205,6 +2205,24 @@ def admin_update_promotion():
     action = request.form.get("action", "save")
     db = SessionLocal()
     try:
+        if action == "clear_all":
+            products = db.query(Product).filter(
+                or_(
+                    Product.promotion_price.isnot(None),
+                    Product.promotion_tag.isnot(None),
+                    Product.promotion_start.isnot(None),
+                    Product.promotion_end.isnot(None),
+                )
+            ).all()
+            for product in products:
+                product.promotion_price = None
+                product.promotion_tag = None
+                product.promotion_start = None
+                product.promotion_end = None
+            db.commit()
+            flash(f"Đã gỡ tất cả khuyến mãi của {len(products)} mã hàng.")
+            return redirect(url_for("admin_dashboard") + "#khuyen-mai")
+
         if action == "clear":
             product = db.query(Product).filter(func.lower(Product.code) == code.lower()).first()
             if not product:
@@ -2266,6 +2284,135 @@ def admin_update_promotion():
     finally:
         db.close()
     return redirect(url_for("admin_dashboard") + "#khuyen-mai")
+
+
+@app.route("/admin/promotions/import", methods=["POST"])
+@login_required
+def admin_import_promotions():
+    model_aliases = {
+        "gt100": "gt100 nhôm 700c",
+        "fhuang 24 kèm rổ và cây bắt rổ": "fhuang 24 kèm rỗ và cây bắt rỗ",
+    }
+    file = request.files.get("file")
+    redirect_url = url_for("admin_dashboard") + "#khuyen-mai"
+    if not file or not file.filename:
+        flash("Chưa chọn file Excel khuyến mãi.")
+        return redirect(redirect_url)
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        flash("File khuyến mãi phải có định dạng .xlsx hoặc .xls.")
+        return redirect(redirect_url)
+
+    try:
+        df = pd.read_excel(file, dtype=object)
+    except Exception as error:
+        flash(f"Không đọc được file khuyến mãi: {error}")
+        return redirect(redirect_url)
+
+    code_col = find_import_column(df.columns, "Mã hàng", "Mã hàng hóa", "Mã sản phẩm", "code")
+    price_col = find_import_column(df.columns, "Giá khuyến mãi", "Giá KM", "Giá giảm", "promotion price")
+    tag_col = find_import_column(df.columns, "Tag", "Tag hiển thị", "Nhãn")
+    start_col = find_import_column(df.columns, "Áp dụng từ", "Từ ngày", "Ngày bắt đầu", "promotion start")
+    end_col = find_import_column(df.columns, "Áp dụng tới", "Đến ngày", "Ngày kết thúc", "promotion end")
+    missing = []
+    if not code_col:
+        missing.append("Mã hàng")
+    if not price_col:
+        missing.append("Giá khuyến mãi")
+    if not start_col:
+        missing.append("Áp dụng từ")
+    if not end_col:
+        missing.append("Áp dụng tới")
+    if missing:
+        flash("File thiếu cột bắt buộc: " + ", ".join(missing) + ".")
+        return redirect(redirect_url)
+
+    requested_codes = {
+        model_aliases.get(
+            clean_import_text(value).casefold(),
+            clean_import_text(value).casefold(),
+        )
+        for value in df[code_col].tolist()
+        if clean_import_text(value)
+    }
+
+    def excel_date(value):
+        if value is None or pd.isna(value):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, (int, float)):
+            try:
+                return (datetime(1899, 12, 30) + timedelta(days=float(value))).date()
+            except (TypeError, ValueError, OverflowError):
+                return None
+        text_value = clean_import_text(value)
+        for date_format in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(text_value, date_format).date()
+            except ValueError:
+                continue
+        return None
+
+    db = SessionLocal()
+    updated = 0
+    errors = []
+    try:
+        matched_products = db.query(Product).filter(or_(
+            func.lower(Product.code).in_(requested_codes),
+            func.lower(Product.model).in_(requested_codes),
+        )).all()
+        products_by_code = {}
+        products_by_model = {}
+        for product in matched_products:
+            if product.code:
+                products_by_code[product.code.casefold()] = product
+            if product.model:
+                products_by_model.setdefault(product.model.casefold(), []).append(product)
+        updated_variants = 0
+        for row_number, (_, row) in enumerate(df.iterrows(), start=2):
+            code = clean_import_text(row[code_col])
+            lookup_key = model_aliases.get(code.casefold(), code.casefold())
+            price = safe_float(row[price_col])
+            start_date = excel_date(row[start_col])
+            end_date = excel_date(row[end_col])
+            raw_tag = clean_import_text(row[tag_col]).casefold() if tag_col else "discount"
+            tag = "hot" if raw_tag in {"hot", "nóng"} else "discount"
+            targets = products_by_model.get(lookup_key) or []
+            if not targets and products_by_code.get(lookup_key):
+                targets = [products_by_code[lookup_key]]
+
+            if not code:
+                errors.append(f"Dòng {row_number}: thiếu mã hàng")
+            elif not targets:
+                errors.append(f"Dòng {row_number}: không tìm thấy mã {code}")
+            elif not price or price <= 0:
+                errors.append(f"Dòng {row_number}: giá khuyến mãi không hợp lệ")
+            elif not start_date or not end_date:
+                errors.append(f"Dòng {row_number}: ngày áp dụng không hợp lệ")
+            elif end_date < start_date:
+                errors.append(f"Dòng {row_number}: ngày kết thúc trước ngày bắt đầu")
+            else:
+                for product in targets:
+                    product.promotion_price = price
+                    product.promotion_tag = tag
+                    product.promotion_start = start_date
+                    product.promotion_end = end_date
+                updated_variants += len(targets)
+                updated += 1
+
+        db.commit()
+        message = f"Đã import {updated} dòng khuyến mãi cho {updated_variants} biến thể sản phẩm."
+        if errors:
+            message += f" Bỏ qua {len(errors)} dòng lỗi: " + "; ".join(errors[:3])
+        flash(message)
+    except Exception as error:
+        db.rollback()
+        flash(f"Lỗi khi import khuyến mãi: {error}")
+    finally:
+        db.close()
+    return redirect(redirect_url)
 
 
 @app.route("/admin/products/add", methods=["POST"])
