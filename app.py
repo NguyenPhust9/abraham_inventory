@@ -70,6 +70,7 @@ app.config["SECRET_KEY"] = SECRET_KEY
 
 # ---------- Database ----------
 Base = declarative_base()
+IS_VERCEL = bool(os.environ.get("VERCEL"))
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
@@ -82,13 +83,19 @@ if DATABASE_URL:
         database_url = make_url(DATABASE_URL)
         direct_host = database_url.host or ""
         pooler_user = database_url.username
+        pooler_port = int(os.environ.get("SUPABASE_POOLER_PORT", "5432"))
+        # Vercel spawns many short-lived functions. Supabase Session Pooler
+        # (5432) has a small client limit, while Transaction Pooler (6543) is
+        # designed for serverless workloads.
+        if IS_VERCEL and pooler_port == 5432:
+            pooler_port = 6543
         if direct_host.startswith("db.") and direct_host.endswith(".supabase.co"):
             project_ref = direct_host.split(".")[1]
             if pooler_user == "postgres":
                 pooler_user = f"postgres.{project_ref}"
         DATABASE_URL = database_url.set(
             host=pooler_host,
-            port=int(os.environ.get("SUPABASE_POOLER_PORT", "5432")),
+            port=pooler_port,
             username=pooler_user,
         ).render_as_string(hide_password=False)
 
@@ -271,7 +278,8 @@ class PurchaseReceiptItem(Base):
     line_total = Column(Float, default=0)
 
 
-Base.metadata.create_all(engine)
+if not IS_VERCEL:
+    Base.metadata.create_all(engine)
 
 
 def ensure_retail_price_column():
@@ -282,7 +290,8 @@ def ensure_retail_price_column():
             conn.execute(text("ALTER TABLE products ADD COLUMN retail_price FLOAT"))
 
 
-ensure_retail_price_column()
+if not IS_VERCEL:
+    ensure_retail_price_column()
 
 
 def ensure_promotion_columns():
@@ -300,7 +309,8 @@ def ensure_promotion_columns():
                 conn.execute(text(f"ALTER TABLE products ADD COLUMN {column_name} {column_type}"))
 
 
-ensure_promotion_columns()
+if not IS_VERCEL:
+    ensure_promotion_columns()
 
 
 def ensure_amis_async_id_column():
@@ -312,7 +322,8 @@ def ensure_amis_async_id_column():
             conn.execute(text("ALTER TABLE products ADD COLUMN amis_async_id VARCHAR"))
 
 
-ensure_amis_async_id_column()
+if not IS_VERCEL:
+    ensure_amis_async_id_column()
 
 
 # ---------- Upload folder ----------
