@@ -18,14 +18,14 @@
 <div class="national-ticker">
   <div class="national-ticker-track">
     <span>
-      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Tri ân người gieo tri thức
-      <i aria-hidden="true">·</i><em>Đồng hành cùng thầy cô Việt Nam</em>
-      <i aria-hidden="true">·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i aria-hidden="true">·</i>
+      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Lên xe đón mùa hội
+      <i aria-hidden="true">·</i><em>Chọn xe ưng ý, săn giá mê ly</em>
+      <i aria-hidden="true">·</i>Halloween 31.10<i aria-hidden="true">·</i>
     </span>
     <span aria-hidden="true">
-      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Tri ân người gieo tri thức
-      <i aria-hidden="true">·</i><em>Đồng hành cùng thầy cô Việt Nam</em>
-      <i aria-hidden="true">·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i aria-hidden="true">·</i>
+      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Lên xe đón mùa hội
+      <i aria-hidden="true">·</i><em>Chọn xe ưng ý, săn giá mê ly</em>
+      <i aria-hidden="true">·</i>Halloween 31.10<i aria-hidden="true">·</i>
     </span>
   </div>
   <a class="hero-manage-overlay" href="{{ url_for('admin_login') }}">
@@ -41,13 +41,25 @@
     ========================================================= -->
   <section class="catalog-hero-image">
 
-    <img
-      src="{{ url_for('static', filename='uploads/anh2011.png') }}"
-      alt="Abraham Bike - Tri ân thầy cô 20/11"
-      class="hero-banner-img"
+    <img class="hero-banner-mobile-preview"
+      src="{{ url_for('static', filename='uploads/hlw1.jpg') }}"
+      alt="Abraham Bike - Halloween">
+    <video
+      class="hero-banner-img hero-banner-video"
+      loop muted playsinline
+      preload="none"
+      poster="{{ url_for('static', filename='uploads/hlw1.jpg') }}"
+      disablepictureinpicture
+      disableremoteplayback
+      aria-label="Abraham Bike - Halloween"
     >
+      <source src="{{ url_for('static', filename='uploads/halloween_banner.mp4') }}" type="video/mp4">
+      <img src="{{ url_for('static', filename='uploads/hlw1.jpg') }}" alt="Abraham Bike - Halloween">
+    </video>
+    <button type="button" class="hero-sound-toggle" aria-label="T&#7855;t ti&#7871;ng" aria-pressed="false">T&#7855;t ti&#7871;ng</button>
 
   </section>
+  <script src="{{ url_for('static', filename='hero-banner.js') }}?v=4" defer></script>
 
 
   {% if price_type == 'retail' and not retail_visible %}
