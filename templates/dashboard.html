@@ -594,6 +594,19 @@
           element.appendChild(footer);
           return;
         }
+        const planning = line.match(/^(\d+)\.\s+(.+?):\s+(.+)$/i);
+        if (planning) {
+          const row = document.createElement("div");
+          row.className = "inventory-ai-plan-row";
+          const label = document.createElement("span");
+          label.textContent = planning[2];
+          const value = document.createElement("strong");
+          value.className = "inventory-ai-highlight";
+          value.textContent = planning[3];
+          row.append(label, value);
+          element.appendChild(row);
+          return;
+        }
         const title = document.createElement("div");
         title.className = lineIndex === 0 ? "inventory-ai-answer-title" : "inventory-ai-answer-line";
         title.textContent = line;

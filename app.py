@@ -2154,6 +2154,50 @@ def format_ai_money(value):
     return f"{float(value):,.0f}".replace(",", ".") + "đ"
 
 
+def format_ai_number(value):
+    number = float(value or 0)
+    if number.is_integer():
+        return f"{number:,.0f}".replace(",", ".")
+    return f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def inventory_planning_search(query):
+    """Return the same monthly-sales and two-month reserve data as the reorder panel."""
+    monthly_sales = load_monthly_sales()
+    query_key = product_match_key(query)
+    db = SessionLocal()
+    try:
+        grouped = {}
+        for product in db.query(Product).order_by(Product.model, Product.color).all():
+            key = product_match_key(product.model)
+            if not key:
+                continue
+            if key not in grouped:
+                grouped[key] = {"model": normalize_model_name(product.model), "stock": 0}
+            grouped[key]["stock"] += max(product.stock or 0, 0)
+    finally:
+        db.close()
+
+    candidate_keys = [key for key in grouped if key == query_key]
+    if not candidate_keys:
+        candidate_keys = [key for key in grouped if query_key and (query_key in key or key in query_key)]
+    results = []
+    for key in candidate_keys[:10]:
+        average_monthly = monthly_sales.get(key)
+        if average_monthly is None:
+            continue
+        stock = grouped[key]["stock"]
+        reserve_target = math.ceil(average_monthly * 2)
+        results.append({
+            "model": grouped[key]["model"],
+            "average_monthly_sales": round(average_monthly, 1),
+            "stock": stock,
+            "reserve_target": reserve_target,
+            "reorder_quantity": max(math.ceil(average_monthly * 2 - stock), 0),
+        })
+    return results
+
+
 def extract_inventory_query(question):
     """Extract a product code/name from common Vietnamese inventory questions."""
     normalized = normalize_ai_text(question)
@@ -2197,13 +2241,29 @@ def extract_inventory_query(question):
 
 def answer_inventory_question(question):
     normalized = normalize_ai_text(question)
-    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "san pham", "mau", "het hang", "da giu", "co the ban")
+    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
     if not any(term in normalized for term in supported_terms):
         return "Tôi chỉ hỗ trợ tra cứu tồn kho, số đã giữ, số có thể bán, giá và khuyến mãi trong hệ thống."
 
     query = extract_inventory_query(question)
     if not query:
         return "Bạn hãy cho tôi mã hàng hoặc tên mẫu xe cần tra cứu. Ví dụ: “Mã 3dao20 còn tồn bao nhiêu?”"
+
+    wants_planning = any(term in normalized for term in ("trung binh", "ban tb", "can nhap", "nhap them"))
+    if wants_planning:
+        planning_rows = inventory_planning_search(query)
+        if not planning_rows:
+            return f"Chưa có dữ liệu bán trung bình 12 tháng khớp với “{query}”, nên hệ thống chưa tính được số lượng cần nhập."
+        item = planning_rows[0]
+        return "\n".join([
+            f"Kế hoạch tồn kho của {item['model']}:",
+            "",
+            "━━ NHU CẦU NHẬP HÀNG ━━",
+            f"1. Bán TB/tháng: {format_ai_number(item['average_monthly_sales'])}",
+            f"2. Tồn kho hiện tại: {format_ai_number(item['stock'])}",
+            f"3. Mức dự trữ 2 tháng: {format_ai_number(item['reserve_target'])}",
+            f"4. Cần nhập thêm: {format_ai_number(item['reorder_quantity'])}",
+        ])
     result = inventory_ai_search(query)
     products = result["products"]
     if not products:
