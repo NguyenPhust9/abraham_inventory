@@ -502,9 +502,19 @@
   <div class="inventory-ai-messages" id="inventoryAiMessages" aria-live="polite">
     <div class="inventory-ai-message assistant">Bạn muốn kiểm tra tồn kho hoặc giá của mã xe nào?</div>
   </div>
-  <div class="inventory-ai-suggestions">
+  <div class="inventory-ai-suggestions public-ai-suggestions" aria-label="Câu hỏi gợi ý">
     <button type="button" data-question="Mã 3dao20 hiện còn tồn bao nhiêu?">Tồn mã 3dao20</button>
     <button type="button" data-question="Những mã hàng nào đang có thể bán bằng 0?">Mã đã hết hàng</button>
+    <button type="button" data-question="Cho tôi danh sách chương trình khuyến mãi đang áp dụng">CTKM đang có</button>
+    <button type="button" data-question="Mẫu nào đang được giảm nhiều nhất?">Giảm nhiều nhất</button>
+    <button type="button" data-question="Khuyến mãi nào sắp hết hạn?">Sắp hết khuyến mãi</button>
+    <button type="button" data-question="Tìm xe dưới 5 triệu">Xe dưới 5 triệu</button>
+    <button type="button" data-question="Tìm xe trong khoảng từ 5 đến 7 triệu">Xe từ 5–7 triệu</button>
+    <button type="button" data-question="Tìm xe màu đỏ còn hàng">Xe đỏ còn hàng</button>
+    <button type="button" data-question="Tìm xe màu xanh còn hàng">Xe xanh còn hàng</button>
+    <button type="button" data-question="Gợi ý xe đang khuyến mãi và còn hàng">Khuyến mãi còn hàng</button>
+    <button type="button" data-question="Mã nào sắp hết hàng?">Sản phẩm sắp hết</button>
+    <button type="button" data-question="Mã nào tồn kho nhiều nhất?">Tồn nhiều nhất</button>
   </div>
   <form class="inventory-ai-form" id="inventoryAiForm">
     <textarea id="inventoryAiInput" maxlength="1000" rows="1" placeholder="Ví dụ: mã 3dao20 còn bao nhiêu?" required></textarea>
@@ -539,6 +549,7 @@
   const form = document.getElementById("inventoryAiForm");
   const input = document.getElementById("inventoryAiInput");
   const messages = document.getElementById("inventoryAiMessages");
+  const inventoryAiHistory = [];
   if (!launcher || !panel || !form) return;
 
   function toggle(open) {
@@ -629,6 +640,7 @@
     if (!question) return;
     toggle(true);
     addMessage(question, "user");
+    inventoryAiHistory.push({ role: "user", content: question });
     input.value = "";
     input.disabled = true;
     const loading = addMessage("Đang tra dữ liệu hiện tại…", "assistant loading");
@@ -636,12 +648,13 @@
       const response = await fetch("{{ url_for('public_inventory_ai_chat') }}", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: question }] })
+        body: JSON.stringify({ messages: inventoryAiHistory.slice(-8) })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Không thể tra cứu.");
       renderAnswer(loading, data.answer);
       loading.classList.remove("loading");
+      inventoryAiHistory.push({ role: "assistant", content: data.answer });
     } catch (error) {
       loading.textContent = error.message || "Không thể kết nối trợ lý.";
       loading.classList.remove("loading");

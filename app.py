@@ -2145,7 +2145,8 @@ def inventory_ai_search(query):
 
 def normalize_ai_text(value):
     value = unicodedata.normalize("NFD", str(value or "").lower())
-    return "".join(char for char in value if unicodedata.category(char) != "Mn")
+    value = "".join(char for char in value if unicodedata.category(char) != "Mn")
+    return value.replace("đ", "d")
 
 
 def format_ai_money(value):
@@ -2215,6 +2216,304 @@ def is_generic_promotion_question(normalized):
         "cac uu dai",
     )
     return any(phrase in normalized for phrase in phrases)
+
+
+def parse_ai_money_limit(normalized, marker):
+    match = re.search(
+        marker + r"\s*([\d.,]+)\s*(trieu|tr|m|nghin|ngan|k)?",
+        normalized,
+    )
+    if not match:
+        return None
+    raw = match.group(1)
+    unit = match.group(2) or ""
+    if unit in ("trieu", "tr", "m"):
+        number = float(raw.replace(",", "."))
+        return number * 1_000_000
+    if unit in ("nghin", "ngan", "k"):
+        number = float(raw.replace(",", "."))
+        return number * 1_000
+    return float(re.sub(r"[^0-9]", "", raw) or 0)
+
+
+def product_filter_answer(question):
+    """Filter products from natural-language price, color, stock and promo constraints."""
+    normalized = normalize_ai_text(question)
+    maximum = parse_ai_money_limit(normalized, r"(?:duoi|toi da|khong qua)")
+    minimum = parse_ai_money_limit(normalized, r"(?:tren|tu)")
+    range_match = re.search(
+        r"(?:tu|khoang)\s*([\d.,]+)\s*(trieu|tr|m)?\s*(?:den|toi|-)\s*([\d.,]+)\s*(trieu|tr|m)?",
+        normalized,
+    )
+    if range_match:
+        left_unit = range_match.group(2) or range_match.group(4) or ""
+        right_unit = range_match.group(4) or range_match.group(2) or ""
+        minimum = parse_ai_money_limit(f"tu {range_match.group(1)} {left_unit}", r"tu")
+        maximum = parse_ai_money_limit(f"duoi {range_match.group(3)} {right_unit}", r"duoi")
+
+    wants_available = any(term in normalized for term in ("con hang", "ban ngay", "co the ban"))
+    wants_promotion = any(term in normalized for term in ("khuyen mai", "ctkm", "uu dai", "giam gia"))
+    colors = (
+        "do", "xanh", "xanh duong", "xanh la", "den", "trang", "vang",
+        "cam", "hong", "tim", "xam", "ghi", "bac", "nau",
+    )
+    color_pattern = "|".join(re.escape(color) for color in sorted(colors, key=len, reverse=True))
+    color_match = re.search(rf"\bmau\s+({color_pattern})\b", normalized)
+    requested_color = color_match.group(1) if color_match else next(
+        (
+            color for color in sorted(colors, key=len, reverse=True)
+            if re.search(rf"\b{re.escape(color)}\b", normalized)
+            and not (color == "tim" and normalized.startswith("tim "))
+        ),
+        None,
+    )
+
+    today = datetime.now().date()
+    db = SessionLocal()
+    try:
+        products = db.query(Product).order_by(Product.model, Product.color, Product.code).all()
+    finally:
+        db.close()
+
+    category_names = sorted(
+        {normalize_ai_text(product.category).strip(): product.category for product in products if product.category},
+        key=len,
+        reverse=True,
+    )
+    requested_category = next((key for key in category_names if key and key in normalized), None)
+    rows = []
+    for product in products:
+        promotion_active = bool(
+            product.promotion_price and product.promotion_price > 0
+            and product.promotion_start and product.promotion_end
+            and product.promotion_start <= today <= product.promotion_end
+        )
+        shown_price = product.promotion_price if promotion_active else product.price
+        if maximum is not None and (shown_price is None or shown_price > maximum):
+            continue
+        if minimum is not None and (shown_price is None or shown_price < minimum):
+            continue
+        if wants_available and product.available <= 0:
+            continue
+        if wants_promotion and not promotion_active:
+            continue
+        if requested_color and requested_color not in normalize_ai_text(product.color):
+            continue
+        if requested_category and requested_category not in normalize_ai_text(product.category):
+            continue
+        rows.append((product, shown_price, promotion_active))
+
+    if not rows:
+        return "Không tìm thấy sản phẩm phù hợp với các điều kiện bạn yêu cầu."
+    rows.sort(key=lambda row: (row[1] is None, row[1] or 0, row[0].model, row[0].code))
+    lines = [f"Tìm thấy {len(rows)} sản phẩm phù hợp:"]
+    for product, shown_price, promotion_active in rows[:20]:
+        promo_label = " (khuyến mãi)" if promotion_active else ""
+        lines.append(
+            f"• {product.code} - {product.model}"
+            f"{' - ' + product.color if product.color else ''}: còn {product.available}, "
+            f"giá {format_ai_money(shown_price)}{promo_label}"
+        )
+    if len(rows) > 20:
+        lines.append(f"• Còn {len(rows) - 20} sản phẩm khác.")
+    return "\n".join(lines)
+
+
+def is_product_filter_question(normalized):
+    lead_terms = ("tim ", "goi y", "danh sach", "xe nao", "san pham nao", "mau nao")
+    filter_terms = (
+        "duoi ", "tren ", "khoang ", " tu ", "con hang", "ban ngay",
+        "khuyen mai", "ctkm", "uu dai", "giam gia", "mau ",
+    )
+    has_lead = any(term in normalized for term in lead_terms)
+    has_filter = any(term in normalized for term in filter_terms)
+    has_price_constraint = any(term in normalized for term in ("duoi ", "tren ", "khoang ", " tu "))
+    has_product_context = any(term in normalized for term in ("xe", "san pham", "khuyen mai", "ctkm", "uu dai"))
+    has_combined_promo_filter = any(term in normalized for term in ("khuyen mai", "ctkm", "uu dai")) and any(
+        term in normalized for term in ("mau ", "con hang", "ban ngay")
+    )
+    return (has_lead and has_filter) or (has_price_constraint and has_product_context) or has_combined_promo_filter
+
+
+def promotion_insight_answer(question):
+    normalized = normalize_ai_text(question)
+    today = datetime.now().date()
+    db = SessionLocal()
+    try:
+        products = (
+            db.query(Product)
+            .filter(
+                Product.promotion_price > 0,
+                Product.promotion_start <= today,
+                Product.promotion_end >= today,
+            )
+            .all()
+        )
+    finally:
+        db.close()
+    if not products:
+        return "Hiện chưa có chương trình khuyến mãi nào đang áp dụng."
+
+    if any(term in normalized for term in ("giam nhieu nhat", "giam sau nhat", "tot nhat")):
+        products.sort(key=lambda p: ((p.price or 0) - (p.promotion_price or 0)), reverse=True)
+        title = "Các mã đang được giảm nhiều nhất:"
+    elif any(term in normalized for term in ("sap het han", "gan het han", "ket thuc som")):
+        products.sort(key=lambda p: (p.promotion_end, p.code))
+        title = "Các khuyến mãi sắp hết hạn:"
+    else:
+        return product_filter_answer(question)
+
+    lines = [title]
+    for product in products[:10]:
+        saving = max((product.price or 0) - (product.promotion_price or 0), 0)
+        percent = round(saving * 100 / product.price) if product.price and saving else 0
+        lines.append(
+            f"• {product.code} - {product.model}: {format_ai_money(product.promotion_price)}, "
+            f"giảm {format_ai_money(saving)} ({percent}%), hết hạn {product.promotion_end.strftime('%d/%m/%Y')}"
+        )
+    return "\n".join(lines)
+
+
+def comparison_answer(question):
+    normalized = normalize_ai_text(question)
+    match = re.search(r"so sanh\s+(.+?)\s+(?:va|voi)\s+(.+)$", normalized)
+    if not match:
+        return "Bạn hãy nhập hai mã hoặc mẫu xe cần so sánh. Ví dụ: “So sánh 3DAO20 và 3DAO26”."
+    queries = [part.strip(" .?!") for part in match.groups()]
+    summaries = []
+    for query in queries:
+        result = inventory_ai_search(query)
+        rows = result["products"]
+        if not rows:
+            return f"Không tìm thấy mã hoặc mẫu xe “{query}” để so sánh."
+        prices = [row["promotion_price"] or row["dealer_price"] for row in rows if row["promotion_price"] or row["dealer_price"]]
+        summaries.append({
+            "query": query.upper(),
+            "variants": len(rows),
+            "available": sum(row["available"] for row in rows),
+            "stock": sum(row["stock"] for row in rows),
+            "price": min(prices) if prices else None,
+            "promotions": sum(1 for row in rows if row["promotion_price"] is not None),
+        })
+    lines = [f"So sánh {summaries[0]['query']} và {summaries[1]['query']}:"]
+    for item in summaries:
+        lines.append(
+            f"• {item['query']}: {item['variants']} mã/màu, tồn {item['stock']}, "
+            f"có thể bán {item['available']}, giá từ {format_ai_money(item['price'])}, "
+            f"{item['promotions']} mã đang khuyến mãi"
+        )
+    if summaries[0]["price"] and summaries[1]["price"]:
+        cheaper = min(summaries, key=lambda item: item["price"])
+        difference = abs(summaries[0]["price"] - summaries[1]["price"])
+        lines.append(f"Giá thấp nhất: {cheaper['query']} rẻ hơn {format_ai_money(difference)}.")
+    return "\n".join(lines)
+
+
+def is_inventory_insight_question(normalized):
+    terms = (
+        "sap het", "gan het", "ton nhieu nhat", "ton cao nhat", "tong gia tri ton",
+        "gia tri ton kho", "ban chay nhung", "can nhap gap", "duoi 5 chiec",
+        "ton kho am", "giu lon hon ton", "loi du lieu ton", "cap nhat lan cuoi",
+    )
+    return any(term in normalized for term in terms) or bool(
+        re.search(r"(?:con|ton)\s+duoi\s+\d+\s*(?:chiec|san pham|xe)?", normalized)
+    )
+
+
+def inventory_insight_answer(question):
+    normalized = normalize_ai_text(question)
+    db = SessionLocal()
+    try:
+        products = db.query(Product).order_by(Product.model, Product.color, Product.code).all()
+    finally:
+        db.close()
+    if not products:
+        return "Hệ thống chưa có dữ liệu sản phẩm để phân tích tồn kho."
+
+    if any(term in normalized for term in ("tong gia tri ton", "gia tri ton kho")):
+        total = sum(max(product.stock or 0, 0) * (product.price or 0) for product in products)
+        priced = sum(1 for product in products if product.price and product.price > 0)
+        return f"Tổng giá trị tồn kho theo giá đại lý hiện tại là {format_ai_money(total)} trên {priced}/{len(products)} mã có giá."
+
+    if any(term in normalized for term in ("ton nhieu nhat", "ton cao nhat")):
+        ranked = sorted(products, key=lambda product: product.stock or 0, reverse=True)[:10]
+        lines = ["Các mã có tồn kho cao nhất:"]
+        lines.extend(f"• {p.code} - {p.model}: tồn {p.stock or 0}, có thể bán {p.available}" for p in ranked)
+        return "\n".join(lines)
+
+    if "cap nhat lan cuoi" in normalized:
+        updated = [product.updated_at for product in products if product.updated_at]
+        if not updated:
+            return "Chưa có thời gian cập nhật tồn kho trong hệ thống."
+        latest = max(updated)
+        return f"Dữ liệu sản phẩm được cập nhật gần nhất lúc {latest.strftime('%H:%M ngày %d/%m/%Y')}."
+
+    if any(term in normalized for term in ("ton kho am", "giu lon hon ton", "loi du lieu ton")):
+        invalid = [
+            product for product in products
+            if (product.stock or 0) < 0 or (product.reserved or 0) < 0 or (product.reserved or 0) > (product.stock or 0)
+        ]
+        if not invalid:
+            return "Không phát hiện mã nào có tồn âm, số giữ âm hoặc số đã giữ lớn hơn tồn kho."
+        lines = [f"Phát hiện {len(invalid)} mã có dữ liệu tồn kho cần kiểm tra:"]
+        lines.extend(f"• {p.code}: tồn {p.stock or 0}, đã giữ {p.reserved or 0}" for p in invalid[:20])
+        return "\n".join(lines)
+
+    if any(term in normalized for term in ("ban chay nhung", "can nhap gap")):
+        monthly_sales = load_monthly_sales()
+        candidates = []
+        for product in products:
+            average = monthly_sales.get(product_match_key(product.model))
+            if average and product.available < average * 2:
+                candidates.append((product, average, max(math.ceil(average * 2 - product.available), 0)))
+        candidates.sort(key=lambda row: (row[2], row[1]), reverse=True)
+        if not candidates:
+            return "Chưa có mã bán chạy nào đang thiếu mức dự trữ hai tháng."
+        lines = ["Các mã bán tốt nhưng tồn khả dụng đang thấp:"]
+        for product, average, needed in candidates[:10]:
+            lines.append(
+                f"• {product.code} - {product.model}: còn {product.available}, "
+                f"bán TB {format_ai_number(average)}/tháng, đề xuất nhập {needed}"
+            )
+        return "\n".join(lines)
+
+    threshold_match = re.search(r"(?:con|ton)?\s*duoi\s+(\d+)\s*(?:chiec|san pham|xe)?", normalized)
+    threshold = int(threshold_match.group(1)) if threshold_match else 5
+    low_stock = [product for product in products if 0 < product.available < threshold]
+    low_stock.sort(key=lambda product: (product.available, product.model, product.code))
+    if not low_stock:
+        return f"Không có mã nào còn từ 1 đến {threshold - 1} chiếc có thể bán."
+    lines = [f"Có {len(low_stock)} mã sắp hết hàng (còn dưới {threshold} chiếc có thể bán):"]
+    lines.extend(f"• {p.code} - {p.model}: còn {p.available}" for p in low_stock[:20])
+    if len(low_stock) > 20:
+        lines.append(f"• Còn {len(low_stock) - 20} mã khác.")
+    return "\n".join(lines)
+
+
+def resolve_conversation_question(messages, latest_question):
+    """Resolve simple ordinal and refinement follow-ups from recent chat context."""
+    normalized = normalize_ai_text(latest_question)
+    previous_assistant = next(
+        (str(item.get("content", "")) for item in reversed(messages[:-1]) if isinstance(item, dict) and item.get("role") == "assistant"),
+        "",
+    )
+    ordinal_words = {"nhat": 1, "mot": 1, "hai": 2, "ba": 3, "tu": 4, "nam": 5}
+    ordinal_match = re.search(r"(?:mau|ma|san pham|xe)\s+thu\s+(nhat|mot|hai|ba|tu|nam)", normalized)
+    if ordinal_match and previous_assistant:
+        codes = re.findall(r"(?:^|\n)\s*(?:•|\d+\.)\s*([A-Za-z0-9][A-Za-z0-9._/-]*)", previous_assistant)
+        position = ordinal_words[ordinal_match.group(1)]
+        if len(codes) >= position:
+            return f"{latest_question} mã {codes[position - 1]}"
+
+    refinement_terms = ("chi lay", "loc them", "trong so do", "mau do", "mau xanh", "con hang thoi", "khuyen mai thoi")
+    if any(term in normalized for term in refinement_terms):
+        previous_user = next(
+            (str(item.get("content", "")) for item in reversed(messages[:-1]) if isinstance(item, dict) and item.get("role") == "user"),
+            "",
+        )
+        if previous_user:
+            return f"{previous_user}. {latest_question}"
+    return latest_question
 
 
 def inventory_planning_search(query):
@@ -2297,10 +2596,22 @@ def extract_inventory_query(question):
 
 def answer_inventory_question(question):
     normalized = normalize_ai_text(question)
+    if "so sanh" in normalized:
+        return comparison_answer(question)
+
+    if is_inventory_insight_question(normalized):
+        return inventory_insight_answer(question)
+
+    if any(term in normalized for term in ("giam nhieu nhat", "giam sau nhat", "khuyen mai tot nhat", "sap het han", "gan het han", "ket thuc som")):
+        return promotion_insight_answer(question)
+
+    if is_product_filter_question(normalized):
+        return product_filter_answer(question)
+
     if is_generic_promotion_question(normalized):
         return active_promotion_answer()
 
-    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "ctkm", "uu dai", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
+    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "ctkm", "uu dai", "so sanh", "tim ", "goi y", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
     if not any(term in normalized for term in supported_terms):
         return "Tôi chỉ hỗ trợ tra cứu tồn kho, số đã giữ, số có thể bán, giá và khuyến mãi trong hệ thống."
 
@@ -2406,6 +2717,7 @@ def inventory_chat_response():
             for item in reversed(messages)
             if isinstance(item, dict) and item.get("role") == "user" and str(item.get("content", "")).strip()
         )
+        latest_question = resolve_conversation_question(messages, latest_question)
         return jsonify({"answer": answer_inventory_question(latest_question)})
     except Exception:
         app.logger.exception("Inventory AI chat failed")

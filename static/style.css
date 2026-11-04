@@ -1365,3 +1365,17 @@ body{
   .promotion-import-form{grid-template-columns:1fr;}
   .promotion-import-form button{width:100%;}
 }
+
+/* Public assistant: keep many suggested questions on one horizontally scrollable row. */
+.public-ai-suggestions{
+  scroll-behavior:smooth;
+  scroll-snap-type:x proximity;
+  overscroll-behavior-x:contain;
+  touch-action:pan-x;
+  scrollbar-width:thin;
+  scrollbar-color:#9bc8e8 transparent;
+}
+.public-ai-suggestions::-webkit-scrollbar{height:5px;}
+.public-ai-suggestions::-webkit-scrollbar-track{background:transparent;}
+.public-ai-suggestions::-webkit-scrollbar-thumb{border-radius:999px;background:#9bc8e8;}
+.public-ai-suggestions button{scroll-snap-align:start;white-space:nowrap;}
