@@ -155,12 +155,6 @@
         <h2 class="icon-title"><span class="module-icon"><i data-lucide="badge-percent"></i></span>Khuyến mãi theo mã hàng</h2>
         <p class="hint">Áp dụng riêng cho Giá đại lý. Giá lẻ luôn giữ nguyên. Tag chỉ hiển thị ngoài trang khách trong khoảng ngày đã đặt.</p>
       </div>
-      {% if promotion_products %}
-      <form method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ toàn bộ khuyến mãi của {{ promotion_products|length }} mã hàng? Thao tác này không thể hoàn tác.');">
-        <input type="hidden" name="action" value="clear_all">
-        <button type="submit" class="promotion-clear-all"><i data-lucide="trash-2"></i>Gỡ tất cả ({{ promotion_products|length }})</button>
-      </form>
-      {% endif %}
     </div>
 
     <form method="POST" action="{{ url_for('admin_import_promotions') }}" enctype="multipart/form-data" class="promotion-import-form">
@@ -171,6 +165,12 @@
       <input type="file" name="file" accept=".xlsx,.xls" required>
       <button type="submit"><i data-lucide="file-up"></i>Import Excel</button>
     </form>
+
+    {% if promotion_products %}
+    <form id="clearAllPromotionsForm" method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ toàn bộ khuyến mãi của {{ promotion_products|length }} mã hàng? Thao tác này không thể hoàn tác.');">
+      <input type="hidden" name="action" value="clear_all">
+    </form>
+    {% endif %}
 
     <form method="POST" action="{{ url_for('admin_update_promotion') }}" id="promotionBatchForm">
       <input type="hidden" name="promotions_json" id="promotionsJson">
@@ -183,7 +183,12 @@
       </div>
       <div class="promotion-form-actions">
         <button type="button" id="addPromotionRow" class="promotion-add-row"><i data-lucide="plus"></i>Thêm dòng</button>
-        <button type="submit" class="promotion-save"><i data-lucide="save"></i>Lưu tất cả khuyến mãi</button>
+        <div class="promotion-primary-actions">
+          {% if promotion_products %}
+          <button type="submit" form="clearAllPromotionsForm" class="promotion-clear-all"><i data-lucide="trash-2"></i>Gỡ tất cả ({{ promotion_products|length }})</button>
+          {% endif %}
+          <button type="submit" class="promotion-save"><i data-lucide="save"></i>Lưu tất cả khuyến mãi</button>
+        </div>
       </div>
     </form>
 
@@ -200,7 +205,12 @@
             <td>{{ p.promotion_start.strftime('%d/%m/%Y') if p.promotion_start else '—' }}</td>
             <td>{{ p.promotion_end.strftime('%d/%m/%Y') if p.promotion_end else '—' }}</td>
             <td><span class="promotion-status {{ 'active' if is_active else '' }}">{{ 'Đang áp dụng' if is_active else ('Sắp diễn ra' if p.promotion_start and today < p.promotion_start else 'Đã kết thúc') }}</span></td>
-            <td><form method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ khuyến mãi của mã {{ p.code }}?');"><input type="hidden" name="code" value="{{ p.code }}"><input type="hidden" name="action" value="clear"><button type="submit" class="promotion-clear">Gỡ</button></form></td>
+            <td>
+              <div class="promotion-row-actions">
+                <button type="button" class="promotion-edit" data-code="{{ p.code }}" data-price="{{ p.promotion_price or '' }}" data-tag="{{ p.promotion_tag or 'discount' }}" data-start="{{ p.promotion_start.isoformat() if p.promotion_start else '' }}" data-end="{{ p.promotion_end.isoformat() if p.promotion_end else '' }}"><i data-lucide="pencil"></i>Sửa</button>
+                <form method="POST" action="{{ url_for('admin_update_promotion') }}" onsubmit="return confirm('Gỡ khuyến mãi của mã {{ p.code }}?');"><input type="hidden" name="code" value="{{ p.code }}"><input type="hidden" name="action" value="clear"><button type="submit" class="promotion-clear">Gỡ</button></form>
+              </div>
+            </td>
           </tr>
         {% else %}
           <tr><td colspan="7" class="empty-state">Chưa có mã hàng nào được cài khuyến mãi.</td></tr>
@@ -566,7 +576,7 @@
     });
   }
 
-  function addPromotionRow() {
+  function addPromotionRow(promotion) {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td class="promotion-row-number"></td>
@@ -577,6 +587,16 @@
       <td><input class="promotion-end-input" type="date" required></td>
       <td><button type="button" class="promotion-remove-row" title="Xóa dòng"><i data-lucide="trash-2"></i></button></td>`;
     promotionRows.appendChild(row);
+
+    if (promotion) {
+      const price = String(promotion.price || "").replace(/\.0+$/, "").replace(/\D/g, "");
+      row.querySelector(".promotion-code-input").value = promotion.code || "";
+      row.querySelector(".promotion-price-input").dataset.value = price;
+      row.querySelector(".promotion-price-input").value = price ? Number(price).toLocaleString("vi-VN") : "";
+      row.querySelector(".promotion-tag-input").value = promotion.tag || "discount";
+      row.querySelector(".promotion-start-input").value = promotion.start || "";
+      row.querySelector(".promotion-end-input").value = promotion.end || "";
+    }
 
     row.querySelector(".promotion-code-input").addEventListener("input", function () {
       validatePromotionCodes(false);
@@ -598,7 +618,34 @@
   }
 
   if (promotionRows && promotionBatchForm && promotionsJson && addPromotionRowButton) {
-    addPromotionRowButton.addEventListener("click", addPromotionRow);
+    addPromotionRowButton.addEventListener("click", function () { addPromotionRow(); });
+    document.querySelectorAll(".promotion-edit").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const existingRow = Array.from(promotionRows.querySelectorAll("tr")).find(function (row) {
+          return row.querySelector(".promotion-code-input").value.trim().toLocaleLowerCase("vi") === button.dataset.code.trim().toLocaleLowerCase("vi");
+        });
+        if (existingRow) {
+          existingRow.scrollIntoView({ behavior: "smooth", block: "center" });
+          existingRow.querySelector(".promotion-price-input").focus();
+          return;
+        }
+        const blankRow = Array.from(promotionRows.querySelectorAll("tr")).find(function (row) {
+          return !row.querySelector(".promotion-code-input").value.trim();
+        });
+        if (blankRow) blankRow.remove();
+        addPromotionRow({
+          code: button.dataset.code,
+          price: button.dataset.price,
+          tag: button.dataset.tag,
+          start: button.dataset.start,
+          end: button.dataset.end
+        });
+        validatePromotionCodes(false);
+        refreshPromotionCodeOptions();
+        promotionBatchForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        promotionRows.lastElementChild.querySelector(".promotion-price-input").focus();
+      });
+    });
     promotionBatchForm.addEventListener("submit", function (event) {
       if (!validatePromotionCodes(true)) {
         event.preventDefault();
