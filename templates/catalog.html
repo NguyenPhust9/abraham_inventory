@@ -595,6 +595,20 @@
           element.appendChild(row);
           return;
         }
+        const stockItem = line.match(/^(\d+)\.\s+(.+?):\s+tồn\s+(\d+),\s+giữ\s+(\d+),\s+còn\s+(\d+)$/i);
+        if (stockItem) {
+          const row = document.createElement("div");
+          row.className = "inventory-ai-result-row";
+          const name = document.createElement("span");
+          name.className = "inventory-ai-result-name";
+          name.textContent = `${stockItem[1]}. ${stockItem[2]}`;
+          const values = document.createElement("span");
+          values.className = "inventory-ai-result-values";
+          values.innerHTML = `tồn <strong class="inventory-ai-highlight">${stockItem[3]}</strong><span>, giữ</span><strong class="inventory-ai-highlight">${stockItem[4]}</strong><span>, còn</span><strong class="inventory-ai-highlight">${stockItem[5]}</strong>`;
+          row.append(name, values);
+          element.appendChild(row);
+          return;
+        }
         const total = line.match(/^Tổng có thể bán:\s*(\d+)$/i);
         if (total) {
           const footer = document.createElement("div");

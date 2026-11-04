@@ -2306,16 +2306,28 @@ def product_filter_answer(question):
     if not rows:
         return "Không tìm thấy sản phẩm phù hợp với các điều kiện bạn yêu cầu."
     rows.sort(key=lambda row: (row[1] is None, row[1] or 0, row[0].model, row[0].code))
+    available_rows = [row for row in rows if row[0].available > 0]
+    out_of_stock_rows = [row for row in rows if row[0].available <= 0]
+    total_available = sum(max(row[0].available, 0) for row in rows)
     lines = [f"Tìm thấy {len(rows)} sản phẩm phù hợp:"]
-    for product, shown_price, promotion_active in rows[:20]:
-        promo_label = " (khuyến mãi)" if promotion_active else ""
-        lines.append(
-            f"• {product.code} - {product.model}"
-            f"{' - ' + product.color if product.color else ''}: còn {product.available}, "
-            f"giá {format_ai_money(shown_price)}{promo_label}"
-        )
-    if len(rows) > 20:
-        lines.append(f"• Còn {len(rows) - 20} sản phẩm khác.")
+    if available_rows:
+        lines.extend(["", "━━ CÒN HÀNG ━━"])
+        for index, (product, shown_price, promotion_active) in enumerate(available_rows[:15], start=1):
+            promo_label = " (khuyến mãi)" if promotion_active else ""
+            label = f"{product.code} - {product.model}{' - ' + product.color if product.color else ''}"
+            lines.append(f"{index}. {label}: còn {product.available}, giá {format_ai_money(shown_price)}{promo_label}")
+        if len(available_rows) > 15:
+            lines.append(f"• Còn {len(available_rows) - 15} sản phẩm còn hàng khác.")
+    if out_of_stock_rows:
+        lines.extend(["", "━━ HẾT HÀNG ━━"])
+        for index, (product, shown_price, promotion_active) in enumerate(out_of_stock_rows[:10], start=1):
+            promo_label = " (khuyến mãi)" if promotion_active else ""
+            label = f"{product.code} - {product.model}{' - ' + product.color if product.color else ''}"
+            lines.append(f"{index}. {label}: còn 0, giá {format_ai_money(shown_price)}{promo_label}")
+        if len(out_of_stock_rows) > 10:
+            lines.append(f"• Còn {len(out_of_stock_rows) - 10} sản phẩm hết hàng khác.")
+    lines.append("")
+    lines.append(f"Tổng có thể bán: {total_available}")
     return "\n".join(lines)
 
 
@@ -2559,17 +2571,6 @@ def extract_inventory_query(question):
     if "het hang" in normalized or "co the ban bang 0" in normalized:
         return "hết hàng"
 
-    code_match = re.search(r"\bma(?:\s+hang)?\s+([a-z0-9][a-z0-9._/-]*)", normalized)
-    if code_match:
-        return code_match.group(1)
-
-    product_tokens = [
-        token for token in re.findall(r"[a-z0-9][a-z0-9._/-]*", normalized)
-        if len(token) >= 4 and any(char.isalpha() for char in token) and any(char.isdigit() for char in token)
-    ]
-    if product_tokens:
-        return max(product_tokens, key=len)
-
     db = SessionLocal()
     try:
         products = db.query(Product.code, Product.model).all()
@@ -2583,6 +2584,17 @@ def extract_inventory_query(question):
                 candidates.add((len(candidate), str(value)))
     if candidates:
         return max(candidates)[1]
+
+    code_match = re.search(r"\bma(?:\s+hang)?\s+([a-z0-9][a-z0-9._/-]*)", normalized)
+    if code_match:
+        return code_match.group(1)
+
+    product_tokens = [
+        token for token in re.findall(r"[a-z0-9][a-z0-9._/-]*", normalized)
+        if len(token) >= 4 and any(char.isalpha() for char in token) and any(char.isdigit() for char in token)
+    ]
+    if product_tokens:
+        return max(product_tokens, key=len)
 
     stop_words = {
         "con", "ton", "hien", "tai", "bao", "nhieu", "gia", "khuyen", "mai",
@@ -2611,7 +2623,7 @@ def answer_inventory_question(question):
     if is_generic_promotion_question(normalized):
         return active_promotion_answer()
 
-    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "ctkm", "uu dai", "so sanh", "tim ", "goi y", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
+    supported_terms = ("ton", "con ", "bao nhieu", "con hang", "co hang", "kiem tra", "ma ", "gia", "khuyen mai", "ctkm", "uu dai", "so sanh", "tim ", "goi y", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
     if not any(term in normalized for term in supported_terms):
         return "Tôi chỉ hỗ trợ tra cứu tồn kho, số đã giữ, số có thể bán, giá và khuyến mãi trong hệ thống."
 
@@ -2662,41 +2674,40 @@ def answer_inventory_question(question):
             answer += "."
         return answer
 
+    unique_models = {item["model"] for item in products if item.get("model")}
+    model_name = products[0]["model"] if len(unique_models) == 1 else (query.upper() if any(char.isdigit() for char in query) else (products[0]["model"] or query))
     if wants_price:
-        model_name = query.upper() if any(char.isdigit() for char in query) else (products[0]["model"] or query)
         lines = [f"Giá và số lượng có thể bán của {model_name}:"]
-        available_products = [item for item in products if item["available"] > 0]
-        out_of_stock_products = [item for item in products if item["available"] <= 0]
+    else:
+        lines = [
+            f"Tồn kho và số lượng có thể bán của {model_name} "
+            f"(Tổng tồn {total_stock}, đã giữ {total_reserved}, có thể bán {total_available}):"
+        ]
+    available_products = [item for item in products if item["available"] > 0]
+    out_of_stock_products = [item for item in products if item["available"] <= 0]
 
-        if available_products:
-            lines.extend(["", "━━ CÒN HÀNG ━━"])
-            for index, item in enumerate(available_products, start=1):
-                label = item["color"] or item["code"]
-                shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
-                lines.append(f"{index}. {label}: còn {item['available']}, giá {format_ai_money(shown_price)}")
-
-        if out_of_stock_products:
-            lines.extend(["", "━━ HẾT HÀNG ━━"])
-            for index, item in enumerate(out_of_stock_products, start=1):
-                label = item["color"] or item["code"]
-                shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
-                lines.append(f"{index}. {label}: còn 0, giá {format_ai_money(shown_price)}")
-
-        lines.append("")
-        lines.append(f"Tổng có thể bán: {total_available}")
-        return "\n".join(lines)
-
-    lines = [
-        f"Tìm thấy {len(products)} mã phù hợp. Tổng tồn {total_stock}, đã giữ {total_reserved}, có thể bán {total_available}:"
-    ]
-    for item in products[:12]:
-        line = f"• {item['code']}: tồn {item['stock']}, giữ {item['reserved']}, bán được {item['available']}"
-        if wants_price:
+    if available_products:
+        lines.extend(["", "━━ CÒN HÀNG ━━"])
+        for index, item in enumerate(available_products, start=1):
+            label = item["color"] or item["code"]
             shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
-            line += f", giá {format_ai_money(shown_price)}"
-        lines.append(line)
-    if len(products) > 12:
-        lines.append(f"• Còn {len(products) - 12} mã khác.")
+            if wants_price:
+                lines.append(f"{index}. {label}: còn {item['available']}, giá {format_ai_money(shown_price)}")
+            else:
+                lines.append(f"{index}. {item['code']}: tồn {item['stock']}, giữ {item['reserved']}, còn {item['available']}")
+
+    if out_of_stock_products:
+        lines.extend(["", "━━ HẾT HÀNG ━━"])
+        for index, item in enumerate(out_of_stock_products, start=1):
+            label = item["color"] or item["code"]
+            shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
+            if wants_price:
+                lines.append(f"{index}. {label}: còn 0, giá {format_ai_money(shown_price)}")
+            else:
+                lines.append(f"{index}. {item['code']}: tồn {item['stock']}, giữ {item['reserved']}, còn 0")
+
+    lines.append("")
+    lines.append(f"Tổng có thể bán: {total_available}")
     return "\n".join(lines)
 
 
@@ -3674,4 +3685,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=5000,
         debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+        use_reloader=True,
     )
