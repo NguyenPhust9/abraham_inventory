@@ -2161,6 +2161,62 @@ def format_ai_number(value):
     return f"{number:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def active_promotion_answer():
+    """Return promotions that are valid today for generic CTKM questions."""
+    today = datetime.now().date()
+    db = SessionLocal()
+    try:
+        products = (
+            db.query(Product)
+            .filter(
+                Product.promotion_price.isnot(None),
+                Product.promotion_price > 0,
+                Product.promotion_start.isnot(None),
+                Product.promotion_end.isnot(None),
+                Product.promotion_start <= today,
+                Product.promotion_end >= today,
+            )
+            .order_by(Product.promotion_end, Product.model, Product.color, Product.code)
+            .all()
+        )
+    finally:
+        db.close()
+
+    if not products:
+        return "Hiện chưa có chương trình khuyến mãi nào đang áp dụng."
+
+    lines = [f"Hiện có {len(products)} mã hàng đang áp dụng khuyến mãi:"]
+    for product in products[:20]:
+        label = product.model or product.code
+        if product.color:
+            label += f" - {product.color}"
+        lines.append(
+            f"• {product.code} ({label}): {format_ai_money(product.promotion_price)}, "
+            f"áp dụng đến {product.promotion_end.strftime('%d/%m/%Y')}"
+        )
+    if len(products) > 20:
+        lines.append(f"• Còn {len(products) - 20} mã khuyến mãi khác.")
+    return "\n".join(lines)
+
+
+def is_generic_promotion_question(normalized):
+    """Recognize requests for the promotion list, without requiring a product."""
+    compact = re.sub(r"[^a-z0-9]", "", normalized)
+    if compact == "ctkm":
+        return True
+    phrases = (
+        "chuong trinh khuyen mai",
+        "danh sach khuyen mai",
+        "khuyen mai nao",
+        "dang khuyen mai",
+        "cac khuyen mai",
+        "co khuyen mai gi",
+        "uu dai nao",
+        "cac uu dai",
+    )
+    return any(phrase in normalized for phrase in phrases)
+
+
 def inventory_planning_search(query):
     """Return the same monthly-sales and two-month reserve data as the reorder panel."""
     monthly_sales = load_monthly_sales()
@@ -2241,7 +2297,10 @@ def extract_inventory_query(question):
 
 def answer_inventory_question(question):
     normalized = normalize_ai_text(question)
-    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
+    if is_generic_promotion_question(normalized):
+        return active_promotion_answer()
+
+    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "ctkm", "uu dai", "san pham", "mau", "het hang", "da giu", "co the ban", "trung binh", "ban tb", "can nhap", "nhap them")
     if not any(term in normalized for term in supported_terms):
         return "Tôi chỉ hỗ trợ tra cứu tồn kho, số đã giữ, số có thể bán, giá và khuyến mãi trong hệ thống."
 
