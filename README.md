@@ -74,7 +74,7 @@ Các bước chung (lấy ví dụ Render):
 2. Vào Render.com → "New Web Service" → chọn repo GitHub vừa tạo.
 3. Build command: `pip install -r requirements.txt`
 4. Start command: `gunicorn app:app` (cần thêm `gunicorn` vào `requirements.txt`)
-5. Vào mục Environment Variables, thêm `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SECRET_KEY` (giá trị bạn tự đặt, không dùng giá trị mặc định trong code).
+5. Vào mục Environment Variables, thêm `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SECRET_KEY` (giá trị bạn tự đặt, không dùng giá trị mặc định trong code). Trợ lý tồn kho chạy trực tiếp trên máy chủ và không cần API key bên ngoài.
 6. Sau khi deploy xong, Render cho bạn 1 link dạng `https://ten-app.onrender.com` — dùng link này để tạo mã QR.
 
 **Lưu ý về dữ liệu khi deploy:** một số hosting miễn phí (như Render free tier) **không giữ file SQLite lâu dài** — mỗi lần server khởi động lại có thể mất dữ liệu. Nếu bạn định dùng lâu dài/dữ liệu quan trọng, nên nâng cấp sang database ngoài như PostgreSQL (Render/Railway đều có gói Postgres miễn phí đi kèm) — báo mình nếu cần, mình sẽ chỉnh code qua Postgres.

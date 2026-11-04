@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=41">
+<script src="{{ url_for('static', filename='vendor/lucide.min.js') }}?v=468" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=44">
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -21,5 +22,10 @@
   {% endif %}
 {% endwith %}
 {% block content %}{% endblock %}
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  if (window.lucide) window.lucide.createIcons();
+});
+</script>
 </body>
 </html>

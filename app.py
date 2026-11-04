@@ -2051,6 +2051,259 @@ def admin_dashboard():
         db.close()
 
 
+def inventory_ai_search(query):
+    """Read-only product lookup used by the admin AI assistant."""
+    query = str(query or "").strip()
+    if not query:
+        return {"query": query, "count": 0, "products": [], "message": "Chưa có mã hoặc tên sản phẩm để tra cứu."}
+
+    db = SessionLocal()
+    try:
+        normalized_query = unicodedata.normalize("NFD", query.lower())
+        normalized_query = "".join(char for char in normalized_query if unicodedata.category(char) != "Mn")
+        if "het hang" in normalized_query or "co the ban bang 0" in normalized_query:
+            products = (
+                db.query(Product)
+                .filter((func.coalesce(Product.stock, 0) - func.coalesce(Product.reserved, 0)) <= 0)
+                .order_by(Product.model, Product.color, Product.code)
+                .limit(30)
+                .all()
+            )
+            match_type = "out_of_stock"
+        else:
+            exact = db.query(Product).filter(func.lower(Product.code) == query.lower()).all()
+            if exact:
+                products = exact
+                match_type = "exact_code"
+            else:
+                compact_query = re.sub(r"[^a-z0-9]", "", normalize_ai_text(query))
+                if len(compact_query) >= 4 and any(char.isdigit() for char in compact_query):
+                    candidates = db.query(Product).order_by(Product.model, Product.color, Product.code).all()
+                    normalized_query = normalize_ai_text(query).strip()
+                    direct_code_matches = [
+                        product for product in candidates
+                        if normalized_query in normalize_ai_text(product.code)
+                    ]
+                    direct_model_matches = [
+                        product for product in candidates
+                        if normalized_query in normalize_ai_text(product.model)
+                    ]
+                    compact_matches = [
+                        product for product in candidates
+                        if compact_query in re.sub(r"[^a-z0-9]", "", normalize_ai_text(product.code))
+                        or compact_query in re.sub(r"[^a-z0-9]", "", normalize_ai_text(product.model))
+                    ]
+                    products = (direct_code_matches or direct_model_matches or compact_matches)[:30]
+                else:
+                    like = f"%{query}%"
+                    products = (
+                        db.query(Product)
+                        .filter(or_(Product.code.ilike(like), Product.model.ilike(like), Product.color.ilike(like)))
+                        .order_by(Product.model, Product.color, Product.code)
+                        .limit(30)
+                        .all()
+                    )
+                match_type = "search"
+
+        today = datetime.now().date()
+        rows = []
+        for product in products:
+            promotion_active = bool(
+                product.promotion_price
+                and product.promotion_price > 0
+                and product.promotion_start
+                and product.promotion_end
+                and product.promotion_start <= today <= product.promotion_end
+            )
+            rows.append({
+                "code": product.code,
+                "model": product.model,
+                "color": product.color,
+                "category": product.category,
+                "unit": product.unit,
+                "stock": product.stock or 0,
+                "reserved": product.reserved or 0,
+                "available": product.available,
+                "dealer_price": product.price,
+                "retail_price": product.retail_price,
+                "promotion_price": product.promotion_price if promotion_active else None,
+                "promotion_start": product.promotion_start.isoformat() if promotion_active else None,
+                "promotion_end": product.promotion_end.isoformat() if promotion_active else None,
+                "updated_at": product.updated_at.isoformat() if product.updated_at else None,
+            })
+
+        return {
+            "query": query,
+            "match_type": match_type,
+            "count": len(rows),
+            "truncated": len(rows) == 30,
+            "products": rows,
+        }
+    finally:
+        db.close()
+
+
+def normalize_ai_text(value):
+    value = unicodedata.normalize("NFD", str(value or "").lower())
+    return "".join(char for char in value if unicodedata.category(char) != "Mn")
+
+
+def format_ai_money(value):
+    if value is None:
+        return "chưa có"
+    return f"{float(value):,.0f}".replace(",", ".") + "đ"
+
+
+def extract_inventory_query(question):
+    """Extract a product code/name from common Vietnamese inventory questions."""
+    normalized = normalize_ai_text(question)
+    if "het hang" in normalized or "co the ban bang 0" in normalized:
+        return "hết hàng"
+
+    code_match = re.search(r"\bma(?:\s+hang)?\s+([a-z0-9][a-z0-9._/-]*)", normalized)
+    if code_match:
+        return code_match.group(1)
+
+    product_tokens = [
+        token for token in re.findall(r"[a-z0-9][a-z0-9._/-]*", normalized)
+        if len(token) >= 4 and any(char.isalpha() for char in token) and any(char.isdigit() for char in token)
+    ]
+    if product_tokens:
+        return max(product_tokens, key=len)
+
+    db = SessionLocal()
+    try:
+        products = db.query(Product.code, Product.model).all()
+    finally:
+        db.close()
+    candidates = set()
+    for code, model in products:
+        for value in (code, model):
+            candidate = normalize_ai_text(value).strip()
+            if len(candidate) >= 3 and candidate in normalized:
+                candidates.add((len(candidate), str(value)))
+    if candidates:
+        return max(candidates)[1]
+
+    stop_words = {
+        "con", "ton", "hien", "tai", "bao", "nhieu", "gia", "khuyen", "mai",
+        "san", "pham", "mau", "xe", "tim", "kiem", "cho", "toi", "la", "nao",
+        "da", "giu", "co", "the", "ban", "cua", "xem", "giup", "hang",
+    }
+    tokens = re.findall(r"[a-z0-9][a-z0-9._/-]*", normalized)
+    useful = [token for token in tokens if token not in stop_words and len(token) >= 2]
+    return useful[-1] if useful else ""
+
+
+def answer_inventory_question(question):
+    normalized = normalize_ai_text(question)
+    supported_terms = ("ton", "ma ", "gia", "khuyen mai", "san pham", "mau", "het hang", "da giu", "co the ban")
+    if not any(term in normalized for term in supported_terms):
+        return "Tôi chỉ hỗ trợ tra cứu tồn kho, số đã giữ, số có thể bán, giá và khuyến mãi trong hệ thống."
+
+    query = extract_inventory_query(question)
+    if not query:
+        return "Bạn hãy cho tôi mã hàng hoặc tên mẫu xe cần tra cứu. Ví dụ: “Mã 3dao20 còn tồn bao nhiêu?”"
+    result = inventory_ai_search(query)
+    products = result["products"]
+    if not products:
+        return f"Không tìm thấy mã hoặc mẫu xe “{query}” trong hệ thống. Bạn kiểm tra lại tên giúp tôi."
+
+    if result.get("match_type") == "out_of_stock":
+        codes = ", ".join(item["code"] for item in products[:20])
+        suffix = "" if len(products) <= 20 else f" và {len(products) - 20} mã khác"
+        return f"Hiện có {len(products)} mã không còn số lượng có thể bán: {codes}{suffix}."
+
+    total_stock = sum(item["stock"] for item in products)
+    total_reserved = sum(item["reserved"] for item in products)
+    total_available = sum(item["available"] for item in products)
+    wants_price = "gia" in normalized or "khuyen mai" in normalized
+
+    if len(products) == 1:
+        item = products[0]
+        answer = (
+            f"Mã {item['code']} ({item['model']}{' - ' + item['color'] if item['color'] else ''}) hiện tồn "
+            f"{item['stock']} {item['unit'] or 'chiếc'}, đã giữ {item['reserved']}, có thể bán {item['available']}."
+        )
+        if wants_price:
+            answer += f" Giá đại lý {format_ai_money(item['dealer_price'])}, giá lẻ {format_ai_money(item['retail_price'])}"
+            if item["promotion_price"] is not None:
+                answer += f", giá khuyến mãi {format_ai_money(item['promotion_price'])} đến {item['promotion_end']}"
+            answer += "."
+        return answer
+
+    if wants_price:
+        model_name = query.upper() if any(char.isdigit() for char in query) else (products[0]["model"] or query)
+        lines = [f"Giá và số lượng có thể bán của {model_name}:"]
+        available_products = [item for item in products if item["available"] > 0]
+        out_of_stock_products = [item for item in products if item["available"] <= 0]
+
+        if available_products:
+            lines.extend(["", "━━ CÒN HÀNG ━━"])
+            for index, item in enumerate(available_products, start=1):
+                label = item["color"] or item["code"]
+                shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
+                lines.append(f"{index}. {label}: còn {item['available']}, giá {format_ai_money(shown_price)}")
+
+        if out_of_stock_products:
+            lines.extend(["", "━━ HẾT HÀNG ━━"])
+            for index, item in enumerate(out_of_stock_products, start=1):
+                label = item["color"] or item["code"]
+                shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
+                lines.append(f"{index}. {label}: còn 0, giá {format_ai_money(shown_price)}")
+
+        lines.append("")
+        lines.append(f"Tổng có thể bán: {total_available}")
+        return "\n".join(lines)
+
+    lines = [
+        f"Tìm thấy {len(products)} mã phù hợp. Tổng tồn {total_stock}, đã giữ {total_reserved}, có thể bán {total_available}:"
+    ]
+    for item in products[:12]:
+        line = f"• {item['code']}: tồn {item['stock']}, giữ {item['reserved']}, bán được {item['available']}"
+        if wants_price:
+            shown_price = item["promotion_price"] if item["promotion_price"] is not None else item["dealer_price"]
+            line += f", giá {format_ai_money(shown_price)}"
+        lines.append(line)
+    if len(products) > 12:
+        lines.append(f"• Còn {len(products) - 12} mã khác.")
+    return "\n".join(lines)
+
+
+def inventory_chat_response():
+    body = request.get_json(silent=True) or {}
+    messages = body.get("messages", [])
+    if not isinstance(messages, list):
+        return jsonify({"error": "Dữ liệu hội thoại không hợp lệ."}), 400
+    messages = messages[-8:]
+    if not messages or not any(item.get("role") == "user" and str(item.get("content", "")).strip() for item in messages if isinstance(item, dict)):
+        return jsonify({"error": "Vui lòng nhập câu hỏi."}), 400
+    if any(len(str(item.get("content", ""))) > 1000 for item in messages if isinstance(item, dict)):
+        return jsonify({"error": "Câu hỏi quá dài."}), 400
+
+    try:
+        latest_question = next(
+            str(item.get("content", "")).strip()
+            for item in reversed(messages)
+            if isinstance(item, dict) and item.get("role") == "user" and str(item.get("content", "")).strip()
+        )
+        return jsonify({"answer": answer_inventory_question(latest_question)})
+    except Exception:
+        app.logger.exception("Inventory AI chat failed")
+        return jsonify({"error": "Trợ lý gặp lỗi khi xử lý câu hỏi."}), 500
+
+
+@app.route("/api/inventory-assistant", methods=["POST"])
+def public_inventory_ai_chat():
+    return inventory_chat_response()
+
+
+@app.route("/admin/ai/chat", methods=["POST"])
+@login_required
+def admin_ai_chat():
+    return inventory_chat_response()
+
+
 @app.route("/admin/dealers")
 @login_required
 def admin_dealers():

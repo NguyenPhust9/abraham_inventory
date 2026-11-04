@@ -491,6 +491,27 @@
 
 </div>
 
+<button type="button" class="inventory-ai-launcher" id="inventoryAiLauncher" aria-controls="inventoryAiPanel" aria-expanded="false">
+  <i data-lucide="bot"></i><span>Hỏi Abraham</span>
+</button>
+<aside class="inventory-ai-panel" id="inventoryAiPanel" aria-label="Trợ lý tồn kho" hidden>
+  <header class="inventory-ai-header">
+    <div><span class="inventory-ai-avatar"><img src="{{ url_for('static', filename='favicon.png') }}" alt=""></span><span><strong>Trợ lý Abraham</strong><small>Tra cứu dữ liệu hiện tại miễn phí</small></span></div>
+    <button type="button" id="inventoryAiClose" aria-label="Đóng trợ lý"><i data-lucide="x"></i></button>
+  </header>
+  <div class="inventory-ai-messages" id="inventoryAiMessages" aria-live="polite">
+    <div class="inventory-ai-message assistant">Bạn muốn kiểm tra tồn kho hoặc giá của mã xe nào?</div>
+  </div>
+  <div class="inventory-ai-suggestions">
+    <button type="button" data-question="Mã 3dao20 hiện còn tồn bao nhiêu?">Tồn mã 3dao20</button>
+    <button type="button" data-question="Những mã hàng nào đang có thể bán bằng 0?">Mã đã hết hàng</button>
+  </div>
+  <form class="inventory-ai-form" id="inventoryAiForm">
+    <textarea id="inventoryAiInput" maxlength="1000" rows="1" placeholder="Ví dụ: mã 3dao20 còn bao nhiêu?" required></textarea>
+    <button type="submit" aria-label="Gửi câu hỏi"><i data-lucide="send"></i></button>
+  </form>
+</aside>
+
 
 <!-- =========================================================
      CATALOG JS
@@ -509,6 +530,126 @@
   }, 30000);
 </script>
 {% endif %}
+
+<script>
+(() => {
+  const launcher = document.getElementById("inventoryAiLauncher");
+  const panel = document.getElementById("inventoryAiPanel");
+  const closeButton = document.getElementById("inventoryAiClose");
+  const form = document.getElementById("inventoryAiForm");
+  const input = document.getElementById("inventoryAiInput");
+  const messages = document.getElementById("inventoryAiMessages");
+  if (!launcher || !panel || !form) return;
+
+  function toggle(open) {
+    panel.hidden = !open;
+    launcher.setAttribute("aria-expanded", String(open));
+    if (open) input.focus();
+  }
+  function addMessage(text, role) {
+    const message = document.createElement("div");
+    message.className = "inventory-ai-message " + role;
+    message.textContent = text;
+    messages.appendChild(message);
+    messages.scrollTop = messages.scrollHeight;
+    return message;
+  }
+  function renderAnswer(element, text) {
+    const pattern = /(Tổng tồn|Tổng có thể bán|đã giữ|có thể bán|bán được|tồn|giữ|còn|giá(?: đại lý| lẻ| khuyến mãi)?)\s*:?\s+([\d.]+(?:đ)?)/gi;
+    element.textContent = "";
+    const lines = text.split("\n");
+    if (lines.some(line => line.includes("━━"))) {
+      element.classList.add("structured");
+      lines.forEach((line, lineIndex) => {
+        line = line.trim();
+        if (!line) return;
+        if (line.includes("━━")) {
+          const section = document.createElement("div");
+          section.className = "inventory-ai-section " + (line.includes("HẾT") ? "out" : "available");
+          section.innerHTML = `<span>${line.includes("HẾT") ? "▰" : "⬡"}</span>${line.replace(/━/g, "").trim()}`;
+          element.appendChild(section);
+          return;
+        }
+        const item = line.match(/^(\d+)\.\s+(.+?):\s+còn\s+(\d+),\s+giá\s+(.+)$/i);
+        if (item) {
+          const row = document.createElement("div");
+          row.className = "inventory-ai-result-row";
+          const name = document.createElement("span");
+          name.className = "inventory-ai-result-name";
+          name.textContent = `${item[1]}. ${item[2]}`;
+          const values = document.createElement("span");
+          values.className = "inventory-ai-result-values";
+          values.innerHTML = `còn <strong class="inventory-ai-highlight">${item[3]}</strong><span>, giá</span><strong class="inventory-ai-highlight price">${item[4]}</strong>`;
+          row.append(name, values);
+          element.appendChild(row);
+          return;
+        }
+        const total = line.match(/^Tổng có thể bán:\s*(\d+)$/i);
+        if (total) {
+          const footer = document.createElement("div");
+          footer.className = "inventory-ai-total";
+          footer.innerHTML = `<span>▧ &nbsp;Tổng có thể bán</span><strong class="inventory-ai-highlight">${total[1]}</strong>`;
+          element.appendChild(footer);
+          return;
+        }
+        const title = document.createElement("div");
+        title.className = lineIndex === 0 ? "inventory-ai-answer-title" : "inventory-ai-answer-line";
+        title.textContent = line;
+        element.appendChild(title);
+      });
+      return;
+    }
+    let cursor = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      element.appendChild(document.createTextNode(text.slice(cursor, match.index) + match[1] + " "));
+      const highlight = document.createElement("strong");
+      highlight.className = "inventory-ai-highlight";
+      highlight.textContent = match[2];
+      element.appendChild(highlight);
+      cursor = pattern.lastIndex;
+    }
+    element.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+  async function ask(question) {
+    question = question.trim();
+    if (!question) return;
+    toggle(true);
+    addMessage(question, "user");
+    input.value = "";
+    input.disabled = true;
+    const loading = addMessage("Đang tra dữ liệu hiện tại…", "assistant loading");
+    try {
+      const response = await fetch("{{ url_for('public_inventory_ai_chat') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: question }] })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Không thể tra cứu.");
+      renderAnswer(loading, data.answer);
+      loading.classList.remove("loading");
+    } catch (error) {
+      loading.textContent = error.message || "Không thể kết nối trợ lý.";
+      loading.classList.remove("loading");
+      loading.classList.add("error");
+    } finally {
+      input.disabled = false;
+      input.focus();
+    }
+  }
+  launcher.addEventListener("click", () => toggle(panel.hidden));
+  closeButton.addEventListener("click", () => toggle(false));
+  form.addEventListener("submit", event => { event.preventDefault(); ask(input.value); });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
+  });
+  document.querySelectorAll(".inventory-ai-suggestions button").forEach(button => {
+    button.addEventListener("click", () => ask(button.dataset.question || ""));
+  });
+  if (window.lucide) window.lucide.createIcons();
+})();
+</script>
 
 
 <!-- =========================================================
