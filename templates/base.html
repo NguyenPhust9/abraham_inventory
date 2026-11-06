@@ -5,6 +5,18 @@
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#100D19">
+{% if request.endpoint and not request.endpoint.startswith('admin_') %}
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-P2PEH7NT7E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-P2PEH7NT7E', {
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false
+  });
+</script>
+{% endif %}
 <title>{% block title %}Kho Xe Đạp | Abraham Bike{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
