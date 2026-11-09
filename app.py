@@ -17,8 +17,8 @@ from flask_login import (  # type: ignore
     LoginManager, UserMixin, login_user, logout_user,
     login_required
 )
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey, UniqueConstraint, text, func, inspect, or_  # type: ignore
-from sqlalchemy.orm import sessionmaker, declarative_base  # type: ignore
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey, UniqueConstraint, text, func, inspect, or_, and_, case, event  # type: ignore
+from sqlalchemy.orm import sessionmaker, declarative_base, Session, load_only  # type: ignore
 from sqlalchemy.engine import make_url  # type: ignore
 from sqlalchemy.pool import NullPool  # type: ignore
 from sqlalchemy.dialects.postgresql import insert as pg_insert  # type: ignore
@@ -188,6 +188,30 @@ class AppSetting(Base):
 
     key = Column(String, primary_key=True)
     value = Column(String, nullable=False)
+
+
+def bump_catalog_cache_version(session):
+    revision = str(time.time_ns())
+    cache_setting = session.get(AppSetting, "catalog_cache_version")
+    if cache_setting is None:
+        session.add(AppSetting(key="catalog_cache_version", value=revision))
+    else:
+        cache_setting.value = revision
+
+
+@event.listens_for(Session, "before_flush")
+def refresh_catalog_cache_revision(session, flush_context, instances):
+    product_changed = any(
+        isinstance(row, Product)
+        for row in tuple(session.new) + tuple(session.dirty) + tuple(session.deleted)
+    )
+    catalog_setting_changed = any(
+        isinstance(row, AppSetting)
+        and row.key in {"retail_prices_visible", "inventory_source", "inventory_stock_id"}
+        for row in tuple(session.new) + tuple(session.dirty) + tuple(session.deleted)
+    )
+    if product_changed or catalog_setting_changed:
+        bump_catalog_cache_version(session)
 
 
 class InventoryBatch(Base):
@@ -1051,9 +1075,13 @@ def retail_prices_visible(db):
 def render_catalog_page(price_type):
     db = SessionLocal()
     try:
-        visible = retail_prices_visible(db)
+        settings = dict(db.query(AppSetting.key, AppSetting.value).filter(
+            AppSetting.key.in_(("retail_prices_visible", "catalog_cache_version"))
+        ).all())
+        visible = settings.get("retail_prices_visible") == "1"
+        catalog_cache_version = settings.get("catalog_cache_version", "0")
         incoming_rows = (
-            db.query(PurchaseReceiptItem, PurchaseReceipt.expected_arrival_date)
+            db.query(PurchaseReceiptItem.product_name, PurchaseReceipt.expected_arrival_date)
             .join(PurchaseReceipt, PurchaseReceipt.id == PurchaseReceiptItem.receipt_id)
             .filter(PurchaseReceipt.expected_arrival_date.isnot(None))
             .filter(PurchaseReceipt.expected_arrival_date > datetime.now().date())
@@ -1063,10 +1091,10 @@ def render_catalog_page(price_type):
         )
         incoming_products = [
             {
-                "name": item.product_name,
+                "name": product_name,
                 "date": expected_date.strftime("%d/%m/%Y"),
             }
-            for item, expected_date in incoming_rows
+            for product_name, expected_date in incoming_rows
         ]
     finally:
         db.close()
@@ -1079,6 +1107,7 @@ def render_catalog_page(price_type):
             else ("Giá lẻ" if price_type == "retail" else "Giá đại lý")
         ),
         retail_visible=visible,
+        catalog_cache_version=catalog_cache_version,
         incoming_products=incoming_products,
     )
 
@@ -1280,33 +1309,95 @@ def api_retail_status():
         visible = retail_prices_visible(db)
     finally:
         db.close()
-    return jsonify({"visible": visible})
+    response = jsonify({"visible": visible})
+    response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=60"
+    return response
 
 
 @app.route("/api/products")
 @app.route("/api/products/<price_type>")
 def api_products(price_type="dealer"):
-    """
-    API cho trang khách.
-
-    Điểm quan trọng:
-    - Admin vẫn quản lý từng mã hàng riêng.
-    - API trả model đã chuẩn hóa để frontend tự gộp chung card.
-    - original_model giữ lại tên gốc nếu sau này cần xem/debug.
-    """
+    """Return a paged catalog using only fields needed by the public UI."""
     if price_type not in ("dealer", "retail"):
-        return jsonify({"error": "Loại giá không hợp lệ"}), 404
+        return jsonify({"error": "Invalid price type"}), 404
+
+    try:
+        page = max(int(request.args.get("page", "0")), 0)
+    except (TypeError, ValueError):
+        page = 0
+    try:
+        page_size = min(max(int(request.args.get("page_size", "24")), 1), 60)
+    except (TypeError, ValueError):
+        page_size = 24
 
     db = SessionLocal()
     try:
         visible = retail_prices_visible(db) if price_type == "retail" else True
+        cache_version = db.query(AppSetting.value).filter_by(key="catalog_cache_version").scalar() or "0"
         if price_type == "retail" and not visible:
             response = jsonify([])
             response.headers["X-Retail-Prices-Visible"] = "0"
+            response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+            response.headers["X-Catalog-Cache-Version"] = cache_version
+            response.headers["X-Catalog-Has-More"] = "0"
+            response.headers["X-Catalog-Total-Groups"] = "0"
+            response.headers["X-Catalog-Categories"] = "[]"
             return response
-        products = db.query(Product).order_by(Product.model, Product.color).all()
-        # Match the catalog's model/category grouping. One pictured variant
-        # keeps every code and inventory lot in that group visible.
+
+        has_image = func.max(case(
+            (Product.image_filename.isnot(None) & (func.trim(Product.image_filename) != ""), 1),
+            else_=0,
+        ))
+        group_rows = db.query(
+            Product.model,
+            func.coalesce(Product.category, "").label("category"),
+            has_image.label("has_image"),
+        ).group_by(Product.model, func.coalesce(Product.category, "")).all()
+
+        grouped = {}
+        for original_model, category, pictured in group_rows:
+            normalized_model = normalize_model_name(original_model)
+            key = (normalized_model.lower(), " ".join(str(category or "").lower().split()))
+            group = grouped.setdefault(key, {
+                "model": normalized_model,
+                "category": category or "",
+                "raw_groups": [],
+                "has_image": False,
+            })
+            group["raw_groups"].append((original_model, category or ""))
+            group["has_image"] = group["has_image"] or bool(pictured)
+
+        visible_groups = sorted(
+            (group for group in grouped.values() if group["has_image"]),
+            key=lambda group: (group["model"].lower(), group["category"].lower()),
+        )
+        total_groups = len(visible_groups)
+        categories = sorted({group["category"] for group in visible_groups if group["category"]})
+        start = page * page_size
+        page_groups = visible_groups[start:start + page_size]
+        has_more = start + page_size < total_groups
+        raw_groups = [raw for group in page_groups for raw in group["raw_groups"]]
+
+        product_fields = (
+            Product.id, Product.code, Product.model, Product.color, Product.category,
+            Product.stock, Product.reserved, Product.price, Product.retail_price,
+            Product.promotion_price, Product.promotion_tag, Product.promotion_start,
+            Product.promotion_end, Product.image_filename,
+        )
+        group_filters = [
+            and_(Product.model == model, func.coalesce(Product.category, "") == category)
+            for model, category in raw_groups
+        ]
+        products = []
+        if group_filters:
+            products = (
+                db.query(Product)
+                .options(load_only(*product_fields))
+                .filter(or_(*group_filters))
+                .order_by(Product.model, Product.color, Product.code)
+                .all()
+            )
+
         def catalog_group_key(product):
             return (
                 normalize_model_name(product.model).lower(),
@@ -1318,61 +1409,93 @@ def api_products(price_type="dealer"):
             image = str(product.image_filename or "").strip()
             if image:
                 group_images.setdefault(catalog_group_key(product), image)
-        products = [product for product in products if catalog_group_key(product) in group_images]
 
-        out = []
-        today = datetime.now().date()
-
-        source = db.query(AppSetting).filter_by(key="inventory_source").first()
+        source = db.query(AppSetting.value).filter_by(key="inventory_source").scalar()
+        batch_mode = source == "batch"
+        stock_id = db.query(AppSetting.value).filter_by(key="inventory_stock_id").scalar() if batch_mode else None
         batches_by_product = {}
-        batch_mode = source is not None and source.value == "batch"
-        if batch_mode:
-            stock = db.query(AppSetting).filter_by(key="inventory_stock_id").first()
-            if stock:
-                for lot in db.query(InventoryBatch).filter_by(stock_id=int(stock.value)).order_by(
-                        InventoryBatch.product_id, InventoryBatch.batch_number, InventoryBatch.expiry_date).all():
-                    batches_by_product.setdefault(lot.product_id, []).append(lot)
+        product_ids = [product.id for product in products]
+        if batch_mode and stock_id and product_ids:
+            batch_rows = db.query(
+                InventoryBatch.product_id,
+                InventoryBatch.source_key,
+                InventoryBatch.batch_number,
+                InventoryBatch.expiry_date,
+                InventoryBatch.received_date,
+                InventoryBatch.quantity,
+                InventoryBatch.reserved,
+            ).filter(
+                InventoryBatch.stock_id == int(stock_id),
+                InventoryBatch.product_id.in_(product_ids),
+            ).order_by(
+                InventoryBatch.product_id,
+                InventoryBatch.batch_number,
+                InventoryBatch.expiry_date,
+            ).all()
+            for lot in batch_rows:
+                batches_by_product.setdefault(lot.product_id, []).append(lot)
 
-        for p in products:
-            d = p.to_dict()
-            if price_type == "retail":
-                d["price"] = p.retail_price if visible else None
-
-            base_price = d["price"]
+        today = datetime.now().date()
+        out = []
+        for product in products:
+            key = catalog_group_key(product)
+            if key not in group_images:
+                continue
+            base_price = product.retail_price if price_type == "retail" else product.price
             promotion_active = bool(
                 price_type == "dealer"
-                and p.promotion_price
-                and p.promotion_price > 0
-                and p.promotion_start
-                and p.promotion_end
-                and p.promotion_start <= today <= p.promotion_end
+                and product.promotion_price
+                and product.promotion_price > 0
+                and product.promotion_start
+                and product.promotion_end
+                and product.promotion_start <= today <= product.promotion_end
             )
-            d["original_price"] = base_price if promotion_active else None
-            d["promotion_active"] = promotion_active
-            if promotion_active:
-                d["price"] = p.promotion_price
-
-            d["original_model"] = p.model
-            d["model"] = normalize_model_name(p.model)
-
-            d["image_url"] = str(p.image_filename or "").strip() or group_images[catalog_group_key(p)]
-
+            row = {
+                "id": product.id,
+                "code": product.code,
+                "original_model": product.model,
+                "model": normalize_model_name(product.model),
+                "color": product.color or "",
+                "category": product.category or "",
+                "stock": product.stock or 0,
+                "reserved": product.reserved or 0,
+                "available": max((product.stock or 0) - (product.reserved or 0), 0),
+                "price": product.promotion_price if promotion_active else base_price,
+                "promotion_price": product.promotion_price,
+                "promotion_tag": product.promotion_tag,
+                "promotion_start": product.promotion_start.isoformat() if product.promotion_start else None,
+                "promotion_end": product.promotion_end.isoformat() if product.promotion_end else None,
+                "original_price": base_price if promotion_active else None,
+                "promotion_active": promotion_active,
+                "image_url": str(product.image_filename or "").strip() or group_images[key],
+            }
             if batch_mode:
-                for lot in batches_by_product.get(p.id, []):
-                    row = dict(d)
-                    row.update(row_id=f"{p.id}:{lot.source_key}", batch_number=lot.batch_number,
-                               expiry_date=lot.expiry_date, received_date=lot.received_date,
-                               stock=lot.quantity, reserved=lot.reserved,
-                               available=max(lot.quantity - lot.reserved, 0))
-                    out.append(row)
+                for lot in batches_by_product.get(product.id, []):
+                    batch_row = dict(row)
+                    batch_row.update(
+                        row_id=f"{product.id}:{lot.source_key}",
+                        batch_number=lot.batch_number,
+                        expiry_date=lot.expiry_date,
+                        received_date=lot.received_date,
+                        stock=lot.quantity,
+                        reserved=lot.reserved,
+                        available=max(lot.quantity - lot.reserved, 0),
+                    )
+                    out.append(batch_row)
             else:
-                d.update(received_date=None, batch_number=None, expiry_date=None)
-                out.append(d)
+                row.update(received_date=None, batch_number=None, expiry_date=None)
+                out.append(row)
 
         response = jsonify(out)
         response.headers["X-Retail-Prices-Visible"] = "1" if visible else "0"
+        response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+        response.headers["X-Catalog-Cache-Version"] = cache_version
+        response.headers["X-Catalog-Has-More"] = "1" if has_more else "0"
+        response.headers["X-Catalog-Page"] = str(page)
+        response.headers["X-Catalog-Page-Size"] = str(page_size)
+        response.headers["X-Catalog-Total-Groups"] = str(total_groups)
+        response.headers["X-Catalog-Categories"] = json.dumps(categories, ensure_ascii=True, separators=(",", ":"))
         return response
-
     finally:
         db.close()
 
@@ -2051,6 +2174,58 @@ def admin_dashboard():
         db.close()
 
 
+@app.route("/admin/products/export")
+@login_required
+def admin_products_export():
+    q = request.args.get("q", "").strip()
+    price_type = request.args.get("price_type", "dealer")
+    if price_type not in ("dealer", "retail"):
+        price_type = "dealer"
+
+    db = SessionLocal()
+    try:
+        product_query = db.query(Product)
+        if q:
+            like = f"%{q}%"
+            product_query = product_query.filter(
+                (Product.code.ilike(like)) |
+                (Product.model.ilike(like)) |
+                (Product.color.ilike(like)) |
+                (Product.category.ilike(like))
+            )
+
+        products = product_query.order_by(Product.model, Product.color, Product.code).all()
+        rows = [{
+            "Mã hàng": product.code,
+            "Mẫu xe": product.model,
+            "Màu": product.color or "",
+            "Loại": product.category or "",
+            "Đơn vị": product.unit or "",
+            "Tồn kho": product.stock or 0,
+            "Đã đặt": product.reserved or 0,
+            "Có thể bán": product.available,
+            "Giá đại lý": product.price or 0,
+            "Giá lẻ": product.retail_price or 0,
+            "Giá khuyến mãi": product.promotion_price or 0,
+            "Nhãn khuyến mãi": product.promotion_tag or "",
+            "Ngày bắt đầu KM": product.promotion_start,
+            "Ngày kết thúc KM": product.promotion_end,
+        } for product in products]
+
+        output = BytesIO()
+        pd.DataFrame(rows).to_excel(output, index=False, sheet_name="Danh sach san pham")
+        output.seek(0)
+        suffix = f"_{price_type}" + ("_loc" if q else "")
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=f"danh_sach_san_pham{suffix}_{datetime.now():%Y%m%d}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    finally:
+        db.close()
+
+
 def inventory_ai_search(query):
     """Read-only product lookup used by the admin AI assistant."""
     query = str(query or "").strip()
@@ -2535,13 +2710,14 @@ def inventory_planning_search(query):
     db = SessionLocal()
     try:
         grouped = {}
-        for product in db.query(Product).order_by(Product.model, Product.color).all():
-            key = product_match_key(product.model)
+        product_rows = db.query(Product.model, Product.stock).order_by(Product.model, Product.color).all()
+        for model, stock in product_rows:
+            key = product_match_key(model)
             if not key:
                 continue
             if key not in grouped:
-                grouped[key] = {"model": normalize_model_name(product.model), "stock": 0}
-            grouped[key]["stock"] += max(product.stock or 0, 0)
+                grouped[key] = {"model": normalize_model_name(model), "stock": 0}
+            grouped[key]["stock"] += max(stock or 0, 0)
     finally:
         db.close()
 
@@ -2719,20 +2895,56 @@ def inventory_chat_response():
     messages = messages[-8:]
     if not messages or not any(item.get("role") == "user" and str(item.get("content", "")).strip() for item in messages if isinstance(item, dict)):
         return jsonify({"error": "Vui lòng nhập câu hỏi."}), 400
-    if any(len(str(item.get("content", ""))) > 1000 for item in messages if isinstance(item, dict)):
+    latest_question = next(
+        str(item.get("content", "")).strip()
+        for item in reversed(messages)
+        if isinstance(item, dict) and item.get("role") == "user" and str(item.get("content", "")).strip()
+    )
+    # Previous answers can exceed this limit; validate only the current user input.
+    if len(latest_question) > 1000:
         return jsonify({"error": "Câu hỏi quá dài."}), 400
 
     try:
-        latest_question = next(
-            str(item.get("content", "")).strip()
-            for item in reversed(messages)
-            if isinstance(item, dict) and item.get("role") == "user" and str(item.get("content", "")).strip()
-        )
         latest_question = resolve_conversation_question(messages, latest_question)
         return jsonify({"answer": answer_inventory_question(latest_question)})
     except Exception:
         app.logger.exception("Inventory AI chat failed")
         return jsonify({"error": "Trợ lý gặp lỗi khi xử lý câu hỏi."}), 500
+
+
+PUBLIC_AI_RATE_WINDOW_SECONDS = 60
+PUBLIC_AI_RATE_LIMIT = 10
+PUBLIC_AI_BOT_MARKERS = ("bot", "crawler", "spider", "facebookexternalhit", "zalo", "curl", "python-requests")
+PUBLIC_AI_RATE_LOCK = threading.Lock()
+PUBLIC_AI_REQUEST_TIMES = {}
+
+
+@app.before_request
+def guard_public_inventory_assistant():
+    if request.endpoint != "public_inventory_ai_chat":
+        return
+
+    user_agent = request.headers.get("User-Agent", "").casefold()
+    if any(marker in user_agent for marker in PUBLIC_AI_BOT_MARKERS):
+        return jsonify({"error": "Automated requests are not allowed."}), 403
+
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    client_ip = (forwarded_for.split(",", 1)[0].strip() or request.remote_addr or "unknown")
+    now = time.monotonic()
+    with PUBLIC_AI_RATE_LOCK:
+        recent = [
+            stamp for stamp in PUBLIC_AI_REQUEST_TIMES.get(client_ip, [])
+            if now - stamp < PUBLIC_AI_RATE_WINDOW_SECONDS
+        ]
+        if len(recent) >= PUBLIC_AI_RATE_LIMIT:
+            PUBLIC_AI_REQUEST_TIMES[client_ip] = recent
+            return jsonify({"error": "Too many requests. Please try again shortly."}), 429
+        recent.append(now)
+        PUBLIC_AI_REQUEST_TIMES[client_ip] = recent
+        if len(PUBLIC_AI_REQUEST_TIMES) > 2048:
+            for ip in list(PUBLIC_AI_REQUEST_TIMES):
+                if not any(now - stamp < PUBLIC_AI_RATE_WINDOW_SECONDS for stamp in PUBLIC_AI_REQUEST_TIMES[ip]):
+                    PUBLIC_AI_REQUEST_TIMES.pop(ip, None)
 
 
 @app.route("/api/inventory-assistant", methods=["POST"])
@@ -2815,22 +3027,28 @@ def api_reorder_suggestions():
     try:
         latest_inventory_update = db.query(func.max(Product.updated_at)).scalar()
         grouped = {}
-        for product in db.query(Product).order_by(Product.model, Product.color).all():
-            key = product_match_key(product.model)
+        product_rows = db.query(
+            Product.model,
+            Product.category,
+            Product.stock,
+            Product.image_filename,
+        ).order_by(Product.model, Product.color).all()
+        for model, category, stock, image_filename in product_rows:
+            key = product_match_key(model)
             if not key:
                 continue
 
             if key not in grouped:
                 grouped[key] = {
-                    "model": normalize_model_name(product.model),
-                    "category": product.category or "",
+                    "model": normalize_model_name(model),
+                    "category": category or "",
                     "stock": 0,
                     "image_url": None,
                 }
 
-            grouped[key]["stock"] += max(product.stock or 0, 0)
-            if not grouped[key]["image_url"] and product.image_filename:
-                grouped[key]["image_url"] = product.image_filename
+            grouped[key]["stock"] += max(stock or 0, 0)
+            if not grouped[key]["image_url"] and image_filename:
+                grouped[key]["image_url"] = image_filename
 
         suggestions = []
         matched_models = 0
@@ -2857,9 +3075,10 @@ def api_reorder_suggestions():
             key=lambda item: (item["reorder_quantity"], item["average_monthly_sales"]),
             reverse=True,
         )
-        return jsonify({
-            "items": suggestions,
+        response = jsonify({
+            "items": suggestions[:100],
             "matched_models": matched_models,
+            "returned_items": min(len(suggestions), 100),
             "reserve_months": 2,
             "inventory_updated_at": (
                 latest_inventory_update.isoformat()
@@ -2867,6 +3086,11 @@ def api_reorder_suggestions():
                 if latest_inventory_update else None
             ),
         })
+        response.headers["Cache-Control"] = "public, s-maxage=600, stale-while-revalidate=600"
+        response.headers["X-Catalog-Cache-Version"] = (
+            db.query(AppSetting.value).filter_by(key="catalog_cache_version").scalar() or "0"
+        )
+        return response
     finally:
         db.close()
 
@@ -3403,21 +3627,25 @@ def admin_import():
 
             # Flush theo batch de tranh giu transaction qua lon trong bo nho.
             if len(to_insert) >= BATCH_SIZE:
+                bump_catalog_cache_version(db)
                 db.bulk_insert_mappings(Product, to_insert)
                 db.commit()
                 to_insert.clear()
 
             if len(to_update) >= BATCH_SIZE:
+                bump_catalog_cache_version(db)
                 db.bulk_update_mappings(Product, to_update)
                 db.commit()
                 to_update.clear()
 
         # Flush phan con lai.
         if to_insert:
+            bump_catalog_cache_version(db)
             db.bulk_insert_mappings(Product, to_insert)
             db.commit()
 
         if to_update:
+            bump_catalog_cache_version(db)
             db.bulk_update_mappings(Product, to_update)
             db.commit()
 
@@ -3667,6 +3895,16 @@ def admin_import_price():
 
                 result = conn.execute(sql, params)
                 matched += result.rowcount or 0
+
+            if matched:
+                conn.execute(
+                    text("""
+                        INSERT INTO app_settings (key, value)
+                        VALUES ('catalog_cache_version', :version)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                    """),
+                    {"version": str(time.time_ns())},
+                )
 
         message = f"Đã cập nhật {price_label} cho {matched} mã hàng."
         if skipped:

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block head %}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}?v=2">
+{% endblock %}
 {% block content %}
 
 
@@ -275,12 +277,17 @@
         <h2 class="icon-title"><span class="module-icon"><i data-lucide="package"></i></span>Danh sách sản phẩm</h2>
         <p class="hint">Bấm Sửa để chỉnh thông tin và ảnh của từng mã hàng.</p>
       </div>
-        <div class="search-box">
+        <div class="product-list-actions">
+          <div class="search-box">
           <form method="GET" action="{{ url_for('admin_dashboard') }}" id="searchForm">
             <input type="hidden" name="price_type" value="{{ price_type }}">
             <input id="productSearch" name="q" type="text"
                   placeholder="Tìm mã, mẫu xe, màu, loại..." value="{{ q or '' }}">
           </form>
+          </div>
+          <a class="export-products-btn" href="{{ url_for('admin_products_export', q=q, price_type=price_type) }}">
+            <i data-lucide="download"></i> Xuất file
+          </a>
         </div>
     </div>
 

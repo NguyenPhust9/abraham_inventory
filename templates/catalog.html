@@ -526,18 +526,20 @@
 <!-- =========================================================
      CATALOG JS
 ========================================================= -->
+<script>window.CATALOG_CACHE_VERSION = {{ catalog_cache_version|tojson }};</script>
 {% if price_type != 'retail' or retail_visible %}
 <script src="{{ url_for('static', filename='catalog.js') }}?v=37"></script>
 {% else %}
 <script>
   setInterval(async () => {
+    if (document.visibilityState !== 'visible') return;
     try {
-      const response = await fetch('{{ url_for('api_retail_status') }}', { cache: 'no-store' });
+      const response = await fetch('{{ url_for('api_retail_status') }}');
       if (response.ok && (await response.json()).visible) location.reload();
     } catch (error) {
       // Keep the update message while the service is unavailable.
     }
-  }, 30000);
+  }, 300000);
 </script>
 {% endif %}
 

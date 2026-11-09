@@ -30,6 +30,15 @@ const COLOR_MAP = [
 ];
 
 let PRODUCTS = [];
+let catalogCategories = [];
+let catalogPage = 0;
+let catalogLoadedPages = 0;
+let catalogHasMore = false;
+let catalogTotalGroups = 0;
+let catalogPageLoadPromise = null;
+let catalogFullLoadPromise = null;
+let catalogLastLoadedAt = 0;
+let catalogCacheVersion = String(window.CATALOG_CACHE_VERSION || '0');
 let REORDER_ITEMS = [];
 let reorderQuery = '';
 let reorderRefreshInFlight = false;
@@ -787,7 +796,10 @@ function render() {
 
   const rowCount = groups.reduce((sum, group) => sum + displayVariants(group.variants).length, 0);
   const rowLabel = showLotDetails && filtered.some(p => p.row_id) ? 'dòng tồn kho' : 'biến thể màu';
-  els.summaryText.textContent = `${groups.length} mẫu xe · ${rowCount} ${rowLabel}`;
+  const groupCountLabel = catalogHasMore && !q && activeCat === 'Tất cả' && !onlyInStock && minPrice === null && maxPrice === null
+    ? `${groups.length} / ${catalogTotalGroups}`
+    : String(groups.length);
+  els.summaryText.textContent = `${groupCountLabel} mẫu xe · ${rowCount} ${rowLabel}`;
   els.summaryStock.textContent = `${totalAvail.toLocaleString('vi-VN')} chiếc sẵn sàng`;
 
   for (const g of groups) {
@@ -838,11 +850,32 @@ function render() {
 
     els.grid.appendChild(card);
   }
+  appendLoadMoreButton();
+}
+
+function appendLoadMoreButton() {
+  if (!catalogHasMore) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'catalog-load-more';
+  button.textContent = 'Tải thêm sản phẩm';
+  button.style.cssText = 'grid-column:1/-1;justify-self:center;padding:10px 18px;border:1px solid currentColor;border-radius:999px;background:transparent;color:inherit;cursor:pointer';
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.textContent = 'Đang tải…';
+    try {
+      await loadCatalogPage(catalogPage + 1, true);
+    } catch (error) {
+      console.error('Could not load more catalog products:', error);
+      button.disabled = false;
+      button.textContent = 'Thử tải thêm';
+    }
+  });
+  els.grid.appendChild(button);
 }
 
 function buildPills() {
-  const categories = PRODUCTS
-    .map(p => p.category)
+  const categories = (catalogCategories.length ? catalogCategories : PRODUCTS.map(p => p.category))
     .filter(c => {
       const category = normalizeText(c);
       return category.startsWith('xe đạp') || category.startsWith('phụ tùng');
@@ -873,29 +906,91 @@ function buildPills() {
       el.classList.add('active');
 
       render();
+      completeCatalogBeforeFiltering();
     });
   });
 }
 
-async function load(includeReorderSuggestions = true) {
-  try {
-    const res = await fetch(`/api/products/${priceType}`, {
-      cache: 'no-store'
-    });
+async function loadCatalogPage(page, append) {
+  if (catalogPageLoadPromise) return catalogPageLoadPromise;
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    if (priceType === 'retail' && res.headers.get('X-Retail-Prices-Visible') !== '1') {
+  catalogPageLoadPromise = (async () => {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: '24',
+      v: catalogCacheVersion,
+    });
+    const response = await fetch(`/api/products/${priceType}?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (priceType === 'retail' && response.headers.get('X-Retail-Prices-Visible') !== '1') {
       window.location.reload();
       return;
     }
 
-    const data = await res.json();
-
-    PRODUCTS = data.map(prepareProduct);
-
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error('Invalid catalog response');
+    catalogCacheVersion = response.headers.get('X-Catalog-Cache-Version') || catalogCacheVersion;
+    const nextItems = data.map(prepareProduct);
+    if (append) {
+      const merged = new Map(PRODUCTS.map(item => [item.row_id || item.id, item]));
+      nextItems.forEach(item => merged.set(item.row_id || item.id, item));
+      PRODUCTS = Array.from(merged.values());
+    } else {
+      PRODUCTS = nextItems;
+      catalogLoadedPages = 0;
+    }
+    try {
+      const categories = JSON.parse(response.headers.get('X-Catalog-Categories') || '[]');
+      catalogCategories = Array.isArray(categories) ? categories : [];
+    } catch (_error) {
+      catalogCategories = [];
+    }
+    catalogPage = page;
+    catalogLoadedPages = Math.max(catalogLoadedPages, page + 1);
+    catalogHasMore = response.headers.get('X-Catalog-Has-More') === '1';
+    catalogTotalGroups = Number(response.headers.get('X-Catalog-Total-Groups') || 0);
     buildPills();
     render();
     renderPromotionSuggestions();
+  })();
+
+  try {
+    return await catalogPageLoadPromise;
+  } finally {
+    catalogPageLoadPromise = null;
+  }
+}
+
+function completeCatalogBeforeFiltering() {
+  if (!catalogHasMore) return;
+  loadAllCatalogPages()
+    .then(render)
+    .catch(error => console.error('Could not load all catalog products:', error));
+}
+
+async function loadAllCatalogPages() {
+  if (catalogFullLoadPromise) return catalogFullLoadPromise;
+  catalogFullLoadPromise = (async () => {
+    while (catalogHasMore) {
+      await loadCatalogPage(catalogPage + 1, true);
+    }
+  })();
+  try {
+    await catalogFullLoadPromise;
+  } finally {
+    catalogFullLoadPromise = null;
+  }
+}
+
+async function load(includeReorderSuggestions = true) {
+  try {
+    const pagesToReload = Math.max(catalogLoadedPages, 1);
+    await loadCatalogPage(0, false);
+    for (let page = 1; page < pagesToReload && catalogHasMore; page += 1) {
+      await loadCatalogPage(page, true);
+    }
+    if (isPromotionCatalog) await loadAllCatalogPages();
+    catalogLastLoadedAt = Date.now();
     if (includeReorderSuggestions) loadReorderSuggestions();
   } catch (error) {
     console.error('Không tải được dữ liệu sản phẩm:', error);
@@ -906,7 +1001,10 @@ async function load(includeReorderSuggestions = true) {
 }
 
 if (els.search) {
-  els.search.addEventListener('input', render);
+  els.search.addEventListener('input', () => {
+    render();
+    if (els.search.value.trim()) completeCatalogBeforeFiltering();
+  });
 }
 
 if (els.onlyStock) {
@@ -914,6 +1012,7 @@ if (els.onlyStock) {
     playUISound('click');
     onlyInStock = els.onlyStock.checked;
     render();
+    completeCatalogBeforeFiltering();
   });
 }
 
@@ -942,6 +1041,7 @@ if (els.sortStock) {
     playUISound('click');
     sortStockOrder = els.sortStock.value;
     render();
+    completeCatalogBeforeFiltering();
   });
 }
 
@@ -949,6 +1049,7 @@ if (els.minPrice) {
   els.minPrice.addEventListener('input', () => {
     minPrice = readPriceFilter(els.minPrice);
     render();
+    completeCatalogBeforeFiltering();
   });
 }
 
@@ -956,6 +1057,7 @@ if (els.maxPrice) {
   els.maxPrice.addEventListener('input', () => {
     maxPrice = readPriceFilter(els.maxPrice);
     render();
+    completeCatalogBeforeFiltering();
   });
 }
 
@@ -1059,9 +1161,10 @@ async function loadReorderSuggestions() {
   reorderRefreshInFlight = true;
 
   try {
-    const response = await fetch('/api/reorder-suggestions', { cache: 'no-store' });
+    const response = await fetch(`/api/reorder-suggestions?v=${encodeURIComponent(catalogCacheVersion)}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    catalogCacheVersion = response.headers.get('X-Catalog-Cache-Version') || catalogCacheVersion;
     REORDER_ITEMS = Array.isArray(data.items) ? data.items : [];
     reorderLastLoadedAt = Date.now();
     renderReorderSuggestions();
@@ -1120,7 +1223,11 @@ if (reorderDesktopToggle && catalogContentLayout) {
   });
 }
 
-setInterval(loadReorderSuggestions, 5 * 60 * 1000);
+setInterval(() => {
+  if (document.visibilityState === 'visible' && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
+    loadReorderSuggestions();
+  }
+}, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
     loadReorderSuggestions();
@@ -1204,4 +1311,13 @@ document.addEventListener('touchstart', unlockAudio, { once: true, passive: true
 
 load();
 
-setInterval(() => load(false), 30000);
+setInterval(() => {
+  if (document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
+    load(false);
+  }
+}, 300000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
+    load(false);
+  }
+});

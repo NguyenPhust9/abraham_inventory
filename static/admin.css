@@ -1,0 +1,125 @@
+/* Admin palette is independent of the seasonal storefront theme. */
+.admin-page {
+  --bg: #f0f8ff;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --ink: #164b80;
+  --ink-soft: #416d96;
+  --line: #cfe5f8;
+  --chip-border: #cfe5f8;
+  --accent: #2563a6;
+  --accent-hover: #1d528c;
+  --accent-dark: #234e7b;
+  --accent-deep: #1e3651;
+  --gold: #6592bd;
+  --gold-bright: #8bafd0;
+  --gold-soft: #e8f5ff;
+  --good: #287452;
+  --good-bg: #eaf5ef;
+  --low: #93651c;
+  --low-bg: #fbf2e2;
+  --out: #b34545;
+  --out-bg: #fbecec;
+  --info: #176eae;
+  --info-bg: #e8f5ff;
+  --shadow: 0 3px 16px rgba(31, 53, 80, .05);
+  --shadow-lg: 0 16px 40px rgba(31, 53, 80, .12);
+  background: var(--bg);
+  color: var(--ink);
+}
+.admin-page .admin-hero {
+  background: linear-gradient(110deg, #086db2, #138aca);
+  box-shadow: 0 4px 16px rgba(31, 53, 80, .10);
+}
+.admin-page .admin-hero::before,
+.admin-page .admin-hero::after { display: none; }
+.admin-page .brand-mark,
+.admin-page .account-avatar { background: #e8f5ff; color: #138aca; box-shadow: none; }
+.admin-page .admin-hero .admin-tag { background: #e0f2ff; color: #138aca; }
+.admin-page .account-back,
+.admin-page .admin-main-nav a.active,
+.admin-page .admin-main-nav a:not(.disabled):hover { color: #138aca; background: #f0f9ff; }
+.admin-page .admin-global-search:focus-within { border-color: #b6cee3; }
+.admin-page .dashboard-welcome h1,
+.admin-page .section-heading h2,
+.admin-page .stat-value { color: var(--ink); }
+.admin-page .eyebrow { color: #2d6c9f !important; }
+.admin-page .today-card { background: #fff; border-color: var(--line); color: #2d6c9f; }
+.admin-page .stat-card,
+.admin-page .quick-panel,
+.admin-page .overview-card,
+.admin-page .panel { background: #fff; border-color: var(--line); box-shadow: var(--shadow); }
+.admin-page .stat-icon { box-shadow: none; }
+.admin-page .stat-blue .stat-icon { color: #176eae; background: #e8f5ff; }
+.admin-page .stat-green .stat-icon { color: var(--good); background: var(--good-bg); }
+.admin-page .stat-orange .stat-icon { color: #176eae; background: #e8f5ff; }
+.admin-page .stat-red .stat-icon { color: var(--low); background: var(--low-bg); }
+.admin-page .quick-card { background: #f1f9ff; border-color: #cde8fb; }
+.admin-page .quick-card strong { color: var(--ink); }
+.admin-page .quick-card small { color: var(--ink-soft); }
+.admin-page .quick-card .module-icon,
+.admin-page .quick-card b { background: #daf0ff; color: #176eae; }
+.admin-page .quick-card:not(.disabled):hover {
+  background: #e3f4ff;
+  border-color: #8bcaf2;
+  box-shadow: 0 5px 15px rgba(31, 53, 80, .07);
+}
+.admin-page .quick-card.disabled { opacity: 1; background: #edf7ff; border-color: #d3eafb; }
+.admin-page .quick-card.disabled strong,
+.admin-page .quick-card.disabled small { color: #497598; }
+.admin-page .quick-card.disabled .module-icon,
+.admin-page .quick-card.disabled b { background: #def0fc; color: #507fa4; }
+.admin-page .section-heading-icon,
+.admin-page .activity-icon { background: var(--info-bg); color: var(--info); }
+.admin-page .section-heading-icon.warning { background: var(--low-bg); color: var(--low); }
+.admin-page .section-note,
+.admin-page .section-heading > a { background: #f1f9ff; border-color: var(--line); color: #2d6c9f; }
+.admin-page .compact-table th { background: #f0f8ff; color: #38668f; }
+.admin-page .compact-table td { color: var(--ink); }
+.admin-page a:focus-visible,
+.admin-page button:focus-visible,
+.admin-page input:focus-visible,
+.admin-page select:focus-visible { outline: 3px solid #8bb2d6; outline-offset: 3px; }
+
+.admin-page .stat-label,
+.admin-page .stat-caption,
+.admin-page .dashboard-welcome p,
+.admin-page .today-card small,
+.admin-page .activity-item small,
+.admin-page .activity-item time,
+.admin-page .management-heading > span { color: #416d96; }
+.admin-page .activity-item strong { color: #164b80; }
+
+.admin-page .product-list-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: min(470px, 100%);
+}
+.admin-page .product-list-actions .search-box { flex: 1 1 280px; width: auto; }
+.admin-page .export-products-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #b9ddf5;
+  border-radius: 999px;
+  background: #eaf6ff;
+  color: #176eae;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .18s ease, transform .18s ease;
+}
+.admin-page .export-products-btn:hover { background: #d9efff; transform: translateY(-1px); }
+.admin-page .export-products-btn svg { width: 16px; height: 16px; }
+
+@media (max-width: 600px) {
+  .admin-page .product-list-actions { width: 100%; }
+  .admin-page .product-list-actions .search-box { flex-basis: 0; min-width: 0; }
+  .admin-page .export-products-btn { padding: 0 11px; }
+}
