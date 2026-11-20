@@ -528,7 +528,7 @@
 ========================================================= -->
 <script>window.CATALOG_CACHE_VERSION = {{ catalog_cache_version|tojson }};</script>
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=37"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=38"></script>
 {% else %}
 <script>
   setInterval(async () => {

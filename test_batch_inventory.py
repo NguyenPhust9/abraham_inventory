@@ -55,7 +55,7 @@ class BatchInventoryTest(unittest.TestCase):
             self.assertEqual(len({r["row_id"] for r in data}), 3)
             self.assertEqual({r["code"] for r in data}, {"AURA - Cam"})
             self.assertEqual({r["price"] for r in data}, {100})
-            self.assertEqual({r["image_url"] for r in data}, {"test.jpg"})
+            self.assertEqual({r["image_url"] for r in data}, {"/static/uploads/test.jpg"})
             self.assertEqual(sum(r["stock"] for r in data), 15)
             self.assertEqual(sum(r["available"] for r in data), 14)
             self.assertEqual(sum(r["received_date"] is None for r in data), 1)
@@ -91,7 +91,7 @@ class BatchInventoryTest(unittest.TestCase):
         with self.web.app.test_client() as client:
             data = client.get("/api/products/dealer").get_json()
             self.assertEqual({item['id'] for item in data}, {1, 2, 3, 4, 5})
-            self.assertEqual({item['image_url'] for item in data}, {'test.jpg'})
+            self.assertEqual({item['image_url'] for item in data}, {'/static/uploads/test.jpg'})
             self.assertEqual(sum(item['stock'] for item in data), 115)
 
     def test_invalid_snapshot_preserves_old_inventory(self):

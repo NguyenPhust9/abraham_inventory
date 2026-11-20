@@ -8,8 +8,6 @@ from io import BytesIO
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, quote_plus
 from urllib.request import Request, urlopen
-import cloudinary  # type: ignore
-import cloudinary.uploader  # type: ignore
 from datetime import date, datetime, timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_file  # type: ignore
@@ -26,6 +24,10 @@ import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
 from openpyxl import load_workbook  # type: ignore
+from product_images import (
+    MAX_UPLOAD_BYTES, ProductImageError, image_metadata, prepare_product_image,
+    store_product_image, resolve_product_image, product_image_response,
+)
 
 
 # ---------- Config ----------
@@ -54,18 +56,9 @@ for local_env_path in LOCAL_ENV_PATHS:
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "bike123")
 SECRET_KEY = os.environ.get("SECRET_KEY", "doi-chuoi-bi-mat-nay-truoc-khi-deploy")
-CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
-CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "")
-CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "")
-
-cloudinary.config(
-    cloud_name=CLOUDINARY_CLOUD_NAME,
-    api_key=CLOUDINARY_API_KEY,
-    api_secret=CLOUDINARY_API_SECRET,
-    secure=True,
-)
 app = Flask(__name__)
 app.config["SECRET_KEY"] = SECRET_KEY
+app.jinja_env.globals["product_image_url"] = resolve_product_image
 
 
 # ---------- Database ----------
@@ -304,6 +297,7 @@ class PurchaseReceiptItem(Base):
 
 if not IS_VERCEL:
     Base.metadata.create_all(engine)
+    image_metadata.create_all(engine)
 
 
 def ensure_retail_price_column():
@@ -1020,22 +1014,24 @@ def safe_float(value):
         return None
 
 
-def save_product_image(file, product_id):
-    if not file or not file.filename:
-        return ""
+@app.before_request
+def limit_product_image_request():
+    # Leave Excel imports unchanged; constrain only forms that accept product images.
+    if request.method == "POST" and request.endpoint in {
+        "admin_add_product", "admin_edit_product", "admin_update_product_image"
+    }:
+        if request.content_length and request.content_length > MAX_UPLOAD_BYTES + 128 * 1024:
+            flash("Ảnh tối đa 4 MB. Vui lòng chọn ảnh nhỏ hơn.")
+            return redirect(url_for("admin_dashboard")), 303
 
+
+@app.route("/media/products/<digest>/<variant>.webp")
+def media_product_image(digest, variant):
+    db = SessionLocal()
     try:
-        result = cloudinary.uploader.upload(
-            file,
-            folder="abraham_inventory/products",
-            public_id=f"product_{product_id}",
-            overwrite=True,
-            resource_type="image",
-        )
-        return result.get("secure_url", "")
-    except Exception as e:
-        print(f"Loi upload Cloudinary: {e}")
-        return ""
+        return product_image_response(db, digest, variant)
+    finally:
+        db.close()
 
 
 def seed_if_empty():
@@ -1406,7 +1402,7 @@ def api_products(price_type="dealer"):
 
         group_images = {}
         for product in products:
-            image = str(product.image_filename or "").strip()
+            image = resolve_product_image(product.image_filename)
             if image:
                 group_images.setdefault(catalog_group_key(product), image)
 
@@ -1439,8 +1435,6 @@ def api_products(price_type="dealer"):
         out = []
         for product in products:
             key = catalog_group_key(product)
-            if key not in group_images:
-                continue
             base_price = product.retail_price if price_type == "retail" else product.price
             promotion_active = bool(
                 price_type == "dealer"
@@ -1467,8 +1461,9 @@ def api_products(price_type="dealer"):
                 "promotion_end": product.promotion_end.isoformat() if product.promotion_end else None,
                 "original_price": base_price if promotion_active else None,
                 "promotion_active": promotion_active,
-                "image_url": str(product.image_filename or "").strip() or group_images[key],
+                "image_url": resolve_product_image(product.image_filename) or group_images.get(key),
             }
+            row["image_thumb_url"] = resolve_product_image(row["image_url"], thumbnail=True)
             if batch_mode:
                 for lot in batches_by_product.get(product.id, []):
                     batch_row = dict(row)
@@ -3047,7 +3042,9 @@ def api_reorder_suggestions():
                 }
 
             grouped[key]["stock"] += max(stock or 0, 0)
-            if not grouped[key]["image_url"] and image_filename:
+            if image_filename and (not grouped[key]["image_url"] or (
+                not resolve_product_image(grouped[key]["image_url"]) and resolve_product_image(image_filename)
+            )):
                 grouped[key]["image_url"] = image_filename
 
         suggestions = []
@@ -3066,6 +3063,8 @@ def api_reorder_suggestions():
 
             suggestions.append({
                 **product,
+                "image_url": resolve_product_image(product["image_url"]),
+                "image_thumb_url": resolve_product_image(product["image_url"], thumbnail=True),
                 "average_monthly_sales": round(average_monthly, 1),
                 "reserve_target": math.ceil(reserve_exact),
                 "reorder_quantity": math.ceil(reserve_exact - product["stock"]),
@@ -3380,18 +3379,20 @@ def admin_add_product():
             retail_price=safe_float(request.form.get("retail_price", "").strip()),
         )
 
+        prepared = prepare_product_image(request.files.get("image"))
         db.add(p)
-        db.commit()
-
-        file = request.files.get("image")
-        image_name = save_product_image(file, p.id)
-
+        image_name = store_product_image(db, prepared)
         if image_name:
             p.image_filename = image_name
-            db.commit()
-
+        db.commit()
         flash("Đã thêm sản phẩm.")
-
+    except ProductImageError as error:
+        db.rollback()
+        flash(str(error))
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not save product and image")
+        flash("Chưa lưu được sản phẩm. Vui lòng thử lại; ảnh và dữ liệu cũ được giữ nguyên.")
     finally:
         db.close()
 
@@ -3441,8 +3442,8 @@ def admin_edit_product(product_id):
         p.price = safe_float(request.form.get("price", "").strip())
         p.retail_price = safe_float(request.form.get("retail_price", "").strip())
 
-        file = request.files.get("image")
-        image_name = save_product_image(file, p.id)
+        prepared = prepare_product_image(request.files.get("image"))
+        image_name = store_product_image(db, prepared)
 
         if image_name:
             p.image_filename = image_name
@@ -3450,11 +3451,44 @@ def admin_edit_product(product_id):
         db.commit()
 
         flash("Đã cập nhật sản phẩm.")
-
+    except ProductImageError as error:
+        db.rollback()
+        flash(str(error))
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not update product and image")
+        flash("Chưa lưu được thay đổi. Vui lòng thử lại; ảnh và dữ liệu cũ được giữ nguyên.")
     finally:
         db.close()
 
     return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/products/<int:product_id>/image", methods=["POST"])
+@login_required
+def admin_update_product_image(product_id):
+    db = SessionLocal()
+    try:
+        product = db.get(Product, product_id)
+        if product is None:
+            flash("Không tìm thấy sản phẩm.")
+        else:
+            prepared = prepare_product_image(request.files.get("image"))
+            if prepared is None:
+                raise ProductImageError("Vui lòng chọn ảnh JPG, PNG hoặc WebP.")
+            product.image_filename = store_product_image(db, prepared)
+            db.commit()
+            flash(f"Đã cập nhật ảnh cho {product.code}.")
+    except ProductImageError as error:
+        db.rollback()
+        flash(str(error))
+    except Exception:
+        db.rollback()
+        app.logger.exception("Could not update product image")
+        flash("Chưa lưu được ảnh. Vui lòng thử lại; ảnh cũ được giữ nguyên.")
+    finally:
+        db.close()
+    return redirect(url_for("admin_dashboard", q=request.form.get("return_q", "")) + "#san-pham")
 
 
 @app.route("/admin/products/<int:product_id>/delete-image", methods=["POST"])
@@ -3469,12 +3503,7 @@ def admin_delete_product_image(product_id):
             return redirect(url_for("admin_dashboard"))
 
         if p.image_filename:
-            try:
-                public_id = f"abraham_inventory/products/product_{p.id}"
-                cloudinary.uploader.destroy(public_id, resource_type="image")
-            except Exception as e:
-                print(f"Loi xoa anh Cloudinary: {e}")
-
+            # Unlink only: retain blobs for shared references and cached image URLs.
             p.image_filename = ""
             db.commit()
             flash("Đã xóa ảnh sản phẩm.")

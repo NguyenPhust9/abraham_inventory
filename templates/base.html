@@ -24,6 +24,7 @@
 <script src="{{ url_for('static', filename='vendor/lucide.min.js') }}?v=468" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=45">
 {% block head %}{% endblock %}
+<link rel="stylesheet" href="{{ url_for('static', filename='product-images.css') }}?v=1">
 </head>
 <body>
 {% with messages = get_flashed_messages() %}
@@ -33,6 +34,7 @@
     </div>
   {% endif %}
 {% endwith %}
+<script src="{{ url_for('static', filename='product-images.js') }}?v=1"></script>
 {% block content %}{% endblock %}
 <script>
 window.addEventListener("DOMContentLoaded", function () {

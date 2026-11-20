@@ -310,8 +310,7 @@
 
         <tbody id="productTableBody">
           {% for p in products %}
-          {% set img_url = p.image_filename if p.image_filename and p.image_filename.startswith('http')
-             else (url_for('static', filename='uploads/' + p.image_filename) if p.image_filename else None) %}
+          {% set img_url = product_image_url(p.image_filename, thumbnail=True) %}
 
           <tr>
             <td data-label="Mã hàng">
@@ -331,9 +330,9 @@
 
                   <div class="image-manager">
                     {% if img_url %}
-                      <img src="{{ img_url }}" alt="{{ p.model }}" class="thumb">
+                      <img data-product-image src="{{ img_url }}" alt="{{ p.model }}" class="thumb" loading="lazy" decoding="async">
                     {% else %}
-                      <span class="thumb placeholder"></span>
+                      <span class="thumb placeholder" role="img" aria-label="Chưa có ảnh"></span>
                     {% endif %}
 
                     <div class="image-manager-info">
@@ -343,13 +342,14 @@
 
                     {% if img_url %}
                     <form method="POST" action="{{ url_for('admin_delete_product_image', product_id=p.id) }}"
-                          onsubmit="return confirm('Xóa ảnh sản phẩm này? Ảnh sẽ bị xóa khỏi Cloudinary.');">
+                          onsubmit="return confirm('Gỡ ảnh khỏi sản phẩm này?');">
                       <button type="submit" class="del-img-btn"><i data-lucide="trash-2"></i>Xóa ảnh</button>
                     </form>
                     {% endif %}
                   </div>
 
                   <form method="POST" action="{{ url_for('admin_edit_product', product_id=p.id) }}" enctype="multipart/form-data">
+                    <input type="hidden" name="return_q" value="{{ q or '' }}">
                     <div class="edit-form-grid">
 
                       <div class="field">
@@ -394,7 +394,12 @@
 
                       <div class="field full">
                         <label>{{ "Thay ảnh mới" if img_url else "Thêm ảnh sản phẩm" }}</label>
-                        <input type="file" name="image" accept="image/*">
+                        <input type="file" name="image" accept="image/jpeg,image/png,image/webp">
+                        <small class="image-upload-help">JPG, PNG hoặc WebP, tối đa 4 MB. Ảnh được tự động thu nhỏ và nén.</small>
+                        {% if p.image_filename and not img_url %}
+                        <small class="image-upload-help">Ảnh cũ chưa khôi phục được. Bạn có thể tải ảnh thay thế tại đây.</small>
+                        {% endif %}
+                        <button type="submit" class="image-save-only" formaction="{{ url_for('admin_update_product_image', product_id=p.id) }}">Lưu riêng ảnh</button>
                       </div>
 
                     </div>
@@ -410,7 +415,7 @@
 
             <td class="thumb-cell" data-label="Ảnh">
               {% if img_url %}
-                <img src="{{ img_url }}" alt="{{ p.model }}" class="thumb">
+                <img data-product-image src="{{ img_url }}" alt="{{ p.model }}" class="thumb" loading="lazy" decoding="async">
               {% else %}
                 <span class="thumb placeholder"></span>
               {% endif %}

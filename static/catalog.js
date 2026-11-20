@@ -294,7 +294,8 @@ function prepareProduct(p) {
     reserved: Number(p.reserved || 0),
     available: Number(p.available || 0),
     price: p.price,
-    image_url: p.image_url || null
+    image_url: p.image_url || null,
+    image_thumb_url: p.image_thumb_url || p.image_url || null
   };
 }
 
@@ -622,7 +623,7 @@ function openProductModal(group) {
   els.modalSub.textContent = group.category || 'Chưa phân loại';
 
   const imageHTML = imgVariant && imgVariant.image_url
-    ? `<img class="modal-image" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(group.model)}">
+    ? `<img data-product-image class="modal-image" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(group.model)}" decoding="async">
        <button type="button" class="modal-zoom-btn" id="modalZoomBtn" aria-label="Phóng to ảnh ${escapeHTML(group.model)}">⌕ Phóng to</button>`
     : `<div class="modal-no-image">Chưa có ảnh sản phẩm</div>`;
 
@@ -817,9 +818,9 @@ function render() {
         ${
           imgVariant && imgVariant.image_url
             ? `<div class="card-image-stage">
-                <img class="card-img" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(g.model)}">
+                <img data-product-image class="card-img" src="${escapeHTML(imgVariant.image_thumb_url || imgVariant.image_url)}" alt="${escapeHTML(g.model)}" loading="lazy" decoding="async">
               </div>`
-            : ''
+            : `<div class="card-image-stage">${productImagePlaceholder()}</div>`
         }
 
         <div class="model">${escapeHTML(g.model)}</div>
@@ -1095,8 +1096,8 @@ function renderReorderSuggestions() {
     <article class="reorder-item">
       <div class="reorder-thumb">
         ${item.image_url
-          ? `<img src="${escapeHTML(item.image_url)}" alt="${escapeHTML(item.model)}">`
-          : '<span aria-hidden="true">□</span>'}
+          ? `<img data-product-image src="${escapeHTML(item.image_thumb_url || item.image_url)}" alt="${escapeHTML(item.model)}" loading="lazy" decoding="async">`
+          : productImagePlaceholder()}
       </div>
       <div class="reorder-copy">
         <strong>${escapeHTML(item.model)}</strong>
@@ -1137,8 +1138,8 @@ function renderPromotionSuggestions() {
     <a class="promotion-suggestion-item" href="/ctkm" aria-label="Xem khuyến mãi ${escapeHTML(group.model)}">
       <div class="promotion-suggestion-thumb">
         ${promotion.image_url
-          ? `<img src="${escapeHTML(promotion.image_url)}" alt="${escapeHTML(group.model)}">`
-          : '<span aria-hidden="true">✦</span>'}
+          ? `<img data-product-image src="${escapeHTML(promotion.image_thumb_url || promotion.image_url)}" alt="${escapeHTML(group.model)}" loading="lazy" decoding="async">`
+          : productImagePlaceholder()}
       </div>
       <div class="promotion-suggestion-copy">
         <span class="promotion-suggestion-tag ${promotion.promotion_tag === 'hot' ? 'hot' : 'discount'}">
