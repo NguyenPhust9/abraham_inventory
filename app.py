@@ -17,13 +17,12 @@ from flask_login import (  # type: ignore
 )
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey, UniqueConstraint, text, func, inspect, or_, and_, case, event  # type: ignore
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, load_only  # type: ignore
-from sqlalchemy.engine import make_url  # type: ignore
-from sqlalchemy.pool import NullPool  # type: ignore
 from sqlalchemy.dialects.postgresql import insert as pg_insert  # type: ignore
 import pandas as pd  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 import math
 from openpyxl import load_workbook  # type: ignore
+from database_config import database_connection_settings
 from product_images import (
     MAX_UPLOAD_BYTES, ProductImageError, image_metadata, prepare_product_image,
     store_product_image, resolve_product_image, product_image_response,
@@ -66,40 +65,8 @@ Base = declarative_base()
 IS_VERCEL = bool(os.environ.get("VERCEL"))
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-    # Some Supabase direct database hosts are IPv6-only. Local machines without
-    # IPv6 use the project's IPv4 Session Pooler with the same credentials.
-    pooler_host = os.environ.get("SUPABASE_POOLER_HOST", "").strip()
-    if pooler_host:
-        database_url = make_url(DATABASE_URL)
-        direct_host = database_url.host or ""
-        pooler_user = database_url.username
-        pooler_port = int(os.environ.get("SUPABASE_POOLER_PORT", "5432"))
-        # Vercel spawns many short-lived functions. Supabase Session Pooler
-        # (5432) has a small client limit, while Transaction Pooler (6543) is
-        # designed for serverless workloads.
-        if IS_VERCEL and pooler_port == 5432:
-            pooler_port = 6543
-        if direct_host.startswith("db.") and direct_host.endswith(".supabase.co"):
-            project_ref = direct_host.split(".")[1]
-            if pooler_user == "postgres":
-                pooler_user = f"postgres.{project_ref}"
-        DATABASE_URL = database_url.set(
-            host=pooler_host,
-            port=pooler_port,
-            username=pooler_user,
-        ).render_as_string(hide_password=False)
-
-    engine_options = {"pool_pre_ping": True}
-    if pooler_host:
-        # Transaction Pooler handles pooling for us. NullPool prevents each web
-        # process/serverless instance from reserving its own persistent clients.
-        engine_options["poolclass"] = NullPool
-    else:
-        engine_options["pool_recycle"] = 300
-    engine = create_engine(DATABASE_URL, **engine_options)
+    database_url, engine_options = database_connection_settings(DATABASE_URL, os.environ, IS_VERCEL)
+    engine = create_engine(database_url, **engine_options)
 else:
     engine = create_engine(
         f"sqlite:///{DB_PATH}",
