@@ -193,6 +193,37 @@ class AdminWorkspaceTest(unittest.TestCase):
         self.assertNotIn('</script><script>alert(1)</script>', html)
         self.assertIn('</script>', self.editor_data(html)[0]['color'])
 
+    def test_excel_import_keeps_x6_sizes_in_models_for_existing_and_new_products(self):
+        with self.sessions() as db:
+            existing = db.get(self.web.Product, 1)
+            existing.code, existing.model, existing.color = 'X6-18 Vàng', 'X6', '18 Vàng'
+            existing.image_filename = 'keep.webp'
+            db.commit()
+        rows = [
+            {'Mã hàng hóa': 'X6-18 Vàng', 'Tên hàng hóa': 'X6-18 Vàng'},
+            {'Mã hàng hóa': 'X6-20 Dương', 'Tên hàng hóa': 'X6-20 Dương'},
+        ]
+        file = BytesIO()
+        pd.DataFrame(rows).to_excel(file, index=False)
+        file.seek(0)
+        response = self.client.post('/admin/import', data={'file': (file, 'products.xlsx')})
+        self.assertEqual(response.status_code, 302)
+        with self.sessions() as db:
+            existing = db.get(self.web.Product, 1)
+            self.assertEqual((existing.model, existing.color), ('X6-18', 'Vàng'))
+            self.assertEqual((existing.stock, existing.reserved, existing.price,
+                              existing.retail_price, existing.image_filename),
+                             (10, 3, 1000000, 1200000, 'keep.webp'))
+            added = db.query(self.web.Product).filter_by(code='X6-20 Dương').one()
+            self.assertEqual((added.model, added.color), ('X6-20', 'Dương'))
+            added.image_filename = 'new.webp'
+            db.commit()
+        for model, color in [('X6-18', 'Vàng'), ('X6-20', 'Dương')]:
+            result = self.client.get('/api/products/dealer', query_string={'q': model})
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual([(row['model'], row['color']) for row in result.json], [(model, color)])
+        self.assertEqual(self.web.split_model_color('24BIKE Nhôm (tem đậm) - Đỏ'), ('24BIKE Nhôm', 'Đỏ'))
+
     def test_unauthenticated_sections_require_login(self):
         client = self.web.app.test_client()
         for path in ['/admin', '/admin?section=promotions', '/admin?section=import']:

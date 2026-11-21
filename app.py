@@ -23,6 +23,7 @@ from werkzeug.utils import secure_filename  # type: ignore
 import math
 from openpyxl import load_workbook  # type: ignore
 from database_config import database_connection_settings
+from product_names import split_model_color as split_product_name
 from product_images import (
     MAX_UPLOAD_BYTES, ProductImageError, image_metadata, prepare_product_image,
     store_product_image, resolve_product_image, product_image_response,
@@ -433,18 +434,8 @@ def split_model_color(name: str):
 
     Sau khi tách màu, model cũng được chuẩn hóa để tránh tách card ngoài trang khách.
     """
-    if not name:
-        return "", ""
-
-    name = str(name).strip()
-    parts = name.rsplit("-", 1)
-
-    if len(parts) == 2 and parts[1].strip():
-        model = normalize_model_name(parts[0].strip())
-        color = parts[1].strip()
-        return model, color
-
-    return normalize_model_name(name), ""
+    model, color = split_product_name(name)
+    return normalize_model_name(model), color
 
 
 def safe_int(value, default=0):

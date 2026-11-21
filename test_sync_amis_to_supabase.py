@@ -144,6 +144,26 @@ class SyncAmisToSupabaseTest(unittest.TestCase):
 
         self.assertEqual(inventory_map, {})
 
+    def test_sync_inserts_x6_variants_with_model_sizes_and_clean_colors(self):
+        inventory_map = sync.build_inventory_map([
+            {'product_code': f'X6-{size} {color}', 'product_name': f'X6-{size} {color}',
+             'main_stock_quantity': 12, 'amount_summary': 3}
+            for size in (18, 20) for color in ('Cam', 'Đỏ', 'Dương', 'Vàng')
+        ])
+        with redirect_stdout(io.StringIO()):
+            sync.update_supabase(inventory_map)
+        engine = create_engine(self.database_url)
+        try:
+            with engine.connect() as connection:
+                rows = connection.execute(text("SELECT code,model,color,stock,reserved FROM products WHERE code LIKE 'X6-%'")).mappings().all()
+            self.assertEqual(len(rows), 8)
+            for row in rows:
+                self.assertEqual(row['code'], row['model'] + ' ' + row['color'])
+                self.assertIn(row['model'], ('X6-18', 'X6-20'))
+                self.assertEqual((row['stock'], row['reserved']), (12, 3))
+        finally:
+            engine.dispose()
+
     def test_builds_and_replaces_product_lots(self):
         batch_map = sync.build_batch_map(
             [

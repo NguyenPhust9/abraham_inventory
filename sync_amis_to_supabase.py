@@ -10,6 +10,7 @@ import requests
 from amis_app_session import AmisAppSession
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
+from product_names import split_model_color
 
 
 load_dotenv(override=True)
@@ -140,17 +141,6 @@ def first_text(item: dict[str, Any], *keys: str) -> str:
             return " ".join(text_value.split())
 
     return ""
-
-
-def split_model_color(value: str) -> tuple[str, str]:
-    """Tach ten/mau tu dang 'PASSION 20 - CAM'."""
-    text_value = " ".join(str(value or "").strip().split())
-    parts = re.split(r"\s+-\s+", text_value)
-
-    if len(parts) >= 2 and parts[-1].strip():
-        return " - ".join(parts[:-1]).strip(), parts[-1].strip()
-
-    return text_value, ""
 
 
 def to_integer(value: Any) -> int:
