@@ -131,6 +131,29 @@ class AdminWorkspaceTest(unittest.TestCase):
         self.assertTrue(response.location.startswith('/admin?'))
         self.assertEqual(parse_qs(urlparse(response.location).query)['price_type'], ['dealer'])
 
+    def test_add_and_edit_accept_vnd_prices_without_rounding_to_thousands(self):
+        cases = [
+            ('1.000', '70.500', 1000, 70500),
+            ('47.001', '1.234.567', 47001, 1234567),
+            ('47000', '70501', 47000, 70501),
+            ('47000.0', '70500.0', 47000, 70500),
+            ('0', '', 0, None),
+            ('', '0', None, 0),
+        ]
+        for index, (price, retail_price, expected_price, expected_retail) in enumerate(cases):
+            for action in ['add', 'edit']:
+                with self.subTest(action=action, price=price, retail_price=retail_price):
+                    code = f'VND-{index}' if action == 'add' else 'BIKE-001'
+                    route = '/admin/products/add' if action == 'add' else '/admin/products/1/edit'
+                    response = self.client.post(route, data=dict(
+                        code=code, model='Price test', stock='10', reserved='3',
+                        price=price, retail_price=retail_price))
+                    self.assertEqual(response.status_code, 302)
+                    with self.sessions() as db:
+                        product = db.query(self.web.Product).filter_by(code=code).one()
+                        self.assertEqual(product.price, expected_price)
+                        self.assertEqual(product.retail_price, expected_retail)
+
     def test_promotion_workspace_is_paginated_and_clear_all_is_global(self):
         html = self.get_html('/admin?section=promotions')
         self.assertEqual(html.count('class="promotion-edit"'), 25)

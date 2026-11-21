@@ -981,6 +981,15 @@ def safe_float(value):
         return None
 
 
+def parse_vnd_price(value):
+    """Accept grouped VND form values while preserving unformatted numeric callers."""
+    if isinstance(value, str):
+        value = value.strip()
+        if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", value):
+            value = value.replace(".", "")
+    return safe_float(value)
+
+
 @app.before_request
 def limit_product_image_request():
     # Leave Excel imports unchanged; constrain only forms that accept product images.
@@ -3403,8 +3412,8 @@ def admin_add_product():
             unit=request.form.get("unit", "Chiếc").strip() or "Chiếc",
             stock=safe_int(request.form.get("stock")),
             reserved=safe_int(request.form.get("reserved")),
-            price=safe_float(price),
-            retail_price=safe_float(request.form.get("retail_price", "").strip()),
+            price=parse_vnd_price(price),
+            retail_price=parse_vnd_price(request.form.get("retail_price", "")),
         )
 
         prepared = prepare_product_image(request.files.get("image"))
@@ -3467,8 +3476,8 @@ def admin_edit_product(product_id):
         p.unit = request.form.get("unit", "Chiếc").strip() or "Chiếc"
         p.stock = safe_int(request.form.get("stock"))
         p.reserved = safe_int(request.form.get("reserved"))
-        p.price = safe_float(request.form.get("price", "").strip())
-        p.retail_price = safe_float(request.form.get("retail_price", "").strip())
+        p.price = parse_vnd_price(request.form.get("price", ""))
+        p.retail_price = parse_vnd_price(request.form.get("retail_price", ""))
 
         prepared = prepare_product_image(request.files.get("image"))
         image_name = store_product_image(db, prepared)

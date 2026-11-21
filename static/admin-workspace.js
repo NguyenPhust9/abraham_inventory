@@ -20,6 +20,36 @@
   document.querySelectorAll('form[data-confirm]').forEach(form => form.addEventListener('submit', event => {
     if (!window.confirm(form.dataset.confirm)) event.preventDefault();
   }));
+  function formatVndPrice(value) {
+    const digits = String(value).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  document.querySelectorAll('[data-vnd-price]').forEach(input => {
+    input.value = formatVndPrice(input.value);
+    input.addEventListener('beforeinput', event => {
+      const caret = input.selectionStart;
+      if (caret !== input.selectionEnd) return;
+      // Skip a grouping dot so Backspace/Delete still removes a digit.
+      if (event.inputType === 'deleteContentBackward' && input.value[caret - 1] === '.') {
+        input.setSelectionRange(caret - 1, caret - 1);
+      } else if (event.inputType === 'deleteContentForward' && input.value[caret] === '.') {
+        input.setSelectionRange(caret + 1, caret + 1);
+      }
+    });
+    input.addEventListener('input', () => {
+      const digitsBeforeCaret = input.value.slice(0, input.selectionStart).replace(/\D/g, '').length;
+      const formatted = formatVndPrice(input.value);
+      if (input.value === formatted) return;
+      input.value = formatted;
+      let caret = 0;
+      let digits = 0;
+      while (caret < formatted.length && digits < digitsBeforeCaret) {
+        if (formatted[caret] !== '.') digits++;
+        caret++;
+      }
+      input.setSelectionRange(caret, caret);
+    });
+  });
   if (location.hash === '#khuyen-mai' && !document.getElementById('khuyen-mai')) {
     location.replace('/admin?section=promotions#khuyen-mai');
     return;
@@ -41,7 +71,11 @@
     trigger = button;
     form.reset();
     for (const name of ['code', 'model', 'color', 'category', 'unit', 'stock', 'reserved', 'price', 'retail_price']) {
-      form.elements.namedItem(name).value = product[name] ?? '';
+      const input = form.elements.namedItem(name);
+      const value = product[name];
+      input.value = input.hasAttribute('data-vnd-price')
+        ? (value == null ? '' : formatVndPrice(Math.round(value)))
+        : (value ?? '');
     }
     form.elements.namedItem('image').setCustomValidity('');
     form.action = product.edit_url;

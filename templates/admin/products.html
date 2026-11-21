@@ -50,7 +50,7 @@
         <label>Mã hàng hóa<input name="code" required></label><label>Tên mẫu xe<input name="model" required></label>
         <label>Màu sản phẩm<input name="color"></label><label>Loại xe<input name="category" list="cat-list"></label>
         <label>Tồn kho<input name="stock" type="number" inputmode="numeric"></label><label>Đã đặt<input name="reserved" type="number" inputmode="numeric"></label>
-        <label>Giá đại lý<input name="price" type="number" inputmode="numeric" step="1000" placeholder="Liên hệ"></label><label>Giá lẻ<input name="retail_price" type="number" inputmode="numeric" step="1000" placeholder="Liên hệ"></label>
+        <label>Giá đại lý<input name="price" type="text" inputmode="numeric" data-vnd-price pattern="[0-9]+(\.[0-9]{3})*" placeholder="Liên hệ"></label><label>Giá lẻ<input name="retail_price" type="text" inputmode="numeric" data-vnd-price pattern="[0-9]+(\.[0-9]{3})*" placeholder="Liên hệ"></label>
         <label class="full">Ảnh sản phẩm<input type="file" name="image" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG hoặc WebP, tối đa 4 MB. Ảnh được tự động thu nhỏ và nén.</small></label>
       </div>
       <button type="submit" class="image-save-only" id="saveImageOnly"><i data-lucide="image"></i>Lưu riêng ảnh</button>
