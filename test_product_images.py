@@ -6,7 +6,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from PIL import Image
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import sessionmaker
 from werkzeug.datastructures import FileStorage
 
@@ -32,6 +32,7 @@ class ProductImageTest(unittest.TestCase):
         assert cls.web.engine.url.database == ":memory:"
 
     def setUp(self):
+        media._clear_image_response_cache()
         self.engine = create_engine("sqlite:///:memory:")
         self.web.Base.metadata.create_all(self.engine)
         media.image_metadata.create_all(self.engine)
@@ -53,6 +54,7 @@ class ProductImageTest(unittest.TestCase):
 
     def tearDown(self):
         self.factory.stop()
+        media._clear_image_response_cache()
         self.engine.dispose()
 
     def login(self):
@@ -130,6 +132,156 @@ class ProductImageTest(unittest.TestCase):
         self.assertEqual(missing.status_code, 404)
         self.assertEqual(missing.headers["Cache-Control"], "no-store")
         self.assertEqual(self.client.get(url.replace("full.webp", "huge.webp")).status_code, 404)
+
+    def test_media_uses_one_query_and_metadata_only_for_head_or_not_modified(self):
+        self.login()
+        self.upload()
+        full_url = self.saved_url()
+        statements = []
+
+        def record_query(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(statement)
+
+        event.listen(self.engine, "before_cursor_execute", record_query)
+        try:
+            for variant in ("full", "thumb"):
+                url = full_url.replace("full.webp", f"{variant}.webp")
+                statements.clear()
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(statements), 1)
+                self.assertIn(f"product_images.{variant}_data", statements[0])
+                other_variant = "thumb" if variant == "full" else "full"
+                self.assertNotIn(f"product_images.{other_variant}_data", statements[0])
+                self.assertEqual(len(response.data), response.content_length)
+                etag = response.headers["ETag"]
+
+                for method, headers, status in (
+                    ("HEAD", {}, 200),
+                    ("GET", {"If-None-Match": etag}, 304),
+                    ("GET", {"If-None-Match": "W/" + etag}, 304),
+                ):
+                    with self.subTest(variant=variant, method=method, headers=headers):
+                        media._clear_image_response_cache()
+                        statements.clear()
+                        cached = self.client.open(url, method=method, headers=headers)
+                        self.assertEqual(cached.status_code, status)
+                        self.assertEqual(cached.data, b"")
+                        self.assertEqual(len(statements), 1)
+                        self.assertNotIn("full_data", statements[0])
+                        self.assertNotIn("thumb_data", statements[0])
+                        self.assertIn(f"product_images.{variant}_size", statements[0])
+                        self.assertIn("immutable", cached.headers["Cache-Control"])
+
+            statements.clear()
+            missing_digest = "0" * 64
+            missing = self.client.get(f"/media/products/{missing_digest}/full.webp", headers={
+                "If-None-Match": f'"{missing_digest}-full"',
+            })
+            self.assertEqual(missing.status_code, 404)
+            self.assertEqual(missing.headers["Cache-Control"], "no-store")
+            self.assertEqual(len(statements), 1)
+            self.assertNotIn("full_data", statements[0])
+        finally:
+            event.remove(self.engine, "before_cursor_execute", record_query)
+
+    def test_warm_images_skip_database_for_get_head_and_conditional_requests(self):
+        self.login()
+        self.upload()
+        full_url = self.saved_url()
+        statements = []
+
+        def record_query(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(self.engine, "before_cursor_execute", record_query)
+        try:
+            for variant in ("full", "thumb"):
+                url = full_url.replace("full.webp", f"{variant}.webp")
+                cold = self.client.get(url)
+                self.assertEqual(cold.status_code, 200)
+                statements.clear()
+                for method, headers, status in (
+                    ("GET", {}, 200),
+                    ("HEAD", {}, 200),
+                    ("GET", {"If-None-Match": cold.headers["ETag"]}, 304),
+                    ("GET", {"If-None-Match": "W/" + cold.headers["ETag"]}, 304),
+                ):
+                    with self.subTest(variant=variant, method=method, status=status):
+                        warm = self.client.open(url, method=method, headers=headers)
+                        self.assertEqual(warm.status_code, status)
+                        self.assertEqual(warm.data, cold.data if method == "GET" and status == 200 else b"")
+                        self.assertEqual(warm.headers["ETag"], cold.headers["ETag"])
+                        self.assertIn("immutable", warm.headers["Cache-Control"])
+                        if status == 200:
+                            self.assertEqual(warm.content_length, len(cold.data))
+                        self.assertEqual(statements, [])
+        finally:
+            event.remove(self.engine, "before_cursor_execute", record_query)
+
+    def test_image_cache_evicts_by_bytes_and_entries_without_changing_responses(self):
+        self.login()
+        self.upload()
+        full_url = self.saved_url()
+        thumb_url = full_url.replace("full.webp", "thumb.webp")
+        full = self.client.get(full_url).data
+        thumb = self.client.get(thumb_url).data
+        self.upload(data=picture("blue"))
+        second_url = self.saved_url()
+        statements = []
+
+        def record_query(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(self.engine, "before_cursor_execute", record_query)
+        try:
+            with patch.object(media, "IMAGE_RESPONSE_CACHE_ENTRIES", 2):
+                media._clear_image_response_cache()
+                self.client.get(full_url)
+                self.client.get(thumb_url)
+                self.client.get(full_url)  # Mark full as most recently used.
+                self.client.get(second_url)
+                statements.clear()
+                self.assertEqual(self.client.get(full_url).data, full)
+                self.assertEqual(statements, [])
+                self.assertEqual(self.client.get(thumb_url).data, thumb)
+                self.assertEqual(len(statements), 1)
+                self.assertEqual(len(media._image_response_cache), 2)
+
+            with patch.object(media, "IMAGE_RESPONSE_CACHE_BYTES", len(full) + len(thumb) - 1):
+                media._clear_image_response_cache()
+                statements.clear()
+                for url, expected in ((full_url, full), (thumb_url, thumb), (full_url, full)):
+                    self.assertEqual(self.client.get(url).data, expected)
+                    self.assertLessEqual(media._image_response_cache_bytes, media.IMAGE_RESPONSE_CACHE_BYTES)
+                self.assertEqual(len(statements), 3)
+
+            with patch.object(media, "IMAGE_RESPONSE_CACHE_BYTES", len(full) - 1):
+                media._clear_image_response_cache()
+                statements.clear()
+                self.assertEqual(self.client.get(full_url).data, full)
+                self.assertEqual(self.client.get(full_url).data, full)
+                self.assertEqual(len(statements), 2)
+                self.assertEqual(media._image_response_cache_bytes, 0)
+        finally:
+            event.remove(self.engine, "before_cursor_execute", record_query)
+
+    def test_image_cache_cannot_leak_across_database_binds(self):
+        self.login()
+        self.upload()
+        url = self.saved_url()
+        cached = self.client.get(url)
+        other_engine = create_engine("sqlite:///:memory:")
+        try:
+            media.image_metadata.create_all(other_engine)
+            with patch.object(self.web, "SessionLocal", sessionmaker(bind=other_engine)):
+                response = self.client.get(url, headers={"If-None-Match": cached.headers["ETag"]})
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+            self.assertEqual(self.client.get(url).data, cached.data)
+        finally:
+            other_engine.dispose()
 
     def test_corrupt_unsupported_and_oversized_files_keep_old_image(self):
         self.login()

@@ -2,7 +2,7 @@
 import unittest
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 
 from database_config import database_connection_settings
 
@@ -70,6 +70,38 @@ class DatabaseConfigTest(unittest.TestCase):
         url, options = database_connection_settings("postgresql://user:secret@localhost/postgres", {}, False)
         self.assertNotIn("poolclass", options)
         self.assertEqual(options["pool_recycle"], 300)
+
+    def test_local_transaction_pooler_reuses_bounded_connections(self):
+        configurations = (
+            (f"postgresql://postgres.project:secret@{self.pooler}:6543/postgres", {}),
+            ("postgresql://postgres:secret@db.project.supabase.co:5432/postgres",
+             {"SUPABASE_POOLER_HOST": self.pooler, "SUPABASE_POOLER_PORT": "6543"}),
+        )
+        for raw_url, env in configurations:
+            with self.subTest(override=bool(env)):
+                url, options = database_connection_settings(raw_url, env, False)
+                self.assertEqual(url.port, 6543)
+                self.assertTrue(options["pool_pre_ping"])
+                self.assertEqual(options["pool_recycle"], 300)
+                self.assertEqual(options["max_overflow"], 2)
+                engine = create_engine(url, **options)
+                self.assertIsInstance(engine.pool, QueuePool)
+                self.assertEqual(engine.pool.size(), 2)
+                self.assertEqual(engine.pool.timeout(), 15)
+                engine.dispose()
+
+    def test_local_custom_poolers_and_implicit_session_port_keep_null_pool(self):
+        configurations = (
+            (f"postgresql://postgres.project:secret@{self.pooler}/postgres", {}),
+            (f"postgresql://postgres.project:secret@{self.pooler}:7777/postgres", {}),
+            ("postgresql://postgres:secret@db.project.supabase.co/postgres",
+             {"SUPABASE_POOLER_HOST": "proxy.example.com", "SUPABASE_POOLER_PORT": "6543"}),
+        )
+        for raw_url, env in configurations:
+            with self.subTest(override=bool(env)):
+                _, options = database_connection_settings(raw_url, env, False)
+                self.assertIs(options["poolclass"], NullPool)
+                self.assertNotIn("pool_size", options)
 
     def test_sqlite_ignores_postgres_overrides_and_timeout(self):
         url, options = database_connection_settings(

@@ -1,383 +1,102 @@
 {% extends "base.html" %}
-
 {% block title %}{{ price_label }} | Abraham Bike{% endblock %}
-
 {% block head %}
-<link
-  rel="stylesheet"
-  href="{{ url_for('static', filename='catalog_29.css') }}?v=64"
->
+<link rel="stylesheet" href="{{ url_for('static', filename='catalog_29.css') }}?v=64">
+<link rel="stylesheet" href="{{ url_for('static', filename='catalog-workspace.css') }}?v=7">
 {% endblock %}
-
-
 {% block content %}
-
-<!-- =========================================================
-  TICKER THONG TIN KHO
-========================================================= -->
-<div class="national-ticker">
-  <div class="national-ticker-track">
-    <span>
-      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Tri ân người gieo tri thức
-      <i aria-hidden="true">·</i><em>Đồng hành cùng thầy cô Việt Nam</em>
-      <i aria-hidden="true">·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i aria-hidden="true">·</i>
-    </span>
-    <span aria-hidden="true">
-      <b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Tri ân người gieo tri thức
-      <i aria-hidden="true">·</i><em>Đồng hành cùng thầy cô Việt Nam</em>
-      <i aria-hidden="true">·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i aria-hidden="true">·</i>
-    </span>
+<header class="catalog-topbar">
+  <div class="catalog-announcement" id="catalogAnnouncement">
+    <div class="catalog-ticker-viewport">
+      <div class="catalog-announcement-track">
+        <span><b>ABRAHAM BIKE</b><i aria-hidden="true">·</i>Tri ân người gieo tri thức<i aria-hidden="true">·</i><em>Đồng hành cùng thầy cô Việt Nam</em><i aria-hidden="true">·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i aria-hidden="true">·</i></span>
+        <span aria-hidden="true"><b>ABRAHAM BIKE</b><i>·</i>Tri ân người gieo tri thức<i>·</i><em>Đồng hành cùng thầy cô Việt Nam</em><i>·</i>Chào mừng ngày Nhà giáo Việt Nam 20/11<i>·</i></span>
+      </div>
+    </div>
+    <button type="button" class="catalog-ticker-toggle" id="catalogTickerToggle" aria-label="Tạm dừng dòng chữ chạy" aria-pressed="false" title="Tạm dừng dòng chữ chạy"><i data-lucide="pause" class="ticker-pause" aria-hidden="true"></i><i data-lucide="play" class="ticker-play" aria-hidden="true"></i></button>
   </div>
-  <a class="hero-manage-overlay" href="{{ url_for('admin_login') }}">
-    Quản lý kho ↗
-  </a>
-</div>
-
-
-<div class="catalog-page" data-price-type="{{ price_type }}">
-
-    <!-- =========================================================
-      HERO IMAGE
-    ========================================================= -->
-  <section class="catalog-hero-image">
-
-    <img
-      src="{{ url_for('static', filename='uploads/anh2011.png') }}"
-      alt="Abraham Bike - Tri ân thầy cô 20/11"
-      class="hero-banner-img"
-    >
-
-  </section>
-
-
-  {% if price_type == 'retail' and not retail_visible %}
-  <section class="retail-pending-module" role="status">
+  <a class="catalog-admin-link" href="{{ url_for('admin_login') }}">Quản lý kho <i data-lucide="arrow-up-right"></i></a>
+</header>
+<section class="catalog-branding" aria-label="Thông điệp Abraham Bike">
+  <img class="catalog-restored-hero" src="{{ url_for('static', filename='uploads/anh2011.png') }}" width="1774" height="887" alt="Abraham Bike — Tri ân thầy cô 20/11, đồng hành cùng những người gieo tri thức" decoding="async">
+</section>
+<script>
+(() => {
+  const announcement = document.getElementById('catalogAnnouncement');
+  const toggle = document.getElementById('catalogTickerToggle');
+  toggle.addEventListener('click', () => {
+    const paused = announcement.classList.toggle('is-paused');
+    const label = paused ? 'Chạy lại dòng chữ' : 'Tạm dừng dòng chữ chạy';
+    toggle.setAttribute('aria-pressed', String(paused));
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
+  });
+})();
+</script>
+<div class="catalog-page catalog-workspace" data-price-type="{{ price_type }}">
+  <div class="catalog-heading">
+    {% if price_type == 'promotion' %}<h1>Khuyến mãi</h1>{% endif %}
     <nav class="price-module-tabs" aria-label="Chọn bảng giá">
-      <a href="{{ url_for('catalog') }}" class="price-module-tab">Giá đại lý</a>
-      <a href="{{ url_for('retail_catalog') }}" class="price-module-tab active" aria-current="page">Giá lẻ</a>
-              <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab promotion-tab"><span aria-hidden="true">✦</span> CTKM</a>
-              <a href="{{ url_for('dealer_locator') }}" class="price-module-tab"><span aria-hidden="true">⌖</span> Tìm đại lý</a>
+      <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
+      <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
+      <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'promotion' else '' }}" {% if price_type == 'promotion' %}aria-current="page"{% endif %}>Khuyến mãi</a>
+      <a href="{{ url_for('dealer_locator') }}" class="price-module-tab">Tìm đại lý</a>
     </nav>
-    <span class="retail-pending-kicker">GIÁ LẺ</span>
-    <h1>Đang cập nhật</h1>
-    <p>Bảng Giá lẻ sẽ hiển thị khi cửa hàng cập nhật xong.</p>
-  </section>
-  {% endif %}
-
-  {% if price_type != 'retail' or retail_visible %}
-
-  <div class="catalog-content-layout">
-
-  <!-- =========================================================
-       SEARCH + FILTER
-       QUAN TRỌNG:
-       Các ID dưới đây phải giữ nguyên để catalog.js hoạt động
-  ========================================================= -->
-  <section class="catalog-controls-shell">
-
-    <div class="catalog-controls">
-
-      <!-- Heading -->
-      <div class="control-heading">
-
-        <div>
-          <span class="control-kicker">
-            TRA CỨU SẢN PHẨM
-          </span>
-
-          <section class="incoming-strip" aria-label="Hàng sắp về">
-            <div class="incoming-strip-label">
-              <span aria-hidden="true">🚚</span>
-              <strong>Hàng sắp về</strong>
-            </div>
-            <div class="incoming-strip-track">
-              {% for incoming in incoming_products %}
-                <article class="incoming-strip-item">
-                  <strong>{{ incoming.name }}</strong>
-                  <time datetime="{{ incoming.date }}">Dự kiến {{ incoming.date }}</time>
-                </article>
-              {% else %}
-                <div class="incoming-strip-empty">
-                  Hàng sắp về đang cập nhật
-                </div>
-              {% endfor %}
-            </div>
-          </section>
-
-          <div class="control-title-row">
-            <h2>
-              Tìm xe đang có sẵn trong kho
-            </h2>
-
-            <nav class="price-module-tabs" aria-label="Chọn bảng giá">
-              <a href="{{ url_for('catalog') }}" class="price-module-tab {{ 'active' if price_type == 'dealer' else '' }}" {% if price_type == 'dealer' %}aria-current="page"{% endif %}>Giá đại lý</a>
-              <a href="{{ url_for('retail_catalog') }}" class="price-module-tab {{ 'active' if price_type == 'retail' else '' }}" {% if price_type == 'retail' %}aria-current="page"{% endif %}>Giá lẻ</a>
-              <a href="{{ url_for('promotion_catalog') }}" class="price-module-tab promotion-tab {{ 'active' if price_type == 'promotion' else '' }}" {% if price_type == 'promotion' %}aria-current="page"{% endif %}><span aria-hidden="true">✦</span> CTKM</a>
-              <a href="{{ url_for('dealer_locator') }}" class="price-module-tab"><span aria-hidden="true">⌖</span> Tìm đại lý</a>
-            </nav>
-          </div>
-        </div>
-
-        <span class="control-badge">
-          Cập nhật theo tồn kho thực tế
-        </span>
-
-      </div>
-
-
-      <!-- Search -->
-      <div class="searchwrap catalog-search">
-
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7"/>
-          <path d="M21 21l-4.3-4.3"/>
-        </svg>
-
-        <input
-          id="search"
-          type="text"
-          placeholder="Tìm theo tên xe, mã hàng, màu…"
-          autocomplete="off"
-        >
-
-      </div>
-
-
-      <!-- Category Pills -->
-      <div class="pills-wrap">
-
-        <button
-          type="button"
-          class="pills-arrow"
-          id="pillsLeft"
-          aria-label="Cuộn trái"
-        >
-          ‹
-        </button>
-
-        <div
-          class="pills"
-          id="catpills"
-        ></div>
-
-        <button
-          type="button"
-          class="pills-arrow"
-          id="pillsRight"
-          aria-label="Cuộn phải"
-        >
-          ›
-        </button>
-
-      </div>
-
-
-      <!-- Extra Filters -->
-      <div class="extra-filters">
-        <label class="lot-toggle" for="lotDetails">
-          <input type="checkbox" id="lotDetails" role="switch">
-          <span class="lot-toggle-track" aria-hidden="true"></span>
-          <span>Chi tiết lô / ngày nhập kho</span>
-        </label>
-        <button type="button" id="inventoryWarningButton" class="inventory-warning-button" hidden aria-haspopup="dialog" aria-controls="inventoryWarningDialog">⚠ Cảnh báo quá 90 ngày</button>
-
-        <!-- Chỉ hiện sản phẩm còn hàng -->
-        <label class="check-inline">
-
-          <input
-            type="checkbox"
-            id="onlyStock"
-            checked
-          >
-
-          <span>
-            Chỉ hiện còn hàng
-          </span>
-
-        </label>
-
-
-        <!-- Sắp xếp số lượng tồn -->
-        <label
-          class="sort-wrap"
-          for="sortStock"
-        >
-
-          <span>
-            Sắp xếp
-          </span>
-
-          <select
-            class="sort-select"
-            id="sortStock"
-          >
-
-            <option value="">
-              Mặc định
-            </option>
-
-            <option value="asc">
-              Tồn: Ít → Nhiều
-            </option>
-
-            <option value="desc">
-              Tồn: Nhiều → Ít
-            </option>
-
-            <option value="price-desc">
-              Giá: Cao → Thấp
-            </option>
-
-            <option value="price-asc">
-              Giá: Thấp → Cao
-            </option>
-
-          </select>
-
-        </label>
-
-        <div class="price-filter" aria-label="Lọc theo giá bán">
-
-          <span class="price-filter-label">
-            Giá
-          </span>
-
-          <input
-            class="price-input"
-            id="minPrice"
-            type="number"
-            min="0"
-            step="1000"
-            inputmode="numeric"
-            placeholder="Từ"
-            aria-label="Giá thấp nhất"
-          >
-
-          <span class="price-separator">-</span>
-
-          <input
-            class="price-input"
-            id="maxPrice"
-            type="number"
-            min="0"
-            step="1000"
-            inputmode="numeric"
-            placeholder="Đến"
-            aria-label="Giá cao nhất"
-          >
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- =========================================================
-       PRODUCT GRID
-  ========================================================= -->
-  <main class="catalog-main">
-
-    <!-- Summary -->
-    <div class="summary catalog-summary">
-
-      <span id="summaryText"></span>
-
-      <span
-        class="summary-divider"
-        aria-hidden="true"
-      ></span>
-
-      <span id="summaryStock"></span>
-
-    </div>
-
-
-    <!-- catalog.js render card sản phẩm vào đây -->
-    <div
-      class="grid"
-      id="grid"
-    ></div>
-
-
-    <!-- Empty State -->
-    <div
-      class="empty"
-      id="emptyState"
-      style="display:none;"
-    >
-
-      <div
-        class="empty-star"
-        aria-hidden="true"
-      >
-        🎃
-      </div>
-
-      <strong>
-        Không tìm thấy sản phẩm phù hợp
-      </strong>
-
-      <span>
-        Thử đổi từ khóa hoặc bộ lọc để xem thêm sản phẩm.
-      </span>
-
-    </div>
-
-  </main>
-
-  <button type="button" id="reorderMobileTrigger" class="reorder-mobile-trigger" aria-controls="reorderPanel" aria-expanded="false">
-    <span>⚠ Cảnh báo nhập hàng</span>
-    <strong id="reorderMobileCount">Đang tính…</strong>
-  </button>
-  <button type="button" id="reorderBackdrop" class="reorder-backdrop" aria-label="Đóng gợi ý nhập hàng"></button>
-
-  <aside id="reorderPanel" class="reorder-panel" aria-labelledby="reorderPanelTitle">
-    <button type="button" id="reorderDesktopToggle" class="reorder-desktop-toggle" aria-label="Thu gọn gợi ý nhập hàng" aria-expanded="true">›</button>
-    <button type="button" id="reorderMobileClose" class="reorder-mobile-close" aria-label="Đóng">×</button>
-    <section class="reorder-intro">
-      <span class="reorder-kicker">✦ Gợi ý tồn kho</span>
-      <h2>Một số sản phẩm cần nhập hàng</h2>
-      <p>Dựa trên tồn kho hiện tại và lượng bán trung bình, hệ thống cảnh báo khi hàng không đủ dự trữ trong 2 tháng.</p>
-    </section>
-
-    <section class="reorder-list-card">
-      <div class="reorder-list-head">
-        <h3 id="reorderPanelTitle">Gợi ý cần đặt hàng</h3>
-      </div>
-      <div class="reorder-tools">
-        <input id="reorderSearch" type="search" placeholder="Tìm sản phẩm cần nhập…" autocomplete="off" aria-label="Tìm trong danh sách cần nhập">
-      </div>
-      <div id="reorderList" class="reorder-list" aria-live="polite">
-        <div class="reorder-loading">Đang tính mức dự trữ…</div>
-      </div>
-    </section>
-
-    <section class="promotion-suggestion-card" aria-labelledby="promotionSuggestionTitle">
-      <div class="promotion-suggestion-intro">
-        <span class="promotion-suggestion-kicker">✦ Gợi ý CTKM</span>
-        <h2 id="promotionSuggestionTitle">Ưu đãi đang áp dụng</h2>
-        <p>Các mẫu xe có giá khuyến mãi nổi bật trong thời gian hiện tại.</p>
-      </div>
-      <div id="promotionSuggestionList" class="promotion-suggestion-list" aria-live="polite">
-        <div class="reorder-loading">Đang tải chương trình khuyến mãi…</div>
-      </div>
-    </section>
-
-  </aside>
-
   </div>
-
+  {% if price_type == 'retail' and not retail_visible %}
+  <section class="retail-pending-module" role="status"><h2>Đang cập nhật giá lẻ</h2><p>Bảng giá sẽ hiển thị khi cửa hàng cập nhật xong.</p></section>
+  {% endif %}
+  {% if price_type != 'retail' or retail_visible %}
+  <div class="catalog-content-layout reorder-collapsed">
+    <section class="catalog-controls-shell" aria-label="Tìm và lọc sản phẩm">
+      <div class="catalog-controls">
+        <div class="catalog-search-line">
+          <label class="searchwrap catalog-search" for="search">
+            <i data-lucide="search" aria-hidden="true"></i>
+            <input id="search" type="search" placeholder="Tên xe, mã hàng hoặc màu sắc…" aria-label="Tìm sản phẩm" autocomplete="off">
+          </label>
+          <button type="button" id="reorderMobileTrigger" class="catalog-tool-button" aria-controls="reorderPanel" aria-expanded="false"><i data-lucide="package-search" aria-hidden="true"></i><span>Gợi ý nhập hàng</span></button>
+        </div>
+        <div class="catalog-quick-filters">
+          <label class="check-inline"><input type="checkbox" id="onlyStock" checked><span>Chỉ hiện còn hàng</span></label>
+          <label class="sort-wrap" for="sortStock"><span>Sắp xếp</span><select class="sort-select" id="sortStock"><option value="">Tên sản phẩm</option><option value="asc">Tồn: Ít → Nhiều</option><option value="desc">Tồn: Nhiều → Ít</option><option value="price-asc">Giá: Thấp → Cao</option><option value="price-desc">Giá: Cao → Thấp</option></select></label>
+          <button type="button" id="resetCatalogFilters" class="catalog-text-button">Xóa bộ lọc</button>
+        </div>
+        <div class="pills-wrap"><button type="button" class="pills-arrow" id="pillsLeft" aria-label="Cuộn trái">‹</button><div class="pills" id="catpills" aria-label="Loại sản phẩm"></div><button type="button" class="pills-arrow" id="pillsRight" aria-label="Cuộn phải">›</button></div>
+        <div class="catalog-secondary-tools">
+          <details class="catalog-disclosure" id="catalogFilters">
+            <summary><i data-lucide="sliders-horizontal" aria-hidden="true"></i>Bộ lọc chi tiết<span id="filterCount"></span></summary>
+            <div class="extra-filters">
+              <div class="price-filter" aria-label="Lọc theo giá bán"><span class="price-filter-label">Khoảng giá</span><input class="price-input" id="minPrice" type="number" min="0" step="1000" inputmode="numeric" placeholder="Từ" aria-label="Giá thấp nhất"><span class="price-separator">–</span><input class="price-input" id="maxPrice" type="number" min="0" step="1000" inputmode="numeric" placeholder="Đến" aria-label="Giá cao nhất"></div>
+              <label class="lot-toggle" for="lotDetails"><input type="checkbox" id="lotDetails" role="switch"><span class="lot-toggle-track" aria-hidden="true"></span><span>Chi tiết lô / ngày nhập kho</span></label>
+              <button type="button" id="inventoryWarningButton" class="inventory-warning-button" hidden aria-haspopup="dialog" aria-controls="inventoryWarningDialog">Tồn kho quá 90 ngày</button>
+            </div>
+          </details>
+          <details class="catalog-disclosure catalog-incoming">
+            <summary><i data-lucide="truck" aria-hidden="true"></i>Hàng sắp về{% if incoming_products %}<span>{{ incoming_products|length }}</span>{% endif %}</summary>
+            <div class="catalog-incoming-list">{% for incoming in incoming_products %}<article><strong>{{ incoming.name }}</strong><span>Dự kiến {{ incoming.date }}</span></article>{% else %}<p>Lịch hàng sắp về đang cập nhật</p>{% endfor %}</div>
+          </details>
+        </div>
+      </div>
+    </section>
+    <main class="catalog-main">
+      <div class="summary catalog-summary"><span id="summaryText">Đang tải sản phẩm…</span><span id="summaryStock"></span></div>
+      <div id="catalogStatus" class="catalog-status" role="status" aria-live="polite" hidden></div>
+      <div class="grid" id="grid" aria-label="Danh sách sản phẩm" aria-busy="true"></div>
+      <div class="empty" id="emptyState" style="display:none"><strong>Không tìm thấy sản phẩm phù hợp</strong><span>Thử đổi từ khóa hoặc bỏ bộ lọc “Chỉ hiện còn hàng”.</span><button type="button" id="emptyResetFilters" class="catalog-tool-button">Xem tất cả sản phẩm</button></div>
+      <nav id="catalogPagination" class="catalog-pagination" aria-label="Trang sản phẩm"></nav>
+    </main>
+    <button type="button" id="reorderBackdrop" class="reorder-backdrop" aria-label="Đóng gợi ý nhập hàng" hidden></button>
+    <div class="reorder-dock">
+      <button type="button" id="reorderDesktopToggle" class="reorder-dock-toggle" aria-controls="reorderPanel" aria-expanded="false" aria-label="Mở gợi ý nhập hàng" title="Mở gợi ý nhập hàng"><span class="reorder-toggle-arrow" aria-hidden="true">‹</span><span class="reorder-rail-label" aria-hidden="true">Gợi ý nhập hàng</span></button>
+    <aside id="reorderPanel" class="reorder-panel" aria-labelledby="reorderPanelTitle" hidden>
+      <button type="button" id="reorderMobileClose" class="reorder-mobile-close" aria-label="Đóng">×</button>
+      <section class="reorder-intro"><h2 id="reorderPanelTitle">Gợi ý nhập hàng</h2><p>Dựa trên tồn kho hiện tại và lượng bán trung bình để dự trữ trong 2 tháng.</p><span id="reorderMobileCount"></span></section>
+      <section class="reorder-list-card"><div class="reorder-tools"><input id="reorderSearch" type="search" placeholder="Tìm sản phẩm cần nhập…" autocomplete="off" aria-label="Tìm trong danh sách cần nhập"></div><div id="reorderList" class="reorder-list" aria-live="polite"><div class="reorder-loading">Đang tính mức dự trữ…</div></div></section>
+      <section class="promotion-suggestion-card" aria-labelledby="promotionSuggestionTitle"><div class="promotion-suggestion-intro"><h2 id="promotionSuggestionTitle">Ưu đãi đang áp dụng</h2><a href="{{ url_for('promotion_catalog') }}">Xem tất cả khuyến mãi →</a></div><div id="promotionSuggestionList" class="promotion-suggestion-list" aria-live="polite"></div></section>
+    </aside>
+    </div>
+  </div>
 
   <!-- =========================================================
        PRODUCT MODAL
@@ -479,7 +198,7 @@
       class="footer-star"
       aria-hidden="true"
     >
-      🎃
+
     </span>
 
     <span>
@@ -528,7 +247,7 @@
 ========================================================= -->
 <script>window.CATALOG_CACHE_VERSION = {{ catalog_cache_version|tojson }};</script>
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=38"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=42"></script>
 {% else %}
 <script>
   setInterval(async () => {

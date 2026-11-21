@@ -1,6 +1,6 @@
 """Database connection settings shared by local and serverless app startup."""
 from sqlalchemy.engine import make_url
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, QueuePool
 
 
 def database_connection_settings(raw_url, env, is_vercel=False):
@@ -24,7 +24,12 @@ def database_connection_settings(raw_url, env, is_vercel=False):
     is_supabase_pooler = (url.host or "").lower().endswith(".pooler.supabase.com")
     if is_vercel and is_supabase_pooler and url.port in (None, 5432):
         url = url.set(port=6543)
-    if is_vercel or is_supabase_pooler or override_host:
+    if not is_vercel and is_supabase_pooler and url.port == 6543:
+        # Reuse a few local TLS connections. Transaction pooling releases server
+        # connections after each transaction; session-mode clients stay unpooled.
+        options.update(poolclass=QueuePool, pool_size=2, max_overflow=2,
+                       pool_timeout=15, pool_recycle=300)
+    elif is_vercel or is_supabase_pooler or override_host:
         # The external pooler owns pooling. Do not reserve idle clients in each
         # Vercel instance, including when no SUPABASE_POOLER_HOST override exists.
         options["poolclass"] = NullPool

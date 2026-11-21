@@ -7,8 +7,10 @@ The 100 MiB budget includes these retained blobs, not just current references.
 import hashlib
 import re
 import warnings
+from collections import OrderedDict
 from datetime import datetime
 from io import BytesIO
+from threading import Lock
 from urllib.parse import quote, urlsplit
 
 from flask import Response, request
@@ -23,6 +25,14 @@ MAX_THUMB_BYTES = 50 * 1024
 IMAGE_STORAGE_BUDGET = 100 * 1024 * 1024
 IMAGE_STORE_LOCK = 718304251
 MEDIA_PATTERN = re.compile(r"^/media/products/([a-f0-9]{64})/(full|thumb)\.webp$")
+# Image URLs are content addressed: replacing an image creates a different URL.
+# Keep frequently viewed bytes close to the app instead of reading the remote
+# database on every browser cache miss. Bound both bytes and entry overhead.
+IMAGE_RESPONSE_CACHE_BYTES = 32 * 1024 * 1024
+IMAGE_RESPONSE_CACHE_ENTRIES = 512
+_image_response_cache = OrderedDict()
+_image_response_cache_bytes = 0
+_image_response_cache_lock = Lock()
 
 image_metadata = MetaData()
 product_images = Table(
@@ -139,19 +149,64 @@ def store_product_image(db, prepared):
     return f"/media/products/{digest}/full.webp"
 
 
+def _cached_image_bytes(key):
+    with _image_response_cache_lock:
+        data = _image_response_cache.get(key)
+        if data is not None:
+            _image_response_cache.move_to_end(key)
+        return data
+
+
+def _remember_image_bytes(key, data):
+    global _image_response_cache_bytes
+    if len(data) > IMAGE_RESPONSE_CACHE_BYTES or IMAGE_RESPONSE_CACHE_ENTRIES < 1:
+        return
+    with _image_response_cache_lock:
+        previous = _image_response_cache.pop(key, None)
+        if previous is not None:
+            _image_response_cache_bytes -= len(previous)
+        _image_response_cache[key] = data
+        _image_response_cache_bytes += len(data)
+        while (_image_response_cache_bytes > IMAGE_RESPONSE_CACHE_BYTES
+               or len(_image_response_cache) > IMAGE_RESPONSE_CACHE_ENTRIES):
+            _, evicted = _image_response_cache.popitem(last=False)
+            _image_response_cache_bytes -= len(evicted)
+
+
+def _clear_image_response_cache():
+    """Release cached bytes, including retained engine references."""
+    global _image_response_cache_bytes
+    with _image_response_cache_lock:
+        _image_response_cache.clear()
+        _image_response_cache_bytes = 0
+
+
 def product_image_response(db, digest, variant):
     if not re.fullmatch(r"[a-f0-9]{64}", digest) or variant not in ("full", "thumb"):
         return Response(status=404, headers={"Cache-Control": "no-store"})
     size_column = product_images.c.full_size if variant == "full" else product_images.c.thumb_size
-    size = db.execute(select(size_column).where(product_images.c.digest == digest)).scalar()
-    if size is None:
-        return Response(status=404, headers={"Cache-Control": "no-store"})
     etag = f"{digest}-{variant}"
     not_modified = request.if_none_match.contains_weak(etag)
-    body = b""
-    if request.method != "HEAD" and not not_modified:
-        column = product_images.c.full_data if variant == "full" else product_images.c.thumb_data
-        body = bytes(db.execute(select(column).where(product_images.c.digest == digest)).scalar())
+    needs_body = request.method != "HEAD" and not not_modified
+    # Scope by bind so an image read from one database cannot prove that it
+    # exists in another (including isolated test databases).
+    cache_key = (db.get_bind(), digest, variant)
+    cached_data = _cached_image_bytes(cache_key)
+    if cached_data is not None:
+        size = len(cached_data)
+        body = cached_data if needs_body else b""
+    else:
+        columns = [size_column]
+        if needs_body:
+            columns.append(product_images.c.full_data if variant == "full" else product_images.c.thumb_data)
+        # One round trip for cold image requests; HEAD/304 never read image bytes.
+        row = db.execute(select(*columns).where(product_images.c.digest == digest)).first()
+        if row is None:
+            return Response(status=404, headers={"Cache-Control": "no-store"})
+        size = row[0]
+        body = bytes(row[1]) if needs_body else b""
+        if needs_body:
+            _remember_image_bytes(cache_key, body)
     response = Response(body, status=304 if not_modified else 200, mimetype="image/webp")
     if not not_modified:
         response.content_length = size

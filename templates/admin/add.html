@@ -1,0 +1,25 @@
+    <section class="panel">
+      <h2 class="icon-title"><span class="module-icon"><i data-lucide="plus"></i></span>Thêm sản phẩm mới</h2>
+      <p class="hint">Mỗi màu nên là một mã sản phẩm riêng để quản lý tồn kho chính xác.</p>
+
+      <form method="POST" action="{{ url_for('admin_add_product') }}" class="grid-form" enctype="multipart/form-data">
+        <label>Mã hàng hóa<input name="code" placeholder="Mã hàng hóa" required></label>
+        <label>Tên mẫu xe<input name="model" placeholder="Tên mẫu xe" required></label>
+        <label>Màu sản phẩm<input name="color" placeholder="Màu sản phẩm"></label>
+        <label>Loại xe<input name="category" placeholder="Loại xe" list="cat-list"></label>
+
+        <label class="wide">Ảnh sản phẩm<input type="file" name="image" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG hoặc WebP, tối đa 4 MB</small></label>
+
+        <datalist id="cat-list">
+          {% for c in categories %}
+            <option value="{{ c }}">
+          {% endfor %}
+        </datalist>
+
+        <label>Tồn kho<input name="stock" type="number" inputmode="numeric" placeholder="Tồn kho" value="0"></label>
+        <label>Đã đặt<input name="reserved" type="number" inputmode="numeric" placeholder="Đã đặt" value="0"></label>
+        <label>Giá đại lý<input name="price" type="number" inputmode="numeric" step="1000" placeholder="Giá đại lý"></label>
+        <label>Giá lẻ<input name="retail_price" type="number" inputmode="numeric" step="1000" placeholder="Giá lẻ"></label>
+        <button type="submit" class="add-btn"><i data-lucide="plus"></i>Thêm sản phẩm</button>
+      </form>
+    </section>

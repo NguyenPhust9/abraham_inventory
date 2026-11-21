@@ -1,0 +1,17 @@
+<aside class="inventory-ai-panel" id="inventoryAiPanel" aria-label="Trợ lý tồn kho" hidden>
+  <header class="inventory-ai-header">
+    <div><span class="inventory-ai-avatar"><img src="{{ url_for('static', filename='favicon.png') }}" alt=""></span><span><strong>Trợ lý Abraham</strong><small>Dữ liệu trực tiếp từ hệ thống</small></span></div>
+    <button type="button" id="inventoryAiClose" aria-label="Đóng trợ lý"><i data-lucide="x"></i></button>
+  </header>
+  <div class="inventory-ai-messages" id="inventoryAiMessages" aria-live="polite">
+    <div class="inventory-ai-message assistant">Chào bạn! Hãy hỏi tôi về tồn kho, số đã giữ, giá hoặc khuyến mãi của một mã hàng.</div>
+  </div>
+  <div class="inventory-ai-suggestions">
+    <button type="button" data-question="Mã 3dao20 hiện còn tồn bao nhiêu?">Tồn mã 3dao20</button>
+    <button type="button" data-question="Những mã hàng nào đang có thể bán bằng 0?">Mã đã hết hàng</button>
+  </div>
+  <form class="inventory-ai-form" id="inventoryAiForm">
+    <textarea id="inventoryAiInput" maxlength="1000" rows="1" placeholder="Nhập câu hỏi về hệ thống…" required></textarea>
+    <button type="submit" aria-label="Gửi câu hỏi"><i data-lucide="send"></i></button>
+  </form>
+</aside>

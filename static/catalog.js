@@ -32,11 +32,19 @@ const COLOR_MAP = [
 let PRODUCTS = [];
 let catalogCategories = [];
 let catalogPage = 0;
-let catalogLoadedPages = 0;
+let catalogTotalAvailable = 0;
 let catalogHasMore = false;
 let catalogTotalGroups = 0;
-let catalogPageLoadPromise = null;
-let catalogFullLoadPromise = null;
+let catalogController = null;
+let catalogRequestId = 0;
+let catalogSearchTimer = null;
+let catalogBusy = false;
+let catalogFailed = false;
+let searchComposing = false;
+let promotionSuggestions = [];
+let promotionSuggestionsLoadedAt = 0;
+let promotionSuggestionsLoading = false;
+let warningController = null;
 let catalogLastLoadedAt = 0;
 let catalogCacheVersion = String(window.CATALOG_CACHE_VERSION || '0');
 let REORDER_ITEMS = [];
@@ -84,6 +92,46 @@ const els = {
   zoomClose: document.getElementById('imageZoomClose'),
 };
 
+// Load one nearby row ahead; let this observer be the only lazy-loading gate.
+function loadCatalogImage(img) {
+  if (!img.dataset.catalogSrc) return;
+  img.loading = 'eager';
+  img.fetchPriority = 'auto';
+  img.src = img.dataset.catalogSrc;
+  img.removeAttribute('data-catalog-src');
+}
+
+const catalogImageObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    const img = entry.target;
+    loadCatalogImage(img);
+    catalogImageObserver.unobserve(img);
+  }
+}, {rootMargin: '480px 0px'}) : null;
+
+function loadProductDetailImage(image, previewUrl, fullUrl) {
+  const holder = image.parentElement;
+  image.dataset.fullSrc = fullUrl;
+  image.fetchPriority = 'high';
+  image.src = previewUrl || fullUrl;
+  if (!previewUrl || previewUrl === fullUrl) return;
+
+  // Reuse the card's cached photo immediately, then swap in the decoded full image.
+  // Do not replace a newer product or leave a blank image when the full request fails.
+  const fullImage = new Image();
+  fullImage.fetchPriority = 'high';
+  fullImage.decoding = 'async';
+  fullImage.onload = async () => {
+    try { await fullImage.decode(); } catch { return; }
+    if (!holder.isConnected || image.dataset.fullSrc !== fullUrl) return;
+    image.src = fullUrl;
+    // A failed thumbnail may have been replaced by the shared missing-photo handler.
+    if (!image.isConnected) holder.replaceChildren(image);
+  };
+  fullImage.src = fullUrl;
+}
+
 let audioContext = null;
 let imageZoom = 1;
 let zoomDrag = null;
@@ -126,12 +174,12 @@ function setImageZoom(value) {
   layoutImageZoom();
 }
 
-function openImageZoom(imageUrl, title, group) {
+function openImageZoom(imageUrl, title, group, previewUrl) {
   if (!imageUrl || !els.zoomDialog) return;
   zoomGroup = group;
   els.zoomStage.style.width = '0px';
   els.zoomStage.style.height = '0px';
-  els.zoomImage.src = imageUrl;
+  loadProductDetailImage(els.zoomImage, previewUrl, imageUrl);
   els.zoomImage.alt = title;
   els.zoomTitle.textContent = title;
   els.zoomDialog.showModal();
@@ -437,7 +485,7 @@ function inventoryWarnings(items) {
     .sort((a, b) => inventoryAge(b.received_date) - inventoryAge(a.received_date));
 }
 
-function updateInventoryWarnings() {
+function updateInventoryWarnings(items = visibleInventory) {
   const button = document.getElementById('inventoryWarningButton');
   const dialog = document.getElementById('inventoryWarningDialog');
   if (!button || !dialog) return;
@@ -446,8 +494,7 @@ function updateInventoryWarnings() {
     if (dialog.open) dialog.close();
     return;
   }
-  const warnings = inventoryWarnings(visibleInventory);
-  button.textContent = `⚠ Cảnh báo quá 90 ngày (${warnings.length})`;
+  const warnings = inventoryWarnings(items);
   const quantity = warnings.reduce((sum, item) => sum + Number(item.available || 0), 0);
   document.getElementById('inventoryWarningSummary').textContent =
     `${warnings.length} dòng tồn kho · ${quantity.toLocaleString('vi-VN')} chiếc còn hàng quá 90 ngày, theo bộ lọc hiện tại.`;
@@ -457,20 +504,6 @@ function updateInventoryWarnings() {
     <td data-label="Ngày nhập">${escapeHTML(formatInventoryDate(item.received_date))}</td>
     <td data-label="Lưu kho">${inventoryAgeBadge(item.received_date)}</td><td data-label="Còn hàng">${Number(item.available || 0).toLocaleString('vi-VN')}</td></tr>
   `).join('') : '<tr><td colspan="7" class="inventory-warning-empty">Không có lô còn hàng quá 90 ngày trong bộ lọc hiện tại.</td></tr>';
-}
-
-function matchesSearch(product, keyword) {
-  if (!keyword) return true;
-
-  const searchText = [
-    product.model,
-    product.original_model,
-    product.code,
-    product.color,
-    product.category
-  ].map(normalizeText).join(' ');
-
-  return searchText.includes(keyword);
 }
 
 function buildShareText(group) {
@@ -623,8 +656,7 @@ function openProductModal(group) {
   els.modalSub.textContent = group.category || 'Chưa phân loại';
 
   const imageHTML = imgVariant && imgVariant.image_url
-    ? `<img data-product-image class="modal-image" src="${escapeHTML(imgVariant.image_url)}" alt="${escapeHTML(group.model)}" decoding="async">
-       <button type="button" class="modal-zoom-btn" id="modalZoomBtn" aria-label="Phóng to ảnh ${escapeHTML(group.model)}">⌕ Phóng to</button>`
+    ? `<img data-product-image class="modal-image" alt="${escapeHTML(group.model)}" decoding="async">`
     : `<div class="modal-no-image">Chưa có ảnh sản phẩm</div>`;
 
   const variantRows = variants.map(v => {
@@ -701,6 +733,7 @@ function openProductModal(group) {
       </div>
 
       <div class="copy-pair-row">
+        ${imgVariant && imgVariant.image_url ? `<button type="button" class="modal-zoom-btn" id="modalZoomBtn" aria-label="Phóng to ảnh ${escapeHTML(group.model)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg>Phóng to</button>` : ''}
         <button type="button" class="copy-all-btn" id="copyProductImageBtn">
           Copy ảnh
         </button>
@@ -727,7 +760,8 @@ function openProductModal(group) {
   const copyImageBtn = document.getElementById('copyProductImageBtn');
   const zoomBtn = document.getElementById('modalZoomBtn');
   if (zoomBtn) {
-    zoomBtn.addEventListener('click', () => openImageZoom(imgVariant.image_url, group.model, group));
+    loadProductDetailImage(els.modalBody.querySelector('.modal-image'), imgVariant.image_thumb_url, imgVariant.image_url);
+    zoomBtn.addEventListener('click', () => openImageZoom(imgVariant.image_url, group.model, group, imgVariant.image_thumb_url));
   }
 
   if (copyImageBtn) {
@@ -751,61 +785,33 @@ function openProductModal(group) {
 }
 
 function render() {
-  const q = normalizeText(els.search.value);
-
-  const filtered = PRODUCTS.filter(p => {
-    const matchesPromotion = !isPromotionCatalog || (p.promotion_active && p.promotion_tag === 'discount');
-    const matchesCat = activeCat === 'Tất cả' || p.category === activeCat;
-    const matchesQ = matchesSearch(p, q);
-    const matchesStock = !onlyInStock || Number(p.available || 0) > 0;
-    const price = Number(p.price);
-    const hasPrice = Number.isFinite(price) && price > 0;
-    const matchesMinPrice = minPrice === null || (hasPrice && price >= minPrice);
-    const matchesMaxPrice = maxPrice === null || (hasPrice && price <= maxPrice);
-
-    return matchesPromotion && matchesCat && matchesQ && matchesStock && matchesMinPrice && matchesMaxPrice;
-  });
-
+  if (catalogBusy || catalogFailed) return;
+  catalogImageObserver?.disconnect();
+  // The server filters and sorts the complete inventory before pagination.
+  const filtered = PRODUCTS;
   visibleInventory = filtered;
-  updateInventoryWarnings();
+  const warningButton = document.getElementById('inventoryWarningButton');
+  if (warningButton) warningButton.hidden = !showLotDetails;
   const groups = groupByModel(filtered);
-
-  if (sortStockOrder === 'asc' || sortStockOrder === 'desc') {
-    groups.sort((a, b) => {
-      const stockA = getGroupAvailable(a.variants);
-      const stockB = getGroupAvailable(b.variants);
-
-      return sortStockOrder === 'asc' ? stockA - stockB : stockB - stockA;
-    });
-  } else if (sortStockOrder === 'price-asc' || sortStockOrder === 'price-desc') {
-    groups.sort((a, b) => {
-      const priceA = Number(getGroupPrice(a.variants) || 0);
-      const priceB = Number(getGroupPrice(b.variants) || 0);
-
-      return sortStockOrder === 'price-asc' ? priceA - priceB : priceB - priceA;
-    });
-  } else {
-    groups.sort((a, b) => a.model.localeCompare(b.model, 'vi'));
-  }
 
   els.grid.innerHTML = '';
   els.empty.style.display = groups.length ? 'none' : 'block';
 
-  const totalAvail = filtered.reduce((sum, p) => {
-    return sum + Number(p.available || 0);
-  }, 0);
-
-  const rowCount = groups.reduce((sum, group) => sum + displayVariants(group.variants).length, 0);
-  const rowLabel = showLotDetails && filtered.some(p => p.row_id) ? 'dòng tồn kho' : 'biến thể màu';
-  const groupCountLabel = catalogHasMore && !q && activeCat === 'Tất cả' && !onlyInStock && minPrice === null && maxPrice === null
-    ? `${groups.length} / ${catalogTotalGroups}`
-    : String(groups.length);
-  els.summaryText.textContent = `${groupCountLabel} mẫu xe · ${rowCount} ${rowLabel}`;
-  els.summaryStock.textContent = `${totalAvail.toLocaleString('vi-VN')} chiếc sẵn sàng`;
+  els.summaryText.textContent = `${catalogTotalGroups.toLocaleString('vi-VN')} mẫu xe${catalogTotalGroups > groups.length ? ` · Đang xem ${catalogPage * 24 + 1}–${catalogPage * 24 + groups.length}` : ''}`;
+  els.summaryStock.textContent = `${catalogTotalAvailable.toLocaleString('vi-VN')} chiếc sẵn sàng theo bộ lọc`;
 
   for (const g of groups) {
     const card = document.createElement('div');
     card.className = 'card';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Xem ${g.model}`);
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openProductModal(g);
+      }
+    });
 
     const imgVariant = getGroupImage(g.variants);
     const groupPrice = getGroupPrice(g.variants);
@@ -818,7 +824,7 @@ function render() {
         ${
           imgVariant && imgVariant.image_url
             ? `<div class="card-image-stage">
-                <img data-product-image class="card-img" src="${escapeHTML(imgVariant.image_thumb_url || imgVariant.image_url)}" alt="${escapeHTML(g.model)}" loading="lazy" decoding="async">
+                <img data-product-image class="card-img" data-catalog-src="${escapeHTML(imgVariant.image_thumb_url || imgVariant.image_url)}" alt="${escapeHTML(g.model)}" loading="lazy" decoding="async" fetchpriority="low">
               </div>`
             : `<div class="card-image-stage">${productImagePlaceholder()}</div>`
         }
@@ -851,184 +857,231 @@ function render() {
 
     els.grid.appendChild(card);
   }
-  appendLoadMoreButton();
+  for (const img of els.grid.querySelectorAll('img[data-catalog-src]')) {
+    if (catalogImageObserver) catalogImageObserver.observe(img);
+    else loadCatalogImage(img);
+  }
+  renderPagination();
 }
 
-function appendLoadMoreButton() {
-  if (!catalogHasMore) return;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'catalog-load-more';
-  button.textContent = 'Tải thêm sản phẩm';
-  button.style.cssText = 'grid-column:1/-1;justify-self:center;padding:10px 18px;border:1px solid currentColor;border-radius:999px;background:transparent;color:inherit;cursor:pointer';
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    button.textContent = 'Đang tải…';
-    try {
-      await loadCatalogPage(catalogPage + 1, true);
-    } catch (error) {
-      console.error('Could not load more catalog products:', error);
-      button.disabled = false;
-      button.textContent = 'Thử tải thêm';
-    }
-  });
-  els.grid.appendChild(button);
+function renderPagination() {
+  const pagination = document.getElementById('catalogPagination');
+  const pages = Math.ceil(catalogTotalGroups / 24);
+  pagination.replaceChildren();
+  if (pages <= 1) return;
+  const previous = document.createElement('button');
+  previous.type = 'button';
+  previous.textContent = '← Trang trước';
+  previous.disabled = catalogPage === 0 || catalogBusy;
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = 'Trang sau →';
+  next.disabled = !catalogHasMore || catalogBusy;
+  const label = document.createElement('span');
+  label.textContent = `${catalogPage + 1} / ${pages}`;
+  for (const [button, page] of [[previous, catalogPage - 1], [next, catalogPage + 1]]) {
+    button.addEventListener('click', async () => {
+      if (await loadCatalogPage(page)) {
+        document.querySelector('.catalog-controls-shell').scrollIntoView({block: 'start'});
+      }
+    });
+  }
+  pagination.append(previous, label, next);
 }
 
 function buildPills() {
-  const categories = (catalogCategories.length ? catalogCategories : PRODUCTS.map(p => p.category))
-    .filter(c => {
-      const category = normalizeText(c);
-      return category.startsWith('xe đạp') || category.startsWith('phụ tùng');
-    });
-
-  const cats = [
-    'Tất cả',
-    ...Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b, 'vi'))
-  ];
-
-  els.pills.innerHTML = cats.map(c => {
-    return `
-      <div class="pill ${c === activeCat ? 'active' : ''}" data-cat="${escapeHTML(c)}">
-        ${escapeHTML(c)}
-      </div>
-    `;
-  }).join('');
-
-  els.pills.querySelectorAll('.pill').forEach(el => {
-    el.addEventListener('click', () => {
-      playUISound('click');
-      activeCat = el.dataset.cat;
-
-      els.pills.querySelectorAll('.pill').forEach(p => {
-        p.classList.remove('active');
-      });
-
-      el.classList.add('active');
-
-      render();
-      completeCatalogBeforeFiltering();
+  const cats = ['Tất cả', ...Array.from(new Set(catalogCategories.filter(Boolean))).sort((a, b) => a.localeCompare(b, 'vi'))];
+  const signature = JSON.stringify([cats, activeCat]);
+  if (els.pills.dataset.signature === signature) return;
+  els.pills.dataset.signature = signature;
+  els.pills.innerHTML = cats.map(c => `<button type="button" class="pill ${c === activeCat ? 'active' : ''}" data-cat="${escapeHTML(c)}" aria-pressed="${c === activeCat}">${escapeHTML(c)}</button>`).join('');
+  els.pills.querySelectorAll('.pill').forEach(button => {
+    button.addEventListener('click', () => {
+      activeCat = button.dataset.cat;
+      buildPills();
+      scheduleCatalogSearch(0);
     });
   });
 }
 
-async function loadCatalogPage(page, append) {
-  if (catalogPageLoadPromise) return catalogPageLoadPromise;
+function catalogParams(page = 0) {
+  const params = new URLSearchParams({page: String(page), page_size: '24', v: catalogCacheVersion});
+  const q = els.search.value.trim();
+  if (q) params.set('q', q);
+  if (activeCat !== 'Tất cả') params.set('category', activeCat);
+  if (onlyInStock) params.set('only_stock', '1');
+  if (sortStockOrder) params.set('sort', sortStockOrder);
+  if (minPrice !== null) params.set('min_price', String(minPrice));
+  if (maxPrice !== null) params.set('max_price', String(maxPrice));
+  if (isPromotionCatalog) params.set('promotion', 'discount');
+  return params;
+}
 
-  catalogPageLoadPromise = (async () => {
-    const params = new URLSearchParams({
-      page: String(page),
-      page_size: '24',
-      v: catalogCacheVersion,
-    });
-    const response = await fetch(`/api/products/${priceType}?${params.toString()}`);
+function setCatalogBusy(busy) {
+  catalogBusy = busy;
+  els.grid.setAttribute('aria-busy', String(busy));
+  els.grid.inert = busy;
+  const status = document.getElementById('catalogStatus');
+  status.hidden = !busy;
+  if (busy) {
+    status.textContent = 'Đang tìm sản phẩm…';
+    els.empty.style.display = 'none';
+  }
+  document.querySelectorAll('#catalogPagination button').forEach(button => {button.disabled = busy;});
+}
+
+function scheduleCatalogSearch(delay = 220) {
+  clearTimeout(catalogSearchTimer);
+  document.getElementById('inventoryWarningDialog')?.close();
+  // Invalidate immediately, even during debounce, so an older response cannot win.
+  catalogRequestId += 1;
+  catalogController?.abort();
+  setCatalogBusy(true);
+  const filterCount = Number(minPrice !== null) + Number(maxPrice !== null);
+  document.getElementById('filterCount').textContent = filterCount ? `(${filterCount})` : '';
+  catalogSearchTimer = setTimeout(() => loadCatalogPage(0), delay);
+}
+
+async function loadCatalogPage(page = 0) {
+  clearTimeout(catalogSearchTimer);
+  catalogController?.abort();
+  const controller = new AbortController();
+  catalogController = controller;
+  const requestId = ++catalogRequestId;
+  const params = catalogParams(page);
+  setCatalogBusy(true);
+  const timeout = setTimeout(() => controller.abort('timeout'), 20000);
+  try {
+    const response = await fetch(`/api/products/${priceType}?${params}`, {signal: controller.signal, cache: 'no-store', priority: 'high'});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     if (priceType === 'retail' && response.headers.get('X-Retail-Prices-Visible') !== '1') {
       window.location.reload();
-      return;
+      return false;
     }
-
     const data = await response.json();
+    if (requestId !== catalogRequestId) return false;
     if (!Array.isArray(data)) throw new Error('Invalid catalog response');
     catalogCacheVersion = response.headers.get('X-Catalog-Cache-Version') || catalogCacheVersion;
-    const nextItems = data.map(prepareProduct);
-    if (append) {
-      const merged = new Map(PRODUCTS.map(item => [item.row_id || item.id, item]));
-      nextItems.forEach(item => merged.set(item.row_id || item.id, item));
-      PRODUCTS = Array.from(merged.values());
-    } else {
-      PRODUCTS = nextItems;
-      catalogLoadedPages = 0;
-    }
+    PRODUCTS = data.map(prepareProduct);
+    catalogFailed = false;
     try {
       const categories = JSON.parse(response.headers.get('X-Catalog-Categories') || '[]');
       catalogCategories = Array.isArray(categories) ? categories : [];
-    } catch (_error) {
-      catalogCategories = [];
-    }
+    } catch (_error) { catalogCategories = []; }
     catalogPage = page;
-    catalogLoadedPages = Math.max(catalogLoadedPages, page + 1);
     catalogHasMore = response.headers.get('X-Catalog-Has-More') === '1';
     catalogTotalGroups = Number(response.headers.get('X-Catalog-Total-Groups') || 0);
+    catalogTotalAvailable = Number(response.headers.get('X-Catalog-Total-Available') || 0);
+    catalogLastLoadedAt = Date.now();
+    setCatalogBusy(false);
     buildPills();
     render();
-    renderPromotionSuggestions();
-  })();
-
-  try {
-    return await catalogPageLoadPromise;
-  } finally {
-    catalogPageLoadPromise = null;
-  }
-}
-
-function completeCatalogBeforeFiltering() {
-  if (!catalogHasMore) return;
-  loadAllCatalogPages()
-    .then(render)
-    .catch(error => console.error('Could not load all catalog products:', error));
-}
-
-async function loadAllCatalogPages() {
-  if (catalogFullLoadPromise) return catalogFullLoadPromise;
-  catalogFullLoadPromise = (async () => {
-    while (catalogHasMore) {
-      await loadCatalogPage(catalogPage + 1, true);
-    }
-  })();
-  try {
-    await catalogFullLoadPromise;
-  } finally {
-    catalogFullLoadPromise = null;
-  }
-}
-
-async function load(includeReorderSuggestions = true) {
-  try {
-    const pagesToReload = Math.max(catalogLoadedPages, 1);
-    await loadCatalogPage(0, false);
-    for (let page = 1; page < pagesToReload && catalogHasMore; page += 1) {
-      await loadCatalogPage(page, true);
-    }
-    if (isPromotionCatalog) await loadAllCatalogPages();
-    catalogLastLoadedAt = Date.now();
-    if (includeReorderSuggestions) loadReorderSuggestions();
+    return true;
   } catch (error) {
-    console.error('Không tải được dữ liệu sản phẩm:', error);
-    els.grid.innerHTML = '';
-    els.empty.style.display = 'block';
-    els.empty.textContent = 'Không tải được dữ liệu sản phẩm.';
+    if (requestId !== catalogRequestId) return false;
+    setCatalogBusy(false);
+    catalogFailed = true;
+    PRODUCTS = [];
+    catalogTotalGroups = catalogTotalAvailable = 0;
+    els.grid.replaceChildren();
+    document.getElementById('catalogPagination').replaceChildren();
+    els.summaryText.textContent = 'Chưa tải được sản phẩm';
+    els.summaryStock.textContent = '';
+    const status = document.getElementById('catalogStatus');
+    status.hidden = false;
+    status.textContent = 'Kết nối bị gián đoạn. Vui lòng thử lại.';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'catalog-tool-button';
+    retry.textContent = 'Thử lại';
+    retry.addEventListener('click', () => loadCatalogPage(page));
+    status.append(retry);
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    if (requestId === catalogRequestId) catalogController = null;
   }
 }
+
+function load() { return loadCatalogPage(catalogPage); }
 
 if (els.search) {
-  els.search.addEventListener('input', () => {
-    render();
-    if (els.search.value.trim()) completeCatalogBeforeFiltering();
+  els.search.addEventListener('compositionstart', () => {
+    searchComposing = true;
+    clearTimeout(catalogSearchTimer);
+    catalogRequestId += 1;
+    catalogController?.abort();
+  });
+  els.search.addEventListener('compositionend', () => { searchComposing = false; scheduleCatalogSearch(); });
+  els.search.addEventListener('input', () => { if (!searchComposing) scheduleCatalogSearch(); });
+  els.search.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); scheduleCatalogSearch(0); }
   });
 }
+if (els.onlyStock) els.onlyStock.addEventListener('change', () => {
+  onlyInStock = els.onlyStock.checked;
+  scheduleCatalogSearch(0);
+});
 
-if (els.onlyStock) {
-  els.onlyStock.addEventListener('change', () => {
-    playUISound('click');
-    onlyInStock = els.onlyStock.checked;
-    render();
-    completeCatalogBeforeFiltering();
-  });
+function resetCatalogFilters() {
+  els.search.value = '';
+  activeCat = 'Tất cả';
+  onlyInStock = false;
+  els.onlyStock.checked = false;
+  sortStockOrder = '';
+  els.sortStock.value = '';
+  minPrice = maxPrice = null;
+  els.minPrice.value = els.maxPrice.value = '';
+  buildPills();
+  scheduleCatalogSearch(0);
 }
+document.getElementById('resetCatalogFilters').addEventListener('click', resetCatalogFilters);
+document.getElementById('emptyResetFilters').addEventListener('click', resetCatalogFilters);
 
 if (els.lotDetails) {
   els.lotDetails.checked = showLotDetails;
   els.lotDetails.addEventListener('change', () => {
     showLotDetails = els.lotDetails.checked;
+    document.getElementById('inventoryWarningButton').hidden = !showLotDetails;
     render();
   });
 }
 
-document.getElementById('inventoryWarningButton')?.addEventListener('click', () => {
+document.getElementById('inventoryWarningButton')?.addEventListener('click', async () => {
   if (!showLotDetails) return;
-  updateInventoryWarnings();
-  document.getElementById('inventoryWarningDialog').showModal();
+  const dialog = document.getElementById('inventoryWarningDialog');
+  const summary = document.getElementById('inventoryWarningSummary');
+  const rows = document.getElementById('inventoryWarningRows');
+  warningController?.abort();
+  const controller = new AbortController();
+  warningController = controller;
+  summary.textContent = 'Đang kiểm tra các lô quá 90 ngày theo bộ lọc…';
+  rows.replaceChildren();
+  dialog.showModal();
+  const params = catalogParams();
+  params.set('overdue', '1');
+  params.set('page_size', '60');
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const items = [];
+    let page = 0;
+    let hasMore;
+    do {
+      params.set('page', String(page++));
+      const response = await fetch(`/api/products/${priceType}?${params}`, {signal: controller.signal});
+      if (!response.ok) throw new Error('Could not load inventory warnings');
+      items.push(...(await response.json()).map(prepareProduct));
+      hasMore = response.headers.get('X-Catalog-Has-More') === '1';
+    } while (hasMore);
+    if (warningController === controller && dialog.open) updateInventoryWarnings(items);
+  } catch (_error) {
+    if (warningController === controller && dialog.open) summary.textContent = 'Chưa tải được cảnh báo. Đóng và mở lại để thử lại.';
+  } finally { clearTimeout(timeout); }
+});
+
+document.getElementById('inventoryWarningDialog')?.addEventListener('close', () => {
+  warningController?.abort();
+  warningController = null;
 });
 document.getElementById('inventoryWarningClose')?.addEventListener('click', () => {
   document.getElementById('inventoryWarningDialog').close();
@@ -1037,28 +1090,15 @@ document.getElementById('inventoryWarningDialog')?.addEventListener('click', eve
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
-if (els.sortStock) {
-  els.sortStock.addEventListener('change', () => {
-    playUISound('click');
-    sortStockOrder = els.sortStock.value;
-    render();
-    completeCatalogBeforeFiltering();
-  });
-}
-
-if (els.minPrice) {
-  els.minPrice.addEventListener('input', () => {
+if (els.sortStock) els.sortStock.addEventListener('change', () => {
+  sortStockOrder = els.sortStock.value;
+  scheduleCatalogSearch(0);
+});
+for (const input of [els.minPrice, els.maxPrice]) {
+  input?.addEventListener('input', () => {
     minPrice = readPriceFilter(els.minPrice);
-    render();
-    completeCatalogBeforeFiltering();
-  });
-}
-
-if (els.maxPrice) {
-  els.maxPrice.addEventListener('input', () => {
     maxPrice = readPriceFilter(els.maxPrice);
-    render();
-    completeCatalogBeforeFiltering();
+    scheduleCatalogSearch();
   });
 }
 
@@ -1117,7 +1157,7 @@ function renderPromotionSuggestions() {
   const list = document.getElementById('promotionSuggestionList');
   if (!list) return;
 
-  const promotionGroups = groupByModel(PRODUCTS)
+  const promotionGroups = groupByModel(promotionSuggestions)
     .map(group => {
       const promotion = getGroupPromotion(group.variants);
       return promotion ? { group, promotion } : null;
@@ -1178,19 +1218,75 @@ async function loadReorderSuggestions() {
 }
 
 const reorderPanel = document.getElementById('reorderPanel');
-const catalogContentLayout = document.querySelector('.catalog-content-layout');
+const reorderDock = document.querySelector('.reorder-dock');
 const reorderDesktopToggle = document.getElementById('reorderDesktopToggle');
+const catalogContentLayout = document.querySelector('.catalog-content-layout');
+const reorderDesktopMedia = window.matchMedia('(min-width: 1101px)');
 const reorderMobileTrigger = document.getElementById('reorderMobileTrigger');
 const reorderMobileClose = document.getElementById('reorderMobileClose');
 const reorderBackdrop = document.getElementById('reorderBackdrop');
 const reorderSearch = document.getElementById('reorderSearch');
 
-function setReorderPanelOpen(open) {
+function setReorderPanelOpen(open, moveFocus = true) {
   if (!reorderPanel || !reorderMobileTrigger) return;
-  reorderPanel.classList.toggle('mobile-open', open);
-  document.body.classList.toggle('reorder-sheet-open', open);
-  reorderMobileTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const desktop = reorderDesktopMedia.matches;
+  const modalOpen = open && !desktop;
+  reorderPanel.hidden = !open;
+  reorderBackdrop.hidden = !modalOpen;
+  catalogContentLayout.classList.toggle('reorder-collapsed', !open);
+  reorderDock.classList.toggle('is-open', open);
+  reorderPanel.classList.toggle('mobile-open', modalOpen);
+  document.body.classList.toggle('reorder-sheet-open', modalOpen);
+  reorderMobileTrigger.setAttribute('aria-expanded', String(open));
+  reorderDesktopToggle.setAttribute('aria-expanded', String(open));
+  const toggleLabel = open ? 'Thu gọn gợi ý nhập hàng' : 'Mở gợi ý nhập hàng';
+  reorderDesktopToggle.setAttribute('aria-label', toggleLabel);
+  reorderDesktopToggle.title = toggleLabel;
+  reorderDesktopToggle.querySelector('.reorder-toggle-arrow').textContent = open ? '›' : '‹';
+  if (modalOpen) {
+    reorderPanel.setAttribute('role', 'dialog');
+    reorderPanel.setAttribute('aria-modal', 'true');
+  } else {
+    reorderPanel.removeAttribute('role');
+    reorderPanel.removeAttribute('aria-modal');
+  }
+  for (const selector of ['.catalog-controls-shell', '.catalog-main', '.catalog-heading', '.catalog-topbar', '.catalog-branding', '#inventoryAiLauncher', '#inventoryAiPanel']) {
+    document.querySelector(selector).inert = modalOpen;
+  }
+  if (open) {
+    if (modalOpen && moveFocus) reorderMobileClose.focus();
+    if (Date.now() - reorderLastLoadedAt > 300000) loadReorderSuggestions();
+    if (Date.now() - promotionSuggestionsLoadedAt > 300000) loadPromotionSuggestions();
+  } else if (moveFocus) {
+    (desktop ? reorderDesktopToggle : reorderMobileTrigger).focus();
+  }
 }
+
+reorderDesktopToggle?.addEventListener('click', () => setReorderPanelOpen(reorderPanel.hidden));
+reorderDesktopMedia.addEventListener('change', () => setReorderPanelOpen(false, false));
+
+async function loadPromotionSuggestions() {
+  if (promotionSuggestionsLoading) return;
+  promotionSuggestionsLoading = true;
+  const list = document.getElementById('promotionSuggestionList');
+  list.textContent = 'Đang tải khuyến mãi…';
+  try {
+    const response = await fetch(`/api/products/${priceType}?promotion=all&page_size=6`);
+    if (!response.ok) throw new Error('Could not load promotions');
+    promotionSuggestions = (await response.json()).map(prepareProduct);
+    promotionSuggestionsLoadedAt = Date.now();
+    renderPromotionSuggestions();
+  } catch (_error) { list.textContent = 'Chưa tải được khuyến mãi. Mở mục Khuyến mãi để thử lại.'; }
+  finally { promotionSuggestionsLoading = false; }
+}
+
+reorderPanel?.addEventListener('keydown', event => {
+  if (event.key !== 'Tab' || reorderDesktopMedia.matches || reorderPanel.hidden) return;
+  const focusable = Array.from(reorderPanel.querySelectorAll('button, input, a[href]')).filter(el => !el.disabled && el.getClientRects().length);
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+});
 
 if (reorderMobileTrigger) {
   reorderMobileTrigger.addEventListener('click', () => setReorderPanelOpen(true));
@@ -1212,25 +1308,16 @@ if (reorderSearch) {
 }
 
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') setReorderPanelOpen(false);
+  if (event.key === 'Escape' && !reorderPanel.hidden && !document.querySelector('dialog[open]')) setReorderPanelOpen(false);
 });
 
-if (reorderDesktopToggle && catalogContentLayout) {
-  reorderDesktopToggle.addEventListener('click', () => {
-    const collapsed = catalogContentLayout.classList.toggle('reorder-collapsed');
-    reorderDesktopToggle.textContent = collapsed ? '‹' : '›';
-    reorderDesktopToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    reorderDesktopToggle.setAttribute('aria-label', collapsed ? 'Mở gợi ý nhập hàng' : 'Thu gọn gợi ý nhập hàng');
-  });
-}
-
 setInterval(() => {
-  if (document.visibilityState === 'visible' && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
+  if (!reorderPanel.hidden && document.visibilityState === 'visible' && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
     loadReorderSuggestions();
   }
 }, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
+  if (!reorderPanel.hidden && !document.hidden && Date.now() - reorderLastLoadedAt >= 5 * 60 * 1000) {
     loadReorderSuggestions();
   }
 });
@@ -1313,12 +1400,12 @@ document.addEventListener('touchstart', unlockAudio, { once: true, passive: true
 load();
 
 setInterval(() => {
-  if (document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
-    load(false);
+  if (!catalogBusy && document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
+    load();
   }
 }, 300000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
-    load(false);
+  if (!catalogBusy && document.visibilityState === 'visible' && Date.now() - catalogLastLoadedAt >= 5 * 60 * 1000) {
+    load();
   }
 });

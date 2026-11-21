@@ -1,0 +1,11 @@
+<div class="pagination-bar">
+  <span class="result-count">{% if filtered_total %}{{ (page - 1) * per_page + 1 }}–{{ [page * per_page, filtered_total]|min }} trên {{ '{:,}'.format(filtered_total).replace(',', '.') }} mã hàng{% else %}0 mã hàng{% endif %}</span>
+  <nav class="pagination" aria-label="Phân trang">
+    {% if page > 1 %}<a class="page-link" aria-label="Trang trước" href="{{ url_for('admin_dashboard', section=section, page=page-1, q=q, price_type=price_type) }}"><i data-lucide="chevron-left"></i></a>{% else %}<span class="page-link disabled" aria-disabled="true"><i data-lucide="chevron-left"></i></span>{% endif %}
+    {% for num in page_numbers %}
+      {% if not loop.first and num > page_numbers[loop.index0 - 1] + 1 %}<span class="page-ellipsis">…</span>{% endif %}
+      {% if num == page %}<span class="page-link current" aria-current="page">{{ num }}</span>{% else %}<a class="page-link" aria-label="Trang {{ num }}" href="{{ url_for('admin_dashboard', section=section, page=num, q=q, price_type=price_type) }}">{{ num }}</a>{% endif %}
+    {% endfor %}
+    {% if page < total_pages %}<a class="page-link" aria-label="Trang tiếp" href="{{ url_for('admin_dashboard', section=section, page=page+1, q=q, price_type=price_type) }}"><i data-lucide="chevron-right"></i></a>{% else %}<span class="page-link disabled" aria-disabled="true"><i data-lucide="chevron-right"></i></span>{% endif %}
+  </nav>
+</div>

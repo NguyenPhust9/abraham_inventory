@@ -1,0 +1,20 @@
+    <section class="panel" id="nhap-du-lieu">
+      <h2 class="icon-title"><span class="module-icon"><i data-lucide="upload"></i></span>Nhập dữ liệu hàng loạt</h2>
+      <p class="hint">Hỗ trợ Excel/CSV. Trùng mã hàng sẽ cập nhật, mã mới sẽ được thêm.</p>
+
+      <form method="POST" action="{{ url_for('admin_import') }}" enctype="multipart/form-data" class="inline-form">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" aria-label="File sản phẩm Excel hoặc CSV" required>
+        <button type="submit"><i data-lucide="upload"></i>Nhập file</button>
+      </form>
+
+      <hr class="import-divider">
+
+      <h2 class="icon-title"><i data-lucide="badge-dollar-sign"></i>Cập nhật {{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }} nhanh</h2>
+      <p class="hint">Chỉ cập nhật cột giá theo mã hàng, không đổi tên/tồn kho. Nhanh hơn nhiều với file lớn.</p>
+
+      <form method="POST" action="{{ url_for('admin_import_price') }}" enctype="multipart/form-data" class="price-import-form">
+        <input type="hidden" name="price_type" value="{{ price_type }}">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" aria-label="File cập nhật bảng giá" required>
+        <button type="submit" class="price-btn"><i data-lucide="upload"></i>Cập nhật giá</button>
+      </form>
+    </section>

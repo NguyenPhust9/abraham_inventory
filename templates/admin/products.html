@@ -1,0 +1,60 @@
+{% include 'admin/price_tabs.html' %}
+{% if price_type == 'retail' %}
+<section class="retail-visibility-panel">
+  <div><strong>Giá lẻ trên trang khách: {{ 'Đang hiển thị' if retail_visible else 'Đang cập nhật' }}</strong><p class="hint">{{ retail_priced_count }}/{{ total_products }} mã đã có giá lẻ</p></div>
+  <form method="POST" action="{{ url_for('admin_retail_visibility') }}"><input type="hidden" name="enabled" value="{{ '0' if retail_visible else '1' }}"><button type="submit">{{ 'Tạm ẩn giá lẻ' if retail_visible else 'Bật hiển thị giá lẻ' }}</button></form>
+</section>
+{% endif %}
+<section class="panel product-panel" id="san-pham" aria-label="Danh sách sản phẩm">
+  <div class="table-toolbar">
+    <form method="GET" action="{{ url_for('admin_dashboard') }}" id="searchForm" class="product-search" role="search">
+      <input type="hidden" name="price_type" value="{{ price_type }}">
+      <div class="search-input"><i data-lucide="search"></i><input id="productSearch" name="q" type="search" placeholder="Tìm mã, mẫu xe, màu, loại…" value="{{ q }}" aria-label="Tìm sản phẩm" autocomplete="off"></div>
+      <button type="submit">Tìm kiếm</button>
+      {% if q %}<a class="clear-search" href="{{ url_for('admin_dashboard', price_type=price_type) }}">Xóa lọc</a>{% endif %}
+    </form>
+    <a class="button export-products-btn" href="{{ url_for('admin_products_export', q=q, price_type=price_type) }}"><i data-lucide="download"></i>Xuất file</a>
+  </div>
+  <div class="table-wrap" tabindex="0" role="region" aria-label="Bảng sản phẩm, cuộn ngang để xem đủ cột">
+    <table class="product-table">
+      <thead><tr><th scope="col">Mã hàng</th><th scope="col">Sản phẩm / màu</th><th scope="col">Loại</th><th scope="col" class="num">Tồn</th><th scope="col" class="num">Đã đặt</th><th scope="col" class="num">Có thể bán</th><th scope="col" class="num">{{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }}</th><th scope="col" class="action-heading">Thao tác</th></tr></thead>
+      <tbody id="productTableBody">
+      {% for p in products %}
+        {% set img_url = product_image_url(p.image_filename, thumbnail=True) %}
+        <tr data-product-id="{{ p.id }}">
+          <td><span class="product-code">{{ p.code }}</span></td>
+          <td><div class="product-identity">{% if img_url %}<img data-product-image src="{{ img_url }}" alt="" class="thumb" width="44" height="44" loading="lazy" decoding="async">{% else %}<span class="thumb placeholder" role="img" aria-label="Chưa có ảnh"><i data-lucide="bike"></i></span>{% endif %}<span><strong>{{ p.model }}</strong><small>{{ p.color or 'Chưa có màu' }}</small></span></div></td>
+          <td class="category-cell">{{ p.category or 'Chưa phân loại' }}</td>
+          <td class="num" data-label="Tồn">{{ p.stock or 0 }}</td><td class="num muted-text" data-label="Đã đặt">{{ p.reserved or 0 }}</td>
+          <td class="num" data-label="Có thể bán"><span class="stockbadge {{ 'out' if p.available == 0 else ('low' if p.available <= 5 else 'good') }}">{{ p.available }}</span></td>
+          {% set shown_price = p.retail_price if price_type == 'retail' else p.price %}
+          <td class="num price-text" data-label="{{ 'Giá lẻ' if price_type == 'retail' else 'Giá đại lý' }}">{% if shown_price %}{{ '{:,.0f}'.format(shown_price).replace(',', '.') }}<small> ₫</small>{% else %}<span class="muted-text">Liên hệ</span>{% endif %}</td>
+          <td><div class="row-actions"><button type="button" class="edit-btn" data-edit-product="{{ p.id }}" aria-label="Sửa {{ p.code }}"><i data-lucide="pencil"></i>Sửa</button><form method="POST" action="{{ url_for('admin_delete_product', product_id=p.id) }}" data-confirm="Bạn chắc chắn muốn xóa sản phẩm {{ p.code }}?">{% include 'admin/return_context.html' %}<button type="submit" class="icon-button danger" aria-label="Xóa {{ p.code }}" title="Xóa sản phẩm"><i data-lucide="trash-2"></i></button></form></div></td>
+        </tr>
+      {% else %}<tr><td colspan="8"><div class="empty-state"><i data-lucide="search"></i><strong>{{ 'Không tìm thấy sản phẩm' if q else 'Chưa có sản phẩm' }}</strong><p>{{ 'Thử mã hàng, tên xe hoặc màu khác.' if q else 'Thêm sản phẩm mới hoặc nhập file Excel, CSV.' }}</p></div></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'admin/pagination.html' %}
+</section>
+<p class="table-note"><span><span class="status-dot"></span>Có thể bán = tồn kho − đã đặt (tối thiểu 0)</span><span>10 sản phẩm / trang</span></p>
+<datalist id="cat-list">{% for category in categories %}<option value="{{ category }}">{% endfor %}</datalist>
+<script type="application/json" id="editorProducts">{{ editor_products|tojson }}</script>
+<dialog id="productEditor" class="edit-dialog" aria-labelledby="editorTitle" aria-describedby="editorDescription">
+  <div class="modal-head"><div><h2 id="editorTitle">Sửa sản phẩm</h2><p id="editorDescription" class="hint"></p></div><button class="icon-button" type="button" data-close-editor aria-label="Đóng cửa sổ sửa"><i data-lucide="x"></i></button></div>
+  <div class="modal-body">
+    <div class="image-manager"><div id="editorImage" class="editor-preview"></div><span><strong id="editorModel"></strong><small id="editorCode"></small></span><form id="deleteImageForm" method="POST" data-confirm="Gỡ ảnh khỏi sản phẩm này?" hidden>{% include 'admin/return_context.html' %}<button type="submit" class="danger">Xóa ảnh</button></form></div>
+    <form id="productEditForm" method="POST" enctype="multipart/form-data">
+      {% include 'admin/return_context.html' %}<input type="hidden" name="unit">
+      <div class="edit-form-grid">
+        <label>Mã hàng hóa<input name="code" required></label><label>Tên mẫu xe<input name="model" required></label>
+        <label>Màu sản phẩm<input name="color"></label><label>Loại xe<input name="category" list="cat-list"></label>
+        <label>Tồn kho<input name="stock" type="number" inputmode="numeric"></label><label>Đã đặt<input name="reserved" type="number" inputmode="numeric"></label>
+        <label>Giá đại lý<input name="price" type="number" inputmode="numeric" step="1000" placeholder="Liên hệ"></label><label>Giá lẻ<input name="retail_price" type="number" inputmode="numeric" step="1000" placeholder="Liên hệ"></label>
+        <label class="full">Ảnh sản phẩm<input type="file" name="image" accept="image/jpeg,image/png,image/webp"><small>JPG, PNG hoặc WebP, tối đa 4 MB. Ảnh được tự động thu nhỏ và nén.</small></label>
+      </div>
+      <button type="submit" class="image-save-only" id="saveImageOnly"><i data-lucide="image"></i>Lưu riêng ảnh</button>
+    </form>
+  </div>
+  <div class="modal-actions"><button type="button" data-close-editor>Hủy</button><button type="submit" form="productEditForm" class="primary"><i data-lucide="check"></i>Lưu thay đổi</button></div>
+</dialog>

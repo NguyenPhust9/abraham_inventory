@@ -1,0 +1,5 @@
+<nav class="price-tabs" aria-label="Chọn bảng giá quản lý">
+  {% for kind, label in [('dealer', 'Giá đại lý'), ('retail', 'Giá lẻ')] %}
+  <a href="{{ url_for('admin_dashboard', section=section, price_type=kind, q=q) }}" class="{{ 'active' if price_type == kind else '' }}" {% if price_type == kind %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

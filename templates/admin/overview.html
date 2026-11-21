@@ -1,0 +1,51 @@
+  <section class="stats-grid">
+    <div class="stat-card stat-blue">
+
+      <div><div class="stat-label">Mã sản phẩm</div><div class="stat-value">{{ "{:,.0f}".format(total_products).replace(",", ".") }}</div>
+      <div class="stat-caption">Mã sản phẩm đang quản lý</div></div>
+    </div>
+    <div class="stat-card stat-green">
+
+      <div><div class="stat-label">Tồn kho</div><div class="stat-value">{{ "{:,.0f}".format(total_stock).replace(",", ".") }}</div>
+      <div class="stat-caption">Tổng số lượng trong kho</div></div>
+    </div>
+    <div class="stat-card stat-orange">
+
+      <div><div class="stat-label">Có thể bán</div><div class="stat-value">{{ "{:,.0f}".format(total_available).replace(",", ".") }}</div>
+      <div class="stat-caption">Số lượng có thể bán ngay</div></div>
+    </div>
+    <div class="stat-card stat-red">
+
+      <div><div class="stat-label">Sắp hết hàng</div><div class="stat-value">{{ low_stock_count }}</div>
+      <div class="stat-caption">Sản phẩm còn không quá 5 chiếc</div></div>
+    </div>
+  </section>
+
+  <div class="overview-grid" id="ton-kho">
+    <section class="overview-card stock-alert-card">
+      <div class="section-heading"><div><span class="section-heading-icon warning"><i data-lucide="triangle-alert"></i></span><h2>Cảnh báo tồn kho</h2></div><a href="{{ url_for('admin_dashboard') }}">Xem tất cả</a></div>
+      <div class="compact-table-wrap">
+        <table class="compact-table">
+          <thead><tr><th>Mã hàng</th><th>Tên sản phẩm</th><th class="num">Có thể bán</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+          {% for item in low_stock_products %}
+            <tr><td><span class="code-badge">{{ item.code }}</span></td><td>{{ item.model }}</td><td class="num">{{ item.available }}</td><td><span class="stockbadge {{ 'out' if item.available == 0 else 'low' }}">{{ 'Hết hàng' if item.available == 0 else 'Sắp hết' }}</span></td></tr>
+          {% else %}
+            <tr><td colspan="4" class="empty-compact">Không có sản phẩm sắp hết hàng.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overview-card recent-card">
+      <div class="section-heading"><div><span class="section-heading-icon"><i data-lucide="clock-3"></i></span><h2>Cập nhật gần đây</h2></div><span class="section-note">5 sản phẩm mới nhất</span></div>
+      <div class="activity-list">
+      {% for item in recent_products %}
+        <div class="activity-item"><span class="activity-icon"><i data-lucide="refresh-cw"></i></span><span><strong>{{ item.model }}</strong><small>{{ item.code }} · Tồn {{ item.stock or 0 }} · Đã đặt {{ item.reserved or 0 }}</small></span><time>{{ item.updated_at.strftime('%d/%m') }}</time></div>
+      {% else %}
+        <p class="empty-compact">Chưa có dữ liệu cập nhật.</p>
+      {% endfor %}
+      </div>
+    </section>
+  </div>
