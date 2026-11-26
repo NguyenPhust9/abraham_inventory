@@ -2,7 +2,7 @@
 {% block title %}{{ price_label }} | Abraham Bike{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='catalog_29.css') }}?v=64">
-<link rel="stylesheet" href="{{ url_for('static', filename='catalog-workspace.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='catalog-workspace.css') }}?v=8">
 {% endblock %}
 {% block content %}
 <header class="catalog-topbar">
@@ -174,6 +174,7 @@
         <span id="imageZoomTitle" class="image-zoom-title"></span>
         <div class="image-zoom-actions">
           <button type="button" id="imageZoomCopy" aria-label="Sao chép hình ảnh">Copy ảnh</button>
+          <button type="button" id="imageZoomDownload" aria-label="Tải ảnh sản phẩm">Tải ảnh</button>
           <button type="button" id="imageZoomOut" aria-label="Thu nhỏ ảnh">−</button>
           <span id="imageZoomLevel" aria-live="polite">100%</span>
           <button type="button" id="imageZoomIn" aria-label="Phóng to ảnh">+</button>
@@ -247,7 +248,7 @@
 ========================================================= -->
 <script>window.CATALOG_CACHE_VERSION = {{ catalog_cache_version|tojson }};</script>
 {% if price_type != 'retail' or retail_visible %}
-<script src="{{ url_for('static', filename='catalog.js') }}?v=42"></script>
+<script src="{{ url_for('static', filename='catalog.js') }}?v=43"></script>
 {% else %}
 <script>
   setInterval(async () => {

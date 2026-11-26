@@ -87,6 +87,7 @@ const els = {
   zoomViewport: document.getElementById('imageZoomViewport'),
   zoomStage: document.getElementById('imageZoomStage'),
   zoomCopy: document.getElementById('imageZoomCopy'),
+  zoomDownload: document.getElementById('imageZoomDownload'),
   zoomIn: document.getElementById('imageZoomIn'),
   zoomOut: document.getElementById('imageZoomOut'),
   zoomClose: document.getElementById('imageZoomClose'),
@@ -609,6 +610,50 @@ async function copyProductText(group) {
   await copyText(buildShareText(group));
 }
 
+async function downloadProductImage(imageUrl, model, button) {
+  if (!imageUrl || button.disabled) return;
+
+  const label = button.textContent;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  button.disabled = true;
+  button.textContent = 'Đang tải…';
+  button.setAttribute('aria-busy', 'true');
+
+  try {
+    const response = await fetch(imageUrl, { mode: 'cors', signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    if (!blob.size || !blob.type.startsWith('image/')) throw new Error('Ảnh không hợp lệ');
+
+    // Use the full image and export PNG for easy sharing on phones and computers.
+    const pngBlob = await toPngBlob(blob);
+    const filename = String(model || 'san-pham')
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
+      .replace(/[.\s]+$/g, '').trim().slice(0, 120) || 'san-pham';
+    const url = URL.createObjectURL(pngBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Abraham-${filename}.png`;
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      // Give the browser time to begin saving before releasing the image bytes.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  } catch (error) {
+    console.warn('Không tải được ảnh:', error);
+    alert('Không tải được ảnh. Vui lòng kiểm tra kết nối và thử lại.');
+  } finally {
+    clearTimeout(timeout);
+    button.disabled = false;
+    button.textContent = label;
+    button.removeAttribute('aria-busy');
+  }
+}
+
 function toPngBlob(blob) {
   if (blob.type === 'image/png') {
     return Promise.resolve(blob);
@@ -738,13 +783,17 @@ function openProductModal(group) {
           Copy ảnh
         </button>
 
+        <button type="button" class="copy-all-btn" id="downloadProductImageBtn" aria-label="Tải ảnh sản phẩm" ${imgVariant && imgVariant.image_url ? '' : 'disabled'}>
+          Tải ảnh
+        </button>
+
         <button type="button" class="copy-all-btn" id="copyProductTextBtn">
           Copy danh sách
         </button>
       </div>
 
       <div class="modal-note">
-        Gợi ý: bấm "Copy ảnh" dán vào Zalo/Facebook trước, sau đó bấm "Copy danh sách" dán tin nhắn tiếp theo để gửi khách đầy đủ.
+        Gợi ý: bấm "Tải ảnh" để lưu ảnh về máy, hoặc "Copy ảnh" để dán vào Zalo/Facebook. Sau đó bấm "Copy danh sách" để gửi kèm thông tin cho khách.
       </div>
     </div>
   `;
@@ -758,6 +807,11 @@ function openProductModal(group) {
   });
 
   const copyImageBtn = document.getElementById('copyProductImageBtn');
+  const downloadImageBtn = document.getElementById('downloadProductImageBtn');
+  downloadImageBtn.addEventListener('click', event => {
+    event.stopPropagation();
+    downloadProductImage(imgVariant?.image_url, group.model, downloadImageBtn);
+  });
   const zoomBtn = document.getElementById('modalZoomBtn');
   if (zoomBtn) {
     loadProductDetailImage(els.modalBody.querySelector('.modal-image'), imgVariant.image_thumb_url, imgVariant.image_url);
@@ -1329,6 +1383,9 @@ if (els.zoomDialog) {
   els.zoomClose.addEventListener('click', () => els.zoomDialog.close());
   els.zoomCopy.addEventListener('click', () => {
     if (zoomGroup) copyProductImage(zoomGroup);
+  });
+  els.zoomDownload.addEventListener('click', () => {
+    downloadProductImage(els.zoomImage.dataset.fullSrc, els.zoomTitle.textContent, els.zoomDownload);
   });
   els.zoomDialog.addEventListener('close', () => { zoomGroup = null; });
   els.zoomIn.addEventListener('click', () => setImageZoom(imageZoom + .5));
